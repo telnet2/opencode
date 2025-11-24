@@ -245,6 +245,52 @@ Client                                    Server
 - Queue mechanism: `packages/opencode/src/server/tui.ts:13-23`
 - AsyncQueue implementation: `packages/opencode/src/util/queue.ts`
 
+### 4. Streaming Pattern (AI Response Generation)
+
+For AI response generation, streaming works through **SSE events, not HTTP response streaming**.
+
+```
+Client                                    Server
+  │                                         │
+  │──── POST /session/abc/message ────────►│
+  │      { "text": "Explain this code" }   │
+  │      (HTTP request blocks)              │
+  │                                         │
+  │◄─── SSE: message.updated ─────────────│  (status: streaming)
+  │◄─── SSE: message.part.updated ────────│  (text delta: "Let")
+  │◄─── SSE: message.part.updated ────────│  (text delta: " me")
+  │◄─── SSE: message.part.updated ────────│  (text delta: " explain")
+  │◄─── SSE: message.part.updated ────────│  (tool call: Read)
+  │◄─── SSE: message.part.updated ────────│  (tool result)
+  │◄─── SSE: message.part.updated ────────│  (text delta: "This")
+  │◄─── SSE: message.updated ─────────────│  (status: completed)
+  │                                         │
+  │◄─── 200 OK ───────────────────────────│
+  │      { /* complete message */ }         │
+```
+
+**Key Points:**
+1. Client makes POST request to `/session/:id/message`
+2. Server processes AI request using Vercel AI SDK's `streamText()`
+3. As AI generates response, server publishes SSE events:
+   - `message.part.updated` with `delta` field for text chunks
+   - `message.part.updated` for tool calls and results
+   - `message.updated` for status changes
+4. Client receives real-time updates via existing SSE connection
+5. When AI completes, HTTP response returns with final message object
+
+**Why This Design?**
+- Allows single SSE connection for all events (not just AI streaming)
+- Maintains simple request-response semantics for HTTP API
+- Enables multiple clients to observe same session in real-time
+- Batches events efficiently (16ms batching window)
+
+**Implementation Reference:**
+- Processor: `packages/opencode/src/session/processor.ts:49-328`
+- Text delta handling: Line 296-305 (publishes `delta` field)
+- Reasoning delta: Line 73-79
+- Tool call streaming: Line 97-227
+
 ---
 
 ## API Endpoints
@@ -326,7 +372,17 @@ Content-Type: application/json
 }
 ```
 
-**Response:** Streaming response with created assistant message
+**Response:** Returns complete assistant message after processing
+
+**⚠️ Important - Streaming Behavior:**
+While the HTTP response returns after completion, **real-time streaming updates are delivered via SSE events**. As the AI generates its response:
+
+1. Text deltas are sent via `message.part.updated` events with `delta` field
+2. Tool calls are sent as they occur
+3. Client receives incremental updates in real-time through the `/event` SSE stream
+4. HTTP response waits for full completion, then returns final message
+
+See [Streaming Pattern](#streaming-pattern) for details.
 
 #### Abort Session
 
@@ -717,17 +773,28 @@ Message was deleted.
 
 Message part (tool call, text block, etc.) updated.
 
+**For streaming text/reasoning**, includes `delta` field with incremental text chunk.
+
 ```json
 {
   "type": "message.part.updated",
   "properties": {
-    "sessionID": "string",
-    "messageID": "string",
-    "partID": "string",
-    "type": "text" | "tool_use" | "tool_result"
+    "part": {
+      "id": "string",
+      "sessionID": "string",
+      "messageID": "string",
+      "type": "text" | "reasoning" | "tool" | ...,
+      "text": "accumulated text so far",
+      // ... other part-specific fields
+    },
+    "delta": "incremental text chunk"  // Only present during streaming
   }
 }
 ```
+
+**Streaming vs Non-Streaming:**
+- **With `delta`**: Real-time text generation (e.g., `delta: " me"`)
+- **Without `delta`**: Part structure update (e.g., tool call status change)
 
 ##### message.part.removed
 
@@ -1140,21 +1207,35 @@ Content-Type: application/json
 }
 ```
 
-Events emitted during processing:
+Events emitted during processing (showing streaming):
 
 ```
-data: {"type":"message.updated","properties":{"sessionID":"ses_abc123","messageID":"msg_user1","status":"completed"}}
+data: {"type":"message.updated","properties":{"info":{"id":"msg_user1","status":"completed",...}}}
 
-data: {"type":"message.updated","properties":{"sessionID":"ses_abc123","messageID":"msg_asst1","status":"streaming"}}
+data: {"type":"message.updated","properties":{"info":{"id":"msg_asst1","status":"streaming",...}}}
 
-data: {"type":"message.part.updated","properties":{"sessionID":"ses_abc123","messageID":"msg_asst1","partID":"text1","type":"text"}}
+data: {"type":"message.part.updated","properties":{"part":{"id":"text1","type":"text","text":"I"},"delta":"I"}}
 
-data: {"type":"message.part.updated","properties":{"sessionID":"ses_abc123","messageID":"msg_asst1","partID":"tool1","type":"tool_use"}}
+data: {"type":"message.part.updated","properties":{"part":{"id":"text1","type":"text","text":"I'll"},"delta":"'ll"}}
 
-data: {"type":"message.updated","properties":{"sessionID":"ses_abc123","messageID":"msg_asst1","status":"completed"}}
+data: {"type":"message.part.updated","properties":{"part":{"id":"text1","type":"text","text":"I'll analyze"},"delta":" analyze"}}
+
+data: {"type":"message.part.updated","properties":{"part":{"id":"tool1","type":"tool","tool":"Read","state":{"status":"running"}}}}
+
+data: {"type":"message.part.updated","properties":{"part":{"id":"tool1","type":"tool","tool":"Read","state":{"status":"completed","output":"..."}}}}
+
+data: {"type":"message.part.updated","properties":{"part":{"id":"text2","type":"text","text":"The"},"delta":"The"}}
+
+data: {"type":"message.part.updated","properties":{"part":{"id":"text2","type":"text","text":"The bug"},"delta":" bug"}}
+
+data: {"type":"message.updated","properties":{"info":{"id":"msg_asst1","status":"completed",...}}}
 
 data: {"type":"session.idle","properties":{"sessionID":"ses_abc123"}}
 ```
+
+**Note:** Each `message.part.updated` event during text generation includes:
+- `part.text`: Accumulated text so far
+- `delta`: Just the new chunk (for efficient rendering)
 
 ### TUI Command Example
 
