@@ -86,9 +86,36 @@ export const RunCommand = cmd({
         type: "number",
         describe: "port for the local server (defaults to random port if no value provided)",
       })
+      .option("prompt", {
+        type: "string",
+        describe: "custom prompt template (file path or inline text, auto-detected)",
+      })
+      .option("prompt-file", {
+        type: "string",
+        describe: "custom prompt template from file (explicit file mode)",
+      })
+      .option("prompt-inline", {
+        type: "string",
+        describe: "custom prompt template as inline text (explicit inline mode)",
+      })
   },
   handler: async (args) => {
     let message = [...args.message, ...(args["--"] || [])].join(" ")
+
+    // Parse custom prompt from CLI args
+    const getCustomPrompt = () => {
+      if (args.promptInline) {
+        return { type: "inline" as const, value: args.promptInline }
+      }
+      if (args.promptFile) {
+        return { type: "file" as const, value: args.promptFile }
+      }
+      if (args.prompt) {
+        return args.prompt // Auto-detect
+      }
+      return undefined
+    }
+    const customPrompt = getCustomPrompt()
 
     const fileParts: any[] = []
     if (args.file) {
@@ -263,7 +290,11 @@ export const RunCommand = cmd({
               : args.title
             : undefined
 
-        const result = await sdk.session.create({ body: title ? { title } : {} })
+        const body: any = {}
+        if (title) body.title = title
+        if (customPrompt) body.customPrompt = customPrompt
+
+        const result = await sdk.session.create({ body })
         return result.data?.id
       })()
 
@@ -315,7 +346,11 @@ export const RunCommand = cmd({
               : args.title
             : undefined
 
-        const result = await sdk.session.create({ body: title ? { title } : {} })
+        const body: any = {}
+        if (title) body.title = title
+        if (customPrompt) body.customPrompt = customPrompt
+
+        const result = await sdk.session.create({ body })
         return result.data?.id
       })()
 
