@@ -27,10 +27,11 @@ This document describes the architecture for deploying OpenCode as a multi-tenan
 
 1. **[Architecture](./architecture.md)** - System architecture and component design
 2. **[Authentication](./authentication.md)** - User authentication and authorization
-3. **[Storage](./storage.md)** - Data persistence and caching strategies
-4. **[Scaling](./scaling.md)** - Horizontal scaling and deployment patterns
-5. **[Security](./security.md)** - Security controls and compliance
-6. **[API](./api.md)** - API design and versioning
+3. **[Storage](./storage.md)** - Data persistence and caching strategies (PostgreSQL)
+4. **[Storage - MySQL](./storage-mysql.md)** - Alternative MySQL design with BIGINT keys
+5. **[Scaling](./scaling.md)** - Horizontal scaling and deployment patterns
+6. **[Security](./security.md)** - Security controls and compliance
+7. **[API](./api.md)** - API design and versioning
 
 ## High-Level Architecture
 
