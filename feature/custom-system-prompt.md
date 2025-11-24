@@ -2,12 +2,21 @@
 
 ## Executive Summary
 
-This document outlines the design and implementation plan for enabling custom system and initial instruction prompts on a per-session basis. This feature will allow users to create specialized agents (e.g., data analyst, Python expert, security auditor) by providing custom prompt templates when starting a session.
+This document outlines the design and implementation plan for enabling custom system and initial instruction prompts on a per-session basis with template variable interpolation. This feature will allow users to create specialized agents (e.g., data analyst, Python expert, security auditor) by providing custom prompt templates with dynamic variables when starting a session.
+
+**Key Features:**
+- Session-level custom prompt templates (file-based and inline)
+- Template variable interpolation with 17 built-in variables
+- Custom variables via session, config, or environment
+- Auto-detection of primary programming language
+- Git branch awareness
+- Backward compatible with existing sessions
 
 **Status:** Planning
 **Priority:** Medium
-**Complexity:** Medium
+**Complexity:** Medium-High
 **Estimated Files to Modify:** 4-6
+**Estimated LOC:** ~245 (including variable interpolation)
 
 ---
 
@@ -235,6 +244,7 @@ export const Info = z.object({
     type: z.enum(["file", "inline"]),
     value: z.string(),  // File path or inline prompt text
     loadedAt: z.number().optional(),  // Timestamp for cache invalidation
+    variables: z.record(z.string(), z.string()).optional(),  // Custom variables
   }).optional(),
 
   summary: z.object({...}).optional(),
@@ -363,7 +373,260 @@ async function resolveSystemPrompt(input: {
 
 **Note:** Need to pass `sessionID` to `resolveSystemPrompt()` - already available in calling context at line 495.
 
-### 3. Session Creation Logic
+### 3. Template Variable Interpolation
+
+#### Variable Syntax
+
+Templates support **variable interpolation** using the syntax: `${VARIABLE_NAME}`
+
+**Supported variable formats:**
+- `${VAR}` - Simple variable
+- `${VAR:default}` - Variable with default value
+- `${VAR|filter}` - Variable with filter (e.g., `uppercase`, `lowercase`, `capitalize`)
+
+#### Built-in Variables
+
+| Variable | Description | Example Value |
+|----------|-------------|---------------|
+| `${PROJECT_NAME}` | Project directory name | `opencode` |
+| `${PROJECT_PATH}` | Absolute project path | `/home/user/opencode` |
+| `${WORKING_DIR}` | Current working directory | `/home/user/opencode/packages` |
+| `${GIT_BRANCH}` | Current git branch (if git repo) | `main`, `feature/xyz` |
+| `${GIT_REPO}` | Is git repository? | `yes`, `no` |
+| `${PRIMARY_LANGUAGE}` | Detected primary language | `typescript`, `python`, `go` |
+| `${PLATFORM}` | Operating system | `linux`, `darwin`, `win32` |
+| `${DATE}` | Current date | `2024-11-24` |
+| `${TIME}` | Current time | `14:30:00` |
+| `${DATETIME}` | Current date and time | `2024-11-24 14:30:00` |
+| `${USER}` | Current user (if available) | `john` |
+| `${HOSTNAME}` | Machine hostname (if available) | `dev-machine` |
+| `${SESSION_ID}` | Current session ID | `session_abc123` |
+| `${SESSION_TITLE}` | Session title | `Data Analysis Session` |
+| `${AGENT_NAME}` | Agent name (if using agent) | `data-analyst` |
+| `${MODEL_ID}` | LLM model being used | `claude-sonnet-4` |
+| `${OPENCODE_VERSION}` | OpenCode version | `1.2.3` |
+
+#### Custom Variables
+
+Users can define custom variables via:
+
+**1. Session creation:**
+```json
+{
+  "customPrompt": {
+    "type": "file",
+    "value": "analyst.txt",
+    "variables": {
+      "TEAM_NAME": "Data Science",
+      "PROJECT_DOMAIN": "Healthcare Analytics"
+    }
+  }
+}
+```
+
+**2. Config file (`opencode.jsonc`):**
+```jsonc
+{
+  "promptVariables": {
+    "COMPANY_NAME": "Acme Corp",
+    "CODING_STYLE": "functional",
+    "TESTING_FRAMEWORK": "jest"
+  }
+}
+```
+
+**3. Environment variables (prefix: `OPENCODE_VAR_`):**
+```bash
+export OPENCODE_VAR_TEAM_NAME="Data Science"
+export OPENCODE_VAR_DEPLOYMENT_ENV="production"
+```
+
+#### Variable Resolution Order
+
+1. Session-specific variables (highest priority)
+2. Config file variables
+3. Environment variables (`OPENCODE_VAR_*`)
+4. Built-in variables
+5. Default value (if specified in template)
+
+#### Implementation: `SystemPrompt.interpolateVariables()`
+
+**File:** `/packages/opencode/src/session/system.ts`
+
+```typescript
+export async function interpolateVariables(
+  template: string,
+  context: {
+    sessionID: string
+    agent?: Agent.Info
+    model: { providerID: string; modelID: string }
+    customVars?: Record<string, string>
+  }
+): Promise<string> {
+  const session = await Session.get(context.sessionID)
+  const config = await Config.get()
+  const project = Instance.project
+
+  // Build variable map
+  const variables: Record<string, string> = {
+    // Built-in variables
+    PROJECT_NAME: path.basename(Instance.worktree),
+    PROJECT_PATH: Instance.worktree,
+    WORKING_DIR: Instance.directory,
+    GIT_BRANCH: await getGitBranch().catch(() => "unknown"),
+    GIT_REPO: project.vcs === "git" ? "yes" : "no",
+    PRIMARY_LANGUAGE: await detectPrimaryLanguage(),
+    PLATFORM: process.platform,
+    DATE: new Date().toISOString().split("T")[0],
+    TIME: new Date().toTimeString().split(" ")[0],
+    DATETIME: new Date().toISOString().replace("T", " ").split(".")[0],
+    USER: process.env.USER || process.env.USERNAME || "unknown",
+    HOSTNAME: os.hostname(),
+    SESSION_ID: session.id,
+    SESSION_TITLE: session.title,
+    AGENT_NAME: context.agent?.name || "default",
+    MODEL_ID: context.model.modelID,
+    OPENCODE_VERSION: Installation.VERSION,
+  }
+
+  // Merge in order of priority (later overrides earlier)
+  Object.assign(
+    variables,
+    extractEnvVariables(),           // OPENCODE_VAR_*
+    config.promptVariables || {},    // Config file
+    session.customPrompt?.variables || {},  // Session-specific
+    context.customVars || {}         // Inline custom vars
+  )
+
+  // Interpolate: ${VAR}, ${VAR:default}, ${VAR|filter}
+  return template.replace(/\$\{([A-Z_][A-Z0-9_]*)(:[^}]+)?(\|[^}]+)?\}/g, (match, varName, defaultValue, filter) => {
+    let value = variables[varName]
+
+    // Use default if variable not found
+    if (value === undefined && defaultValue) {
+      value = defaultValue.slice(1) // Remove leading ':'
+    }
+
+    // Return original if still not found
+    if (value === undefined) {
+      return match
+    }
+
+    // Apply filter if specified
+    if (filter) {
+      value = applyFilter(value, filter.slice(1)) // Remove leading '|'
+    }
+
+    return value
+  })
+}
+
+function extractEnvVariables(): Record<string, string> {
+  const vars: Record<string, string> = {}
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.startsWith("OPENCODE_VAR_")) {
+      const varName = key.replace("OPENCODE_VAR_", "")
+      vars[varName] = value || ""
+    }
+  }
+  return vars
+}
+
+function applyFilter(value: string, filter: string): string {
+  switch (filter) {
+    case "uppercase": return value.toUpperCase()
+    case "lowercase": return value.toLowerCase()
+    case "capitalize": return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+    default: return value
+  }
+}
+
+async function detectPrimaryLanguage(): Promise<string> {
+  // Count file extensions in project
+  const files = await Ripgrep.tree({ cwd: Instance.directory, limit: 500 })
+  const extensions: Record<string, number> = {}
+
+  for (const line of files.split("\n")) {
+    const ext = path.extname(line).toLowerCase()
+    if (ext) extensions[ext] = (extensions[ext] || 0) + 1
+  }
+
+  // Map extensions to languages
+  const langMap: Record<string, string> = {
+    ".ts": "typescript", ".tsx": "typescript",
+    ".js": "javascript", ".jsx": "javascript",
+    ".py": "python",
+    ".go": "go",
+    ".rs": "rust",
+    ".java": "java",
+    ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp",
+    ".c": "c",
+    ".rb": "ruby",
+    ".php": "php",
+    ".cs": "csharp",
+    ".swift": "swift",
+    ".kt": "kotlin",
+  }
+
+  // Find most common language
+  let maxCount = 0
+  let primaryLang = "unknown"
+  for (const [ext, count] of Object.entries(extensions)) {
+    const lang = langMap[ext]
+    if (lang && count > maxCount) {
+      maxCount = count
+      primaryLang = lang
+    }
+  }
+
+  return primaryLang
+}
+
+async function getGitBranch(): Promise<string> {
+  const result = await Bun.spawn(["git", "branch", "--show-current"], {
+    cwd: Instance.directory,
+    stdout: "pipe",
+  })
+  const output = await new Response(result.stdout).text()
+  return output.trim() || "unknown"
+}
+```
+
+#### Updated `fromSession()` with Interpolation
+
+```typescript
+export async function fromSession(
+  sessionID: string,
+  context: {
+    agent?: Agent.Info
+    model: { providerID: string; modelID: string }
+  }
+): Promise<string | null> {
+  const session = await Session.get(sessionID)
+  if (!session.customPrompt) return null
+
+  let content: string
+
+  if (session.customPrompt.type === "inline") {
+    content = session.customPrompt.value
+  } else if (session.customPrompt.type === "file") {
+    const filePath = resolveTemplatePath(session.customPrompt.value)
+    content = await Bun.file(filePath).text()
+  } else {
+    return null
+  }
+
+  // ✨ NEW: Interpolate variables
+  return await interpolateVariables(content, {
+    sessionID,
+    agent: context.agent,
+    model: context.model,
+    customVars: session.customPrompt.variables,
+  })
+}
+```
+
+### 4. Session Creation Logic
 
 #### Updated `createNext()`
 
@@ -512,6 +775,22 @@ export const create = fn(
 **Complexity:** Low
 **Risk:** Medium (security validation important)
 
+#### Task 1.5: Implement Variable Interpolation
+**File:** `/packages/opencode/src/session/system.ts`
+
+- [ ] Add `interpolateVariables()` function for template variable substitution
+- [ ] Implement built-in variable providers (PROJECT_NAME, GIT_BRANCH, etc.)
+- [ ] Add `detectPrimaryLanguage()` helper function
+- [ ] Add `getGitBranch()` helper function
+- [ ] Implement `extractEnvVariables()` for OPENCODE_VAR_* support
+- [ ] Add filter support (uppercase, lowercase, capitalize)
+- [ ] Update `fromSession()` to call `interpolateVariables()` before returning
+- [ ] Add config schema extension for `promptVariables` in `Config.get()`
+- [ ] Test variable resolution priority order
+
+**Complexity:** Medium
+**Risk:** Low (self-contained feature, no external dependencies)
+
 ### Phase 2: CLI Integration (Priority: Medium)
 
 #### Task 2.1: Add CLI Flag
@@ -610,6 +889,21 @@ export const create = fn(
 }
 ```
 
+**Or with custom variables:**
+```json
+{
+  "customPrompt": {
+    "type": "file",
+    "value": "data-analyst.txt",
+    "variables": {
+      "TEAM_NAME": "Data Science Team",
+      "PROJECT_DOMAIN": "Healthcare Analytics",
+      "FOCUS_AREA": "Patient outcomes prediction"
+    }
+  }
+}
+```
+
 #### `GET /session/:id` (Session Details)
 
 **Response includes new field:**
@@ -620,7 +914,11 @@ export const create = fn(
   "customPrompt": {
     "type": "file",
     "value": "data-analyst.txt",
-    "loadedAt": 1732464000000
+    "loadedAt": 1732464000000,
+    "variables": {
+      "TEAM_NAME": "Data Science Team",
+      "PROJECT_DOMAIN": "Healthcare Analytics"
+    }
   },
   ...
 }
@@ -844,6 +1142,12 @@ export async function fromSession(sessionID: string): Promise<string | null> {
 ```
 You are OpenCode configured as a specialized Data Analyst assistant.
 
+# Project Context
+- Analyzing: ${PROJECT_NAME}
+- Working directory: ${WORKING_DIR}
+- Primary language: ${PRIMARY_LANGUAGE}
+- Date: ${DATE}
+
 # Core Expertise
 - Statistical analysis and hypothesis testing
 - Data cleaning and preprocessing
@@ -881,6 +1185,13 @@ When analyzing data:
 ```
 You are OpenCode configured as a Security Auditor specializing in code security review.
 
+# Project Context
+- Auditing: ${PROJECT_NAME}
+- Primary language: ${PRIMARY_LANGUAGE}
+- Git branch: ${GIT_BRANCH}
+- Platform: ${PLATFORM}
+- Audit date: ${DATE}
+
 # Security Focus Areas
 - OWASP Top 10 vulnerabilities
 - Input validation and sanitization
@@ -912,19 +1223,90 @@ When reviewing code:
 [Base prompt continues...]
 ```
 
+### Example with Custom Variables
+
+**Template file:** `.opencode/prompts/team-analyst.txt`
+
+```
+You are OpenCode configured as a ${TEAM_NAME} analyst.
+
+# Project Context
+- Project: ${PROJECT_NAME}
+- Domain: ${PROJECT_DOMAIN:General Analytics}
+- Focus Area: ${FOCUS_AREA:Data Analysis}
+- Working in: ${WORKING_DIR}
+- Primary Language: ${PRIMARY_LANGUAGE}
+
+# Team Standards
+- Testing Framework: ${TESTING_FRAMEWORK:pytest}
+- Code Style: ${CODING_STYLE:PEP 8}
+
+# Analysis Goals
+Focus on ${FOCUS_AREA} within the ${PROJECT_DOMAIN} domain.
+Ensure all code follows ${TEAM_NAME} best practices.
+
+[Rest of instructions...]
+```
+
+**Usage:**
+
+```bash
+# Set via environment variables
+export OPENCODE_VAR_TEAM_NAME="Data Science Team"
+export OPENCODE_VAR_PROJECT_DOMAIN="Healthcare"
+export OPENCODE_VAR_FOCUS_AREA="Patient Outcomes"
+
+# Start session (variables will be interpolated)
+opencode --prompt team-analyst.txt
+```
+
+**Or via API:**
+
+```json
+{
+  "title": "Healthcare Analysis",
+  "customPrompt": {
+    "type": "file",
+    "value": "team-analyst.txt",
+    "variables": {
+      "TEAM_NAME": "Healthcare Analytics",
+      "PROJECT_DOMAIN": "Medical Records",
+      "FOCUS_AREA": "HIPAA Compliance"
+    }
+  }
+}
+```
+
+**Resulting prompt:**
+
+```
+You are OpenCode configured as a Healthcare Analytics analyst.
+
+# Project Context
+- Project: opencode
+- Domain: Medical Records
+- Focus Area: HIPAA Compliance
+- Working in: /home/user/opencode
+- Primary Language: typescript
+
+# Team Standards
+- Testing Framework: pytest
+- Code Style: PEP 8
+
+# Analysis Goals
+Focus on HIPAA Compliance within the Medical Records domain.
+Ensure all code follows Healthcare Analytics best practices.
+```
+
 ---
 
 ## Future Enhancements
 
 ### Phase 4: Advanced Features (Post-MVP)
 
-1. **Prompt Variables/Interpolation**
-   ```
-   You are analyzing the ${PROJECT_NAME} codebase.
-   Primary language: ${PRIMARY_LANGUAGE}
-   ```
+> **Note:** Template variable interpolation has been moved to Phase 1 (Task 1.5) as a core feature.
 
-2. **Prompt Composition**
+1. **Prompt Composition**
    ```json
    {
      "customPrompt": {
@@ -934,7 +1316,7 @@ When reviewing code:
    }
    ```
 
-3. **Conditional Prompts**
+2. **Conditional Prompts**
    ```json
    {
      "customPrompt": {
@@ -949,16 +1331,16 @@ When reviewing code:
    }
    ```
 
-4. **Prompt Templates Registry**
+3. **Prompt Templates Registry**
    - Community-shared templates
    - Template versioning
    - Template marketplace
 
-5. **Dynamic Prompt Updates**
+4. **Dynamic Prompt Updates**
    - Allow updating session prompt mid-conversation
    - API: `PATCH /session/:id/prompt`
 
-6. **Prompt Analytics**
+5. **Prompt Analytics**
    - Track which prompts lead to better outcomes
    - A/B testing framework
    - Usage statistics
@@ -1096,14 +1478,19 @@ await fetch(`http://localhost:3456/session/${session.id}/message`, {
 | File Path | Lines Modified | Changes |
 |-----------|---------------|---------|
 | `/packages/opencode/src/session/index.ts` | ~50 | Add schema fields, update create() |
-| `/packages/opencode/src/session/system.ts` | ~80 | Add fromSession(), resolveTemplatePath() |
+| `/packages/opencode/src/session/system.ts` | ~180 | Add fromSession(), resolveTemplatePath(), interpolateVariables(), detectPrimaryLanguage(), getGitBranch(), extractEnvVariables(), applyFilter() |
 | `/packages/opencode/src/session/prompt.ts` | ~10 | Update resolveSystemPrompt() |
 | `/packages/opencode/src/server/server.ts` | ~5 | Verify schema validation |
-| **Total Estimated LOC** | **~145** | Core implementation |
+| `/packages/opencode/src/config/config.ts` | ~5 | Add promptVariables field to config schema |
+| **Total Estimated LOC** | **~250** | Core implementation + variable interpolation |
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Last Updated:** 2024-11-24
 **Author:** OpenCode Analysis
 **Status:** Ready for Review
+
+**Changelog:**
+- v2.0: Added template variable interpolation to Phase 1 (17 built-in variables, custom variables support, filters)
+- v1.0: Initial version with basic custom prompt templates
