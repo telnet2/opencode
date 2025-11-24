@@ -300,6 +300,16 @@ export const RunCommand = cmd({
         process.exit(1)
       }
 
+      // Display custom prompt info if one is active
+      if (customPrompt) {
+        const promptLabel = typeof customPrompt === "string"
+          ? customPrompt
+          : customPrompt.type === "file"
+            ? `file: ${customPrompt.value}`
+            : "inline prompt"
+        UI.println(UI.Style.TEXT_INFO_BOLD + "✓  Custom prompt: " + UI.Style.TEXT_DIM + promptLabel)
+      }
+
       const cfgResult = await sdk.config.get()
       if (cfgResult.data && (cfgResult.data.share === "auto" || Flag.OPENCODE_AUTO_SHARE || args.share)) {
         const shareResult = await sdk.session.share({ sessionID }).catch((error) => {
@@ -355,6 +365,16 @@ export const RunCommand = cmd({
         server.stop()
         UI.error("Session not found")
         process.exit(1)
+      }
+
+      // Display custom prompt info if one is active
+      if (customPrompt) {
+        const promptLabel = typeof customPrompt === "string"
+          ? customPrompt
+          : customPrompt.type === "file"
+            ? `file: ${customPrompt.value}`
+            : "inline prompt"
+        UI.println(UI.Style.TEXT_INFO_BOLD + "✓  Custom prompt: " + UI.Style.TEXT_DIM + promptLabel)
       }
 
       const cfgResult = await sdk.config.get()
