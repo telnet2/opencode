@@ -467,6 +467,7 @@ export namespace SessionPrompt {
         modelID: model.info.id,
         agent,
         system: lastUser.system,
+        sessionID: sessionID,
       })
       const tools = await resolveTools({
         agent,
@@ -623,14 +624,23 @@ export namespace SessionPrompt {
     agent: Agent.Info
     providerID: string
     modelID: string
+    sessionID: string
   }) {
     let system = SystemPrompt.header(input.providerID)
     system.push(
-      ...(() => {
+      ...(await (async () => {
         if (input.system) return [input.system]
         if (input.agent.prompt) return [input.agent.prompt]
+
+        // Check for session-level custom prompt
+        const sessionPrompt = await SystemPrompt.fromSession(input.sessionID, {
+          agent: input.agent,
+          model: { providerID: input.providerID, modelID: input.modelID },
+        })
+        if (sessionPrompt) return [sessionPrompt]
+
         return SystemPrompt.provider(input.modelID)
-      })(),
+      })()),
     )
     system.push(...(await SystemPrompt.environment()))
     system.push(...(await SystemPrompt.custom()))
