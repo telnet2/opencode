@@ -26,6 +26,7 @@ import { EOL } from "os"
 import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
+import { PromptsCommand } from "./cli/cmd/prompts"
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
@@ -89,6 +90,7 @@ const cli = yargs(hideBin(process.argv))
   .command(ServeCommand)
   .command(WebCommand)
   .command(ModelsCommand)
+  .command(PromptsCommand)
   .command(StatsCommand)
   .command(ExportCommand)
   .command(ImportCommand)
