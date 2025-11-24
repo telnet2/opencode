@@ -43,7 +43,7 @@ import { Command } from "../command"
 import { $, fileURLToPath } from "bun"
 import { ConfigMarkdown } from "../config/markdown"
 import { SessionSummary } from "./summary"
-import { NamedError } from "@/util/error"
+import { NamedError } from "@opencode-ai/util/error"
 import { fn } from "@/util/fn"
 import { SessionProcessor } from "./processor"
 import { TaskTool } from "@/tool/task"
@@ -467,6 +467,7 @@ export namespace SessionPrompt {
         modelID: model.info.id,
         agent,
         system: lastUser.system,
+        sessionID: sessionID,
       })
       const tools = await resolveTools({
         agent,
@@ -623,14 +624,23 @@ export namespace SessionPrompt {
     agent: Agent.Info
     providerID: string
     modelID: string
+    sessionID: string
   }) {
     let system = SystemPrompt.header(input.providerID)
     system.push(
-      ...(() => {
+      ...(await (async () => {
         if (input.system) return [input.system]
         if (input.agent.prompt) return [input.agent.prompt]
+
+        // Check for session-level custom prompt
+        const sessionPrompt = await SystemPrompt.fromSession(input.sessionID, {
+          agent: input.agent,
+          model: { providerID: input.providerID, modelID: input.modelID },
+        })
+        if (sessionPrompt) return [sessionPrompt]
+
         return SystemPrompt.provider(input.modelID)
-      })(),
+      })()),
     )
     system.push(...(await SystemPrompt.environment()))
     system.push(...(await SystemPrompt.custom()))
@@ -1408,7 +1418,8 @@ export namespace SessionPrompt {
       input.history.filter((m) => m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic))
         .length === 1
     if (!isFirst) return
-    const small = await Provider.getSmallModel(input.providerID)
+    const small =
+      (await Provider.getSmallModel(input.providerID)) ?? (await Provider.getModel(input.providerID, input.modelID))
     const options = pipe(
       {},
       mergeDeep(ProviderTransform.options(small.providerID, small.modelID, small.npm ?? "", input.session.id)),
