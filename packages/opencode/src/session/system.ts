@@ -2,6 +2,9 @@ import { Ripgrep } from "../file/ripgrep"
 import { Global } from "../global"
 import { Filesystem } from "../util/filesystem"
 import { Config } from "../config/config"
+import { Session } from "."
+import { Agent } from "../agent/agent"
+import { Installation } from "../installation"
 
 import { Instance } from "../project/instance"
 import path from "path"
@@ -144,5 +147,220 @@ export namespace SystemPrompt {
       default:
         return [PROMPT_TITLE]
     }
+  }
+
+  function resolveTemplatePath(value: string): string {
+    // Priority order for file resolution:
+    // 1. Absolute path
+    if (path.isAbsolute(value)) return value
+
+    // 2. Home directory
+    if (value.startsWith("~/")) return path.join(os.homedir(), value.slice(2))
+
+    // 3. Check project-level prompts
+    const projectPrompt = path.join(Instance.directory, ".opencode", "prompts", value)
+    if (Bun.file(projectPrompt).existsSync()) return projectPrompt
+
+    // 4. Check global prompts
+    const globalPrompt = path.join(Global.Path.config, "prompts", value)
+    if (Bun.file(globalPrompt).existsSync()) return globalPrompt
+
+    // Fallback: treat as relative to cwd
+    return path.resolve(Instance.directory, value)
+  }
+
+  async function getGitBranch(): Promise<string> {
+    try {
+      const result = Bun.spawn(["git", "branch", "--show-current"], {
+        cwd: Instance.directory,
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const output = await new Response(result.stdout).text()
+      return output.trim() || "unknown"
+    } catch {
+      return "unknown"
+    }
+  }
+
+  async function detectPrimaryLanguage(): Promise<string> {
+    try {
+      // Count file extensions in project
+      const files = await Ripgrep.tree({ cwd: Instance.directory, limit: 500 })
+      const extensions: Record<string, number> = {}
+
+      for (const line of files.split("\n")) {
+        const ext = path.extname(line).toLowerCase()
+        if (ext) extensions[ext] = (extensions[ext] || 0) + 1
+      }
+
+      // Map extensions to languages
+      const langMap: Record<string, string> = {
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".js": "javascript",
+        ".jsx": "javascript",
+        ".py": "python",
+        ".go": "go",
+        ".rs": "rust",
+        ".java": "java",
+        ".cpp": "cpp",
+        ".cc": "cpp",
+        ".cxx": "cpp",
+        ".c": "c",
+        ".rb": "ruby",
+        ".php": "php",
+        ".cs": "csharp",
+        ".swift": "swift",
+        ".kt": "kotlin",
+      }
+
+      // Find most common language
+      let maxCount = 0
+      let primaryLang = "unknown"
+      for (const [ext, count] of Object.entries(extensions)) {
+        const lang = langMap[ext]
+        if (lang && count > maxCount) {
+          maxCount = count
+          primaryLang = lang
+        }
+      }
+
+      return primaryLang
+    } catch {
+      return "unknown"
+    }
+  }
+
+  function extractEnvVariables(): Record<string, string> {
+    const vars: Record<string, string> = {}
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith("OPENCODE_VAR_")) {
+        const varName = key.replace("OPENCODE_VAR_", "")
+        vars[varName] = value || ""
+      }
+    }
+    return vars
+  }
+
+  function applyFilter(value: string, filter: string): string {
+    switch (filter) {
+      case "uppercase":
+        return value.toUpperCase()
+      case "lowercase":
+        return value.toLowerCase()
+      case "capitalize":
+        return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+      default:
+        return value
+    }
+  }
+
+  export async function interpolateVariables(
+    template: string,
+    context: {
+      sessionID: string
+      agent?: Agent.Info
+      model: { providerID: string; modelID: string }
+      customVars?: Record<string, string>
+    },
+  ): Promise<string> {
+    const session = await Session.get(context.sessionID)
+    const config = await Config.get()
+    const project = Instance.project
+
+    // Build variable map
+    const variables: Record<string, string> = {
+      // Built-in variables
+      PROJECT_NAME: path.basename(Instance.worktree),
+      PROJECT_PATH: Instance.worktree,
+      WORKING_DIR: Instance.directory,
+      GIT_BRANCH: await getGitBranch(),
+      GIT_REPO: project.vcs === "git" ? "yes" : "no",
+      PRIMARY_LANGUAGE: await detectPrimaryLanguage(),
+      PLATFORM: process.platform,
+      DATE: new Date().toISOString().split("T")[0],
+      TIME: new Date().toTimeString().split(" ")[0],
+      DATETIME: new Date().toISOString().replace("T", " ").split(".")[0],
+      USER: process.env.USER || process.env.USERNAME || "unknown",
+      HOSTNAME: os.hostname(),
+      SESSION_ID: session.id,
+      SESSION_TITLE: session.title,
+      AGENT_NAME: context.agent?.name || "default",
+      MODEL_ID: context.model.modelID,
+      OPENCODE_VERSION: Installation.VERSION,
+    }
+
+    // Merge in order of priority (later overrides earlier)
+    Object.assign(
+      variables,
+      extractEnvVariables(), // OPENCODE_VAR_*
+      config.promptVariables || {}, // Config file
+      session.customPrompt?.variables || {}, // Session-specific
+      context.customVars || {}, // Inline custom vars
+    )
+
+    // Interpolate: ${VAR}, ${VAR:default}, ${VAR|filter}
+    return template.replace(/\$\{([A-Z_][A-Z0-9_]*)(:[^}]+)?(\|[^}]+)?\}/g, (match, varName, defaultValue, filter) => {
+      let value = variables[varName]
+
+      // Use default if variable not found
+      if (value === undefined && defaultValue) {
+        value = defaultValue.slice(1) // Remove leading ':'
+      }
+
+      // Return original if still not found
+      if (value === undefined) {
+        return match
+      }
+
+      // Apply filter if specified
+      if (filter) {
+        value = applyFilter(value, filter.slice(1)) // Remove leading '|'
+      }
+
+      return value
+    })
+  }
+
+  export async function fromSession(
+    sessionID: string,
+    context: {
+      agent?: Agent.Info
+      model: { providerID: string; modelID: string }
+    },
+  ): Promise<string | null> {
+    const session = await Session.get(sessionID)
+    if (!session.customPrompt) return null
+
+    let content: string
+
+    if (session.customPrompt.type === "inline") {
+      content = session.customPrompt.value
+    } else if (session.customPrompt.type === "file") {
+      const filePath = resolveTemplatePath(session.customPrompt.value)
+
+      // Check file size limit (100 KB)
+      try {
+        const file = Bun.file(filePath)
+        const size = file.size
+        if (size > 100 * 1024) {
+          throw new Error(`Prompt template too large: ${size} bytes (max 100 KB)`)
+        }
+        content = await file.text()
+      } catch (error) {
+        throw new Error(`Failed to load prompt template: ${filePath} - ${error}`)
+      }
+    } else {
+      return null
+    }
+
+    // Interpolate variables
+    return await interpolateVariables(content, {
+      sessionID,
+      agent: context.agent,
+      model: context.model,
+      customVars: session.customPrompt.variables,
+    })
   }
 }

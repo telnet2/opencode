@@ -68,6 +68,14 @@ export namespace Session {
           diff: z.string().optional(),
         })
         .optional(),
+      customPrompt: z
+        .object({
+          type: z.enum(["file", "inline"]),
+          value: z.string(),
+          loadedAt: z.number().optional(),
+          variables: z.record(z.string(), z.string()).optional(),
+        })
+        .optional(),
     })
     .meta({
       ref: "Session",
@@ -124,13 +132,26 @@ export namespace Session {
       .object({
         parentID: Identifier.schema("session").optional(),
         title: z.string().optional(),
+        customPrompt: z
+          .union([
+            z.string(),
+            z.object({
+              type: z.enum(["file", "inline"]),
+              value: z.string(),
+              variables: z.record(z.string(), z.string()).optional(),
+            }),
+          ])
+          .optional(),
       })
       .optional(),
     async (input) => {
+      const customPrompt = input?.customPrompt ? parseCustomPromptInput(input.customPrompt) : undefined
+
       return createNext({
         parentID: input?.parentID,
         directory: Instance.directory,
         title: input?.title,
+        customPrompt,
       })
     },
   )
@@ -172,7 +193,42 @@ export namespace Session {
     })
   })
 
-  export async function createNext(input: { id?: string; title?: string; parentID?: string; directory: string }) {
+  function parseCustomPromptInput(
+    input: string | { type: "file" | "inline"; value: string; variables?: Record<string, string> },
+  ): { type: "file" | "inline"; value: string; loadedAt: number; variables?: Record<string, string> } {
+    if (typeof input === "object") {
+      return {
+        type: input.type,
+        value: input.value,
+        loadedAt: Date.now(),
+        variables: input.variables,
+      }
+    }
+
+    // Auto-detect: if it looks like a file path, treat as file
+    const isFilePath =
+      input.startsWith("/") || // Absolute path
+      input.startsWith("~/") || // Home directory
+      input.startsWith("./") || // Relative path
+      input.startsWith("../") || // Parent directory
+      input.endsWith(".txt") ||
+      input.endsWith(".md") ||
+      !input.includes("\n") // Single line = likely a path
+
+    return {
+      type: isFilePath ? "file" : "inline",
+      value: input,
+      loadedAt: Date.now(),
+    }
+  }
+
+  export async function createNext(input: {
+    id?: string
+    title?: string
+    parentID?: string
+    directory: string
+    customPrompt?: { type: "file" | "inline"; value: string; loadedAt: number; variables?: Record<string, string> }
+  }) {
     const result: Info = {
       id: Identifier.descending("session", input.id),
       version: Installation.VERSION,
@@ -180,6 +236,7 @@ export namespace Session {
       directory: input.directory,
       parentID: input.parentID,
       title: input.title ?? createDefaultTitle(!!input.parentID),
+      customPrompt: input.customPrompt,
       time: {
         created: Date.now(),
         updated: Date.now(),
