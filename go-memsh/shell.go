@@ -119,7 +119,17 @@ func (s *Shell) Run(ctx context.Context, script string) error {
 // If the context belongs to a pipeline stage, the pipeline-specific readers and
 // writers are used; otherwise, the shell's default stdio is returned.
 func (s *Shell) stdio(ctx context.Context) (io.Reader, io.Writer, io.Writer) {
-	if hc := interp.HandlerCtx(ctx); hc != nil {
+	// Use recover to safely check for HandlerContext since HandlerCtx panics
+	// if no context is stored
+	var hc interp.HandlerContext
+	func() {
+		defer func() { recover() }()
+		hc = interp.HandlerCtx(ctx)
+	}()
+
+	// Check if we got a valid HandlerContext by checking if Stdin is set
+	// (HandlerContext is a value type, so we check if it was properly initialized)
+	if hc.Stdin != nil || hc.Stdout != nil || hc.Stderr != nil {
 		in := hc.Stdin
 		if in == nil {
 			in = s.stdin
@@ -330,6 +340,19 @@ func (s *Shell) execHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc 
 			return s.cmdJq(ctx, args)
 		case "curl":
 			return s.cmdCurl(ctx, args)
+		// LLM-optimized commands
+		case "stat":
+			return s.cmdStat(ctx, args)
+		case "readfile":
+			return s.cmdReadfile(ctx, args)
+		case "writefile":
+			return s.cmdWritefile(ctx, args)
+		case "findex", "find2":
+			return s.cmdFindEx(ctx, args)
+		case "grepex", "grep2":
+			return s.cmdGrepEx(ctx, args)
+		case "exists":
+			return s.cmdExists(ctx, args)
 		default:
 			return fmt.Errorf("%s: command not found", args[0])
 		}
