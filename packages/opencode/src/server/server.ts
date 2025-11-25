@@ -18,6 +18,7 @@ import { LSP } from "../lsp"
 import { Format } from "../format"
 import { MessageV2 } from "../session/message-v2"
 import { TuiRoute } from "./tui"
+import { ClientToolsRoute } from "./client-tools"
 import { Permission } from "../permission"
 import { Instance } from "../project/instance"
 import { Vcs } from "../project/vcs"
@@ -1979,6 +1980,7 @@ export namespace Server {
         },
       )
       .route("/tui/control", TuiRoute)
+      .route("/client-tools", ClientToolsRoute)
       .put(
         "/auth/:id",
         describeRoute({
