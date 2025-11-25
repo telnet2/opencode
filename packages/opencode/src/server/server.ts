@@ -19,6 +19,7 @@ import { Format } from "../format"
 import { MessageV2 } from "../session/message-v2"
 import { TuiRoute } from "./tui"
 import { ClientToolsRoute } from "./client-tools"
+import { AsyncToolsRoute } from "./async-tools"
 import { Permission } from "../permission"
 import { Instance } from "../project/instance"
 import { Agent } from "../agent/agent"
@@ -1925,6 +1926,7 @@ export namespace Server {
       )
       .route("/tui/control", TuiRoute)
       .route("/client-tools", ClientToolsRoute)
+      .route("/async-tools", AsyncToolsRoute)
       .put(
         "/auth/:id",
         describeRoute({

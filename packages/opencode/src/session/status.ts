@@ -17,6 +17,13 @@ export namespace SessionStatus {
       z.object({
         type: z.literal("busy"),
       }),
+      z.object({
+        type: z.literal("waiting_async"),
+        pendingID: z.string(),
+        tool: z.string(),
+        since: z.number(),
+        timeout: z.number().optional(),
+      }),
     ])
     .meta({
       ref: "SessionStatus",
