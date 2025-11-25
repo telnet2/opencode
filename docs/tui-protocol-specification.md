@@ -1,7 +1,7 @@
 # OpenCode TUI Client-Server Protocol Specification
 
-**Version:** 1.0.0
-**Last Updated:** 2025-11-24
+**Version:** 1.1.0
+**Last Updated:** 2025-11-25
 
 ## Table of Contents
 
@@ -11,6 +11,7 @@
 - [Data Formats](#data-formats)
 - [Communication Patterns](#communication-patterns)
 - [API Endpoints](#api-endpoints)
+- [Client Tools Protocol](#client-tools-protocol)
 - [Event System](#event-system)
 - [Error Handling](#error-handling)
 - [Security Considerations](#security-considerations)
@@ -559,6 +560,341 @@ GET /provider/auth?directory=/path/to/project
 
 ---
 
+## Client Tools Protocol
+
+Client-side tools allow SDK clients to register custom tools that execute on the client rather than the server. When the AI model calls a client tool, the server delegates execution to the originating client.
+
+### Architecture
+
+```
+┌─────────────────┐                    ┌─────────────────┐                    ┌─────────────────┐
+│   SDK Client    │                    │  OpenCode       │                    │   AI Model      │
+│                 │                    │  Server         │                    │                 │
+│ ┌─────────────┐ │   1. Register      │                 │                    │                 │
+│ │ Tool Defs   │─┼───────────────────►│ ┌─────────────┐ │                    │                 │
+│ └─────────────┘ │                    │ │Tool Registry│ │                    │                 │
+│                 │                    │ └─────────────┘ │                    │                 │
+│                 │                    │                 │   2. AI calls tool │                 │
+│                 │                    │                 │◄───────────────────│                 │
+│ ┌─────────────┐ │   3. Execute Req   │                 │                    │                 │
+│ │ Tool        │◄├────────────────────┤                 │                    │                 │
+│ │ Handler     │ │                    │                 │                    │                 │
+│ └──────┬──────┘ │   4. Result        │                 │   5. Tool result   │                 │
+│        │        ├───────────────────►│                 │───────────────────►│                 │
+│        ▼        │                    │                 │                    │                 │
+│ ┌─────────────┐ │                    │                 │                    │                 │
+│ │ Local Exec  │ │                    │                 │                    │                 │
+│ └─────────────┘ │                    │                 │                    │                 │
+└─────────────────┘                    └─────────────────┘                    └─────────────────┘
+```
+
+### Client Identity
+
+Each SDK client is assigned a unique `clientID` (UUID) for the lifetime of its connection. This ID:
+- Scopes tool registrations to the client
+- Routes tool execution requests to the correct client
+- Enables cleanup when client disconnects
+
+### Data Types
+
+#### ClientToolDefinition
+
+```typescript
+{
+  id: string,                    // Tool identifier (unique per client)
+  description: string,           // Human-readable description for AI
+  parameters: {                  // JSON Schema for tool parameters
+    type: "object",
+    properties: { ... },
+    required?: string[]
+  }
+}
+```
+
+#### ClientToolExecutionRequest
+
+Sent from server to client when AI calls a client tool.
+
+```typescript
+{
+  type: "client-tool-request",
+  requestID: string,             // Unique request identifier
+  sessionID: string,             // Session where tool was called
+  messageID: string,             // Message containing tool call
+  callID: string,                // Tool call identifier
+  tool: string,                  // Full tool ID (prefixed with client_)
+  input: Record<string, unknown> // Tool parameters from AI
+}
+```
+
+#### ClientToolResult
+
+```typescript
+{
+  status: "success",
+  title: string,                 // Display title for tool result
+  output: string,                // Tool output (shown to AI)
+  metadata?: Record<string, unknown>,
+  attachments?: FilePart[]       // Optional file attachments
+}
+```
+
+#### ClientToolError
+
+```typescript
+{
+  status: "error",
+  error: string                  // Error message
+}
+```
+
+### API Endpoints
+
+#### Register Client Tools
+
+Register one or more tools for a client.
+
+```http
+POST /client-tools/register
+Content-Type: application/json
+
+{
+  "clientID": "uuid-string",
+  "tools": [
+    {
+      "id": "my_tool",
+      "description": "Does something useful",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": { "type": "string" }
+        },
+        "required": ["input"]
+      }
+    }
+  ]
+}
+```
+
+**Response:**
+
+```json
+{
+  "registered": ["client_uuid-string_my_tool"]
+}
+```
+
+**Notes:**
+- Tool IDs are prefixed with `client_{clientID}_` to avoid collisions
+- Registering an existing tool ID overwrites the previous definition
+- Tools are automatically unregistered when client disconnects
+
+#### Unregister Client Tools
+
+Remove tools for a client.
+
+```http
+DELETE /client-tools/unregister
+Content-Type: application/json
+
+{
+  "clientID": "uuid-string",
+  "toolIDs": ["my_tool"]         // Optional: if omitted, unregisters all
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true
+}
+```
+
+#### Submit Tool Result
+
+Submit the result of a tool execution.
+
+```http
+POST /client-tools/result
+Content-Type: application/json
+
+{
+  "requestID": "req-uuid-string",
+  "result": {
+    "status": "success",
+    "title": "Tool completed",
+    "output": "Result data here"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true
+}
+```
+
+**Error Response (unknown request):**
+
+```json
+{
+  "error": "Unknown request ID"
+}
+```
+
+#### Stream Tool Requests (SSE)
+
+Long-lived SSE connection for receiving tool execution requests.
+
+```http
+GET /client-tools/pending/:clientID
+Accept: text/event-stream
+```
+
+**Response Stream:**
+
+```
+event: tool-request
+data: {"type":"client-tool-request","requestID":"req-1","sessionID":"ses-1","messageID":"msg-1","callID":"call-1","tool":"client_uuid_my_tool","input":{"input":"hello"}}
+
+event: ping
+data:
+
+event: tool-request
+data: {"type":"client-tool-request","requestID":"req-2",...}
+```
+
+**Events:**
+- `tool-request` - Server requests tool execution
+- `ping` - Keep-alive (every 30 seconds)
+
+**Connection Lifecycle:**
+- Client establishes SSE connection after registering tools
+- Connection remains open for session lifetime
+- On disconnect, all client tools are automatically unregistered
+- Client should implement reconnection with exponential backoff
+
+### WebSocket Protocol (Alternative)
+
+For lower latency, clients may use WebSocket instead of SSE + HTTP.
+
+```http
+GET /client-tools/ws/:clientID
+Upgrade: websocket
+```
+
+#### Client → Server Messages
+
+```typescript
+// Register tools
+{ "type": "register", "tools": ClientToolDefinition[] }
+
+// Submit tool result
+{ "type": "result", "requestID": string, "result": ClientToolResult | ClientToolError }
+
+// Unregister tools
+{ "type": "unregister", "toolIDs"?: string[] }
+```
+
+#### Server → Client Messages
+
+```typescript
+// Registration confirmed
+{ "type": "registered", "toolIDs": string[] }
+
+// Tool execution request
+{ "type": "request", "request": ClientToolExecutionRequest }
+
+// Error
+{ "type": "error", "error": string }
+```
+
+### Communication Pattern
+
+The client tool execution pattern differs from standard request-response:
+
+```
+SDK Client                              Server                              AI Model
+    │                                      │                                   │
+    │── POST /client-tools/register ──────►│                                   │
+    │◄── { registered: [...] } ───────────│                                   │
+    │                                      │                                   │
+    │── GET /client-tools/pending/:id ────►│                                   │
+    │   (SSE connection established)       │                                   │
+    │                                      │                                   │
+    │                                      │◄── AI calls client tool ─────────│
+    │                                      │                                   │
+    │◄── SSE: tool-request ───────────────│                                   │
+    │                                      │                                   │
+    │   (client executes tool locally)     │                                   │
+    │                                      │                                   │
+    │── POST /client-tools/result ────────►│                                   │
+    │                                      │── tool result ───────────────────►│
+    │                                      │                                   │
+    │◄── SSE: tool-request ───────────────│◄── AI calls another tool ─────────│
+    │   ...                                │                                   │
+```
+
+### Timeout Handling
+
+- Server enforces a timeout for tool execution (default: 30 seconds)
+- If client doesn't respond within timeout:
+  - Request is cancelled
+  - Error is returned to AI model
+  - `session.error` event may be emitted
+
+### Error Handling
+
+#### Client Disconnection
+
+When SSE/WebSocket connection drops:
+1. All pending tool requests for that client are cancelled with error
+2. All registered tools are unregistered
+3. AI receives tool execution error
+
+#### Tool Execution Failure
+
+Client should return error result:
+
+```json
+{
+  "status": "error",
+  "error": "Detailed error message"
+}
+```
+
+This is passed to the AI model, which may retry or handle the error.
+
+### Security Considerations
+
+1. **Client Scoping**: Tools are scoped to their registering client
+2. **No Cross-Client Access**: Client A cannot execute Client B's tools
+3. **Session Validation**: Tool execution requires valid session context
+4. **Input Validation**: Tool parameters are validated against JSON Schema before sending to client
+5. **Timeout Protection**: Prevents hung clients from blocking AI responses
+
+### Integration with Permission System
+
+Client tools integrate with the existing permission system:
+
+```typescript
+// Agent permission configuration
+{
+  "permission": {
+    "client_tools": "allow" | "ask" | "deny"
+  }
+}
+```
+
+- `allow` - Execute client tools without prompting
+- `ask` - Request user permission before each execution
+- `deny` - Never execute client tools
+
+---
+
 ## Event System
 
 ### Event Stream Connection
@@ -995,6 +1331,89 @@ LSP diagnostics received.
 }
 ```
 
+#### Client Tool Events
+
+##### client-tool.registered
+
+Client tools were registered.
+
+```json
+{
+  "type": "client-tool.registered",
+  "properties": {
+    "clientID": "string",
+    "toolIDs": ["string"]
+  }
+}
+```
+
+##### client-tool.unregistered
+
+Client tools were unregistered.
+
+```json
+{
+  "type": "client-tool.unregistered",
+  "properties": {
+    "clientID": "string",
+    "toolIDs": ["string"]
+  }
+}
+```
+
+##### client-tool.executing
+
+Client tool execution started.
+
+```json
+{
+  "type": "client-tool.executing",
+  "properties": {
+    "sessionID": "string",
+    "messageID": "string",
+    "callID": "string",
+    "tool": "string",
+    "clientID": "string"
+  }
+}
+```
+
+##### client-tool.completed
+
+Client tool execution completed.
+
+```json
+{
+  "type": "client-tool.completed",
+  "properties": {
+    "sessionID": "string",
+    "messageID": "string",
+    "callID": "string",
+    "tool": "string",
+    "clientID": "string",
+    "success": true
+  }
+}
+```
+
+##### client-tool.failed
+
+Client tool execution failed.
+
+```json
+{
+  "type": "client-tool.failed",
+  "properties": {
+    "sessionID": "string",
+    "messageID": "string",
+    "callID": "string",
+    "tool": "string",
+    "clientID": "string",
+    "error": "string"
+  }
+}
+```
+
 ---
 
 ## Error Handling
@@ -1350,10 +1769,108 @@ Events are:
 - Streamed to SSE clients
 - Batched for performance (16ms batching window)
 
+### Client Tool Execution Example
+
+Complete flow of registering and executing a client tool:
+
+#### 1. Client Registers Tool
+
+```http
+POST /client-tools/register HTTP/1.1
+Host: 127.0.0.1:12345
+Content-Type: application/json
+
+{
+  "clientID": "client-abc-123",
+  "tools": [
+    {
+      "id": "get_local_time",
+      "description": "Get the current local time on the client machine",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "Timezone (e.g., 'America/New_York')"
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "registered": ["client_client-abc-123_get_local_time"]
+}
+```
+
+#### 2. Client Connects to SSE Stream
+
+```http
+GET /client-tools/pending/client-abc-123 HTTP/1.1
+Host: 127.0.0.1:12345
+Accept: text/event-stream
+```
+
+#### 3. AI Calls the Tool (via user prompt)
+
+User sends: "What time is it locally?"
+
+AI decides to call the `get_local_time` tool. Server sends SSE event:
+
+```
+event: tool-request
+data: {"type":"client-tool-request","requestID":"req-xyz-789","sessionID":"ses_abc123","messageID":"msg_asst1","callID":"call_1","tool":"client_client-abc-123_get_local_time","input":{"timezone":"America/New_York"}}
+```
+
+#### 4. Client Executes and Submits Result
+
+```http
+POST /client-tools/result HTTP/1.1
+Host: 127.0.0.1:12345
+Content-Type: application/json
+
+{
+  "requestID": "req-xyz-789",
+  "result": {
+    "status": "success",
+    "title": "Local time (America/New_York)",
+    "output": "2025-11-25 14:30:45 EST"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "success": true
+}
+```
+
+#### 5. Events Emitted
+
+Main SSE stream (`/event`) receives:
+
+```
+data: {"type":"client-tool.executing","properties":{"sessionID":"ses_abc123","messageID":"msg_asst1","callID":"call_1","tool":"client_client-abc-123_get_local_time","clientID":"client-abc-123"}}
+
+data: {"type":"message.part.updated","properties":{"part":{"id":"tool1","type":"tool","tool":"get_local_time","state":{"status":"running"}}}}
+
+data: {"type":"client-tool.completed","properties":{"sessionID":"ses_abc123","messageID":"msg_asst1","callID":"call_1","tool":"client_client-abc-123_get_local_time","clientID":"client-abc-123","success":true}}
+
+data: {"type":"message.part.updated","properties":{"part":{"id":"tool1","type":"tool","tool":"get_local_time","state":{"status":"completed","output":"2025-11-25 14:30:45 EST"}}}}
+```
+
 ---
 
 ## Version History
 
+- **1.1.0** (2025-11-25) - Added Client Tools Protocol section
 - **1.0.0** (2025-11-24) - Initial protocol specification
 
 ---
