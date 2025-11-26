@@ -23,12 +23,13 @@ Available built-in commands:
 - Utilities: help, sleep, true, false, exit
 - Import/Export: import-file, import-dir, export-file, export-dir`
 
-interface BashMetadata {
+export interface BashMetadata {
   output: string
   exit?: number
   error?: string
   cwd: string
   description: string
+  [key: string]: unknown
 }
 
 export const BashTool = Tool.define<

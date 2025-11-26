@@ -9,6 +9,7 @@ import { Installation } from "../installation"
 import { Instance } from "../project/instance"
 import path from "path"
 import os from "os"
+import { existsSync } from "fs"
 
 import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
 import PROMPT_ANTHROPIC_WITHOUT_TODO from "./prompt/qwen.txt"
@@ -157,11 +158,11 @@ export namespace SystemPrompt {
 
     // 3. Check project-level prompts
     const projectPrompt = path.join(Instance.directory, ".opencode", "prompts", value)
-    if (Bun.file(projectPrompt).existsSync()) return projectPrompt
+    if (existsSync(projectPrompt)) return projectPrompt
 
     // 4. Check global prompts
     const globalPrompt = path.join(Global.Path.config, "prompts", value)
-    if (Bun.file(globalPrompt).existsSync()) return globalPrompt
+    if (existsSync(globalPrompt)) return globalPrompt
 
     // Fallback: treat as relative to cwd
     return path.resolve(Instance.directory, value)
