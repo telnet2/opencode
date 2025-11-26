@@ -168,5 +168,18 @@ func InitializeProviders(ctx context.Context, config *types.Config) (*Registry, 
 		}
 	}
 
+	// Initialize ARK if API key is available
+	if cfg, ok := config.Provider["ark"]; ok && cfg.APIKey != "" {
+		provider, err := NewArkProvider(ctx, &ArkConfig{
+			APIKey:    cfg.APIKey,
+			BaseURL:   cfg.BaseURL,
+			Model:     cfg.Model,
+			MaxTokens: 4096,
+		})
+		if err == nil {
+			registry.Register(provider)
+		}
+	}
+
 	return registry, nil
 }
