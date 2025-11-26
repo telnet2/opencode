@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
 	github.com/itchyny/timefmt-go v0.1.6 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
