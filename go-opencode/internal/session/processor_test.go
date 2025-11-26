@@ -345,6 +345,47 @@ func TestProcessCallback(t *testing.T) {
 func TestConstants(t *testing.T) {
 	assert.Equal(t, 50, MaxSteps)
 	assert.Equal(t, 3, MaxRetries)
-	assert.Equal(t, time.Second, RetryBaseDelay)
+	assert.Equal(t, time.Second, RetryInitialInterval)
+	assert.Equal(t, 30*time.Second, RetryMaxInterval)
+	assert.Equal(t, 2*time.Minute, RetryMaxElapsedTime)
 	assert.Equal(t, 150000, MaxContextTokens)
+}
+
+func TestNewRetryBackoff(t *testing.T) {
+	ctx := context.Background()
+	b := newRetryBackoff(ctx)
+
+	// First backoff should be around RetryInitialInterval (with jitter)
+	interval1 := b.NextBackOff()
+	assert.NotEqual(t, interval1, time.Duration(0))
+
+	// Second backoff should be longer due to exponential increase
+	interval2 := b.NextBackOff()
+	assert.NotEqual(t, interval2, time.Duration(0))
+
+	// Third backoff
+	interval3 := b.NextBackOff()
+	assert.NotEqual(t, interval3, time.Duration(0))
+
+	// Fourth should hit max retries (MaxRetries = 3)
+	interval4 := b.NextBackOff()
+	// After max retries, it should return backoff.Stop (-1)
+	assert.Less(t, interval4, time.Duration(0))
+}
+
+func TestNewRetryBackoff_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	b := newRetryBackoff(ctx)
+
+	// First backoff should work
+	interval1 := b.NextBackOff()
+	assert.Greater(t, interval1, time.Duration(0))
+
+	// Cancel the context
+	cancel()
+
+	// After cancellation, should return backoff.Stop
+	interval2 := b.NextBackOff()
+	assert.Less(t, interval2, time.Duration(0))
 }
