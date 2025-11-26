@@ -63,6 +63,9 @@ type ProviderConfig struct {
 	APIKey  string `json:"apiKey,omitempty"`
 	BaseURL string `json:"baseURL,omitempty"` // Changed to match TS (was baseUrl)
 
+	// Model/Endpoint ID (for providers like ARK that require endpoint specification)
+	Model string `json:"model,omitempty"`
+
 	// Nested options (TypeScript style)
 	Options *ProviderOptions `json:"options,omitempty"`
 
