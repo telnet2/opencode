@@ -9,7 +9,7 @@ LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 
 # Binary output
 BIN_DIR := bin
-BINARY := $(BIN_DIR)/opencode-server
+BINARY := $(BIN_DIR)/opencode
 
 # Default target
 all: build
