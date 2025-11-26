@@ -12,6 +12,7 @@ import (
 	"github.com/oklog/ulid/v2"
 
 	"github.com/opencode-ai/opencode/internal/event"
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/pkg/types"
 )
@@ -178,6 +179,31 @@ func (p *Processor) runLoop(
 			return fmt.Errorf("failed to build request: %w", err)
 		}
 
+		// Log the LLM request
+		logging.Debug().
+			Str("sessionID", sessionID).
+			Str("provider", providerID).
+			Str("model", modelID).
+			Int("messageCount", len(req.Messages)).
+			Int("toolCount", len(req.Tools)).
+			Int("maxTokens", req.MaxTokens).
+			Int("step", step).
+			Msg("Sending request to LLM")
+
+		// Log user message content (last user message)
+		if lastUserContent := getLastUserContent(req.Messages); lastUserContent != "" {
+			// Truncate for logging
+			if len(lastUserContent) > 500 {
+				lastUserContent = lastUserContent[:500] + "..."
+			}
+			logging.Debug().
+				Str("sessionID", sessionID).
+				Str("userMessage", lastUserContent).
+				Msg("User message content")
+		}
+
+		requestStart := time.Now()
+
 		// Call LLM with streaming
 		stream, err := prov.CreateCompletion(ctx, req)
 		if err != nil {
@@ -198,6 +224,48 @@ func (p *Processor) runLoop(
 		// Process stream
 		finishReason, err := p.processStream(ctx, stream, state, callback)
 		stream.Close()
+
+		requestDuration := time.Since(requestStart)
+
+		// Log LLM response
+		if state.message.Tokens != nil {
+			logging.Debug().
+				Str("sessionID", sessionID).
+				Str("finishReason", finishReason).
+				Int("inputTokens", state.message.Tokens.Input).
+				Int("outputTokens", state.message.Tokens.Output).
+				Dur("duration", requestDuration).
+				Msg("LLM response received")
+		} else {
+			logging.Debug().
+				Str("sessionID", sessionID).
+				Str("finishReason", finishReason).
+				Dur("duration", requestDuration).
+				Msg("LLM response received")
+		}
+
+		// Log assistant response content
+		if len(state.parts) > 0 {
+			for _, part := range state.parts {
+				switch pt := part.(type) {
+				case *types.TextPart:
+					content := pt.Text
+					if len(content) > 500 {
+						content = content[:500] + "..."
+					}
+					logging.Debug().
+						Str("sessionID", sessionID).
+						Str("assistantMessage", content).
+						Msg("Assistant text response")
+				case *types.ToolPart:
+					logging.Debug().
+						Str("sessionID", sessionID).
+						Str("toolName", pt.ToolName).
+						Str("toolCallID", pt.ToolCallID).
+						Msg("Assistant tool call")
+				}
+			}
+		}
 
 		if err != nil {
 			// Use exponential backoff with jitter for retries
@@ -555,3 +623,13 @@ func ptr[T any](v T) *T {
 
 // Stub for io.EOF check - the actual implementation is in stream.go
 var _ = io.EOF
+
+// getLastUserContent extracts the content from the last user message.
+func getLastUserContent(messages []*schema.Message) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == schema.User {
+			return messages[i].Content
+		}
+	}
+	return ""
+}

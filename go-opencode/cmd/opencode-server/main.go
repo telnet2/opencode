@@ -25,6 +25,7 @@ var (
 	version   = flag.Bool("version", false, "Print version and exit")
 	logLevel  = flag.String("log-level", "INFO", "Log level (DEBUG|INFO|WARN|ERROR)")
 	printLogs = flag.Bool("print-logs", false, "Enable log output to stderr")
+	logFile   = flag.Bool("log-file", false, "Write logs to /tmp/opencode-YYYYMMDD-HHMMSS.log")
 )
 
 const (
@@ -41,18 +42,26 @@ func main() {
 	}
 
 	// Initialize logging
-	if *printLogs {
-		logging.Init(logging.Config{
-			Level:  logging.ParseLevel(*logLevel),
-			Output: os.Stderr,
-			Pretty: true,
-		})
-	} else {
+	logCfg := logging.Config{
+		Level:     logging.ParseLevel(*logLevel),
+		Output:    os.Stderr,
+		Pretty:    *printLogs,
+		LogToFile: *logFile,
+	}
+
+	if !*printLogs && !*logFile {
 		// Disable logging output by default
-		logging.Init(logging.Config{
-			Level:  logging.FatalLevel,
-			Output: os.Stderr,
-		})
+		logCfg.Level = logging.FatalLevel
+	}
+
+	logging.Init(logCfg)
+	defer logging.Close()
+
+	// Log startup info if file logging is enabled
+	if *logFile {
+		logging.Info().
+			Str("logFile", logging.GetLogFilePath()).
+			Msg("File logging enabled")
 	}
 
 	// Determine working directory
