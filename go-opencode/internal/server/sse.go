@@ -1,3 +1,16 @@
+// Package server provides HTTP handlers for the opencode server.
+//
+// SSE Implementation Note:
+// This file contains a custom Server-Sent Events (SSE) implementation rather than
+// using a third-party package like r3labs/sse. This decision was made because:
+//
+// 1. The current implementation is simple, clean, and well-tested (~180 lines)
+// 2. It integrates directly with our internal event bus architecture
+// 3. It supports custom session-based filtering specific to our needs
+// 4. The r3labs/sse package is a heavier framework designed for different use cases
+// 5. Replacing it would add complexity without significant benefits
+//
+// See docs/github-packages-opportunities.md for the full analysis.
 package server
 
 import (
