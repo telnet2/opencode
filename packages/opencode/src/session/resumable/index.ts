@@ -9,6 +9,7 @@
  * - AsyncToolRegistry: Registry for tools that execute asynchronously
  * - SessionResumer: Handles session resumption when results arrive
  * - Recovery: Startup recovery routines
+ * - PendingToolStorage: Pluggable storage backend (file or MySQL)
  *
  * Usage:
  *
@@ -41,12 +42,30 @@
  * ```typescript
  * await Recovery.run()
  * ```
+ *
+ * 4. Configure MySQL storage (optional):
+ * ```typescript
+ * await PendingToolStorage.init({
+ *   type: 'mysql',
+ *   mysql: {
+ *     host: 'localhost',
+ *     port: 3306,
+ *     user: 'root',
+ *     password: 'secret',
+ *     database: 'opencode'
+ *   }
+ * })
+ * ```
  */
 
 export { PendingToolCall } from "./pending-tool"
 export { SessionResumer } from "./session-resumer"
 export { AsyncToolRegistry } from "./async-tool-registry"
 export { Recovery } from "./recovery"
+export { PendingToolStorage } from "./storage"
+
+// Re-export storage types
+export type { StorageBackend, StorageConfig, StorageBackendType } from "./storage"
 
 // Re-export key types
 export type { PendingToolCall as PendingToolCallTypes } from "./pending-tool"
