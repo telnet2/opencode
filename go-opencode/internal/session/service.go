@@ -12,7 +12,10 @@ import (
 
 	"github.com/oklog/ulid/v2"
 
+	"github.com/opencode-ai/opencode/internal/permission"
+	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/storage"
+	"github.com/opencode-ai/opencode/internal/tool"
 	"github.com/opencode-ai/opencode/pkg/types"
 )
 
@@ -24,6 +27,9 @@ type Service struct {
 	mu       sync.RWMutex
 	active   map[string]*ActiveSession
 	abortChs map[string]chan struct{}
+
+	// Processor for agentic loop
+	processor *Processor
 }
 
 // ActiveSession tracks an active processing session.
@@ -40,6 +46,27 @@ func NewService(store *storage.Storage) *Service {
 		active:   make(map[string]*ActiveSession),
 		abortChs: make(map[string]chan struct{}),
 	}
+}
+
+// NewServiceWithProcessor creates a new session service with processor dependencies.
+func NewServiceWithProcessor(
+	store *storage.Storage,
+	providerReg *provider.Registry,
+	toolReg *tool.Registry,
+	permChecker *permission.Checker,
+) *Service {
+	s := &Service{
+		storage:  store,
+		active:   make(map[string]*ActiveSession),
+		abortChs: make(map[string]chan struct{}),
+	}
+	s.processor = NewProcessor(providerReg, toolReg, store, permChecker)
+	return s
+}
+
+// GetProcessor returns the session processor.
+func (s *Service) GetProcessor() *Processor {
+	return s.processor
 }
 
 // Create creates a new session.
@@ -373,7 +400,54 @@ func (s *Service) ProcessMessage(
 	model *types.ModelRef,
 	onUpdate func(msg *types.Message, parts []types.Part),
 ) (*types.Message, []types.Part, error) {
-	// Create assistant message
+	// First, save the user message
+	userMsg := &types.Message{
+		ID:        generateID(),
+		SessionID: session.ID,
+		Role:      "user",
+		Time: types.MessageTime{
+			Created: time.Now().UnixMilli(),
+		},
+	}
+	if model != nil {
+		userMsg.Model = model
+	}
+
+	if err := s.AddMessage(ctx, session.ID, userMsg); err != nil {
+		return nil, nil, err
+	}
+
+	// Save user's text content as a part
+	userPart := &types.TextPart{
+		ID:   generateID(),
+		Type: "text",
+		Text: content,
+	}
+	if err := s.storage.Put(ctx, []string{"part", userMsg.ID, userPart.ID}, userPart); err != nil {
+		return nil, nil, err
+	}
+
+	// Use processor if available
+	if s.processor != nil {
+		var finalMsg *types.Message
+		var finalParts []types.Part
+
+		err := s.processor.Process(ctx, session.ID, DefaultAgent(), func(msg *types.Message, parts []types.Part) {
+			finalMsg = msg
+			finalParts = parts
+			if onUpdate != nil {
+				onUpdate(msg, parts)
+			}
+		})
+
+		if err != nil {
+			return finalMsg, finalParts, err
+		}
+
+		return finalMsg, finalParts, nil
+	}
+
+	// Fallback: Create placeholder assistant message if no processor
 	assistantMsg := &types.Message{
 		ID:        generateID(),
 		SessionID: session.ID,
@@ -388,13 +462,11 @@ func (s *Service) ProcessMessage(
 		assistantMsg.ModelID = model.ModelID
 	}
 
-	// Placeholder - the actual implementation will use the provider
-	// to generate the response and execute tools in a loop
 	parts := []types.Part{
 		&types.TextPart{
 			ID:   generateID(),
 			Type: "text",
-			Text: "This is a placeholder response. The actual implementation will use the Eino provider.",
+			Text: "Processor not initialized. Please configure providers.",
 		},
 	}
 
