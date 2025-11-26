@@ -8,9 +8,10 @@ Usage:
 - Filter files with include parameter (e.g., "*.js", "*.{ts,tsx}")
 - Returns matching lines with file paths and line numbers`
 
-interface GrepMetadata {
+export interface GrepMetadata {
   matches: number
   truncated: boolean
+  [key: string]: unknown
 }
 
 const LIMIT = 100
