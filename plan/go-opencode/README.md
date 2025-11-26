@@ -93,10 +93,10 @@ go-opencode/
 | 3. LLM Integration | Weeks 5-6 | Provider abstraction, streaming | ✅ COMPLETE |
 | 4. Tool System | Weeks 7-8 | Core tools implementation | ✅ COMPLETE |
 | 5. Security | Week 9 | Permission system, bash parsing (mvdan/sh) | ✅ COMPLETE |
-| 6. Processing Loop | Week 10 | Agentic loop, message handling | 🔲 Pending |
+| 6. Processing Loop | Week 10 | Agentic loop, message handling | ✅ COMPLETE |
 | 7. Polish | Weeks 11-12 | LSP, MCP, testing, documentation | 🔲 Pending |
 
-**Implementation Progress:** 146 tests passing across all Phase 1-5 components (as of 2025-11-26)
+**Implementation Progress:** 165+ tests passing across all Phase 1-6 components (as of 2025-11-26)
 
 ## Key Dependencies
 

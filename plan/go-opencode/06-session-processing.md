@@ -1368,15 +1368,17 @@ func TestSystemPrompt_ProviderSpecific(t *testing.T) { /* ... */ }
 
 ### Acceptance Criteria
 
-- [ ] Agentic loop executes tools and continues conversation
-- [ ] Streaming updates sent via callback and events
-- [ ] Tool execution with metadata updates
-- [ ] Doom loop detection and permission handling
-- [ ] Session abort works mid-processing
-- [ ] Error retry with exponential backoff
-- [ ] Context overflow triggers compaction
-- [ ] System prompt includes environment context
-- [ ] Custom rules loaded from AGENTS.md/CLAUDE.md
-- [ ] Step limits prevent infinite loops
-- [ ] Token and cost tracking accurate
-- [ ] Test coverage >80% for session package
+- [x] Agentic loop executes tools and continues conversation
+- [x] Streaming updates sent via callback and events
+- [x] Tool execution with metadata updates
+- [x] Doom loop detection and permission handling
+- [x] Session abort works mid-processing
+- [x] Error retry with exponential backoff
+- [x] Context overflow triggers compaction
+- [x] System prompt includes environment context
+- [x] Custom rules loaded from AGENTS.md/CLAUDE.md
+- [x] Step limits prevent infinite loops
+- [x] Token and cost tracking accurate
+- [x] Test coverage >80% for session package
+
+**Phase 6 Status: ✅ COMPLETE** (2025-11-26)
