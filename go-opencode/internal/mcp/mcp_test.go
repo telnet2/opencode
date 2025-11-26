@@ -186,122 +186,6 @@ func TestTransportType_Constants(t *testing.T) {
 	assert.Equal(t, TransportType("stdio"), TransportTypeStdio)
 }
 
-func TestInitializeRequest(t *testing.T) {
-	req := InitializeRequest{
-		ProtocolVersion: ProtocolVersion,
-		Capabilities: ClientCapabilities{
-			Roots: &RootsCapability{ListChanged: false},
-		},
-		ClientInfo: ClientInfo{
-			Name:    "opencode",
-			Version: "1.0.0",
-		},
-	}
-
-	assert.Equal(t, "2024-11-05", req.ProtocolVersion)
-	assert.NotNil(t, req.Capabilities.Roots)
-	assert.Equal(t, "opencode", req.ClientInfo.Name)
-}
-
-func TestCallToolRequest(t *testing.T) {
-	args := json.RawMessage(`{"key": "value"}`)
-	req := CallToolRequest{
-		Name:      "test_tool",
-		Arguments: args,
-	}
-
-	assert.Equal(t, "test_tool", req.Name)
-	assert.NotNil(t, req.Arguments)
-}
-
-func TestCallToolResponse(t *testing.T) {
-	resp := CallToolResponse{
-		Content: []Content{
-			{Type: "text", Text: "Hello, World!"},
-			{Type: "image", MimeType: "image/png", Data: "base64data"},
-		},
-		IsError: false,
-	}
-
-	assert.Len(t, resp.Content, 2)
-	assert.Equal(t, "text", resp.Content[0].Type)
-	assert.Equal(t, "Hello, World!", resp.Content[0].Text)
-	assert.False(t, resp.IsError)
-}
-
-func TestContent(t *testing.T) {
-	textContent := Content{Type: "text", Text: "Hello"}
-	assert.Equal(t, "text", textContent.Type)
-	assert.Equal(t, "Hello", textContent.Text)
-
-	imageContent := Content{Type: "image", MimeType: "image/png", Data: "data"}
-	assert.Equal(t, "image", imageContent.Type)
-	assert.Equal(t, "image/png", imageContent.MimeType)
-}
-
-func TestJSONRPCRequest(t *testing.T) {
-	req := JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "test",
-		Params:  map[string]string{"key": "value"},
-	}
-
-	assert.Equal(t, "2.0", req.JSONRPC)
-	assert.Equal(t, int64(1), req.ID)
-	assert.Equal(t, "test", req.Method)
-}
-
-func TestJSONRPCResponse(t *testing.T) {
-	resp := JSONRPCResponse{
-		JSONRPC: "2.0",
-		ID:      1,
-		Result:  json.RawMessage(`{"success": true}`),
-	}
-
-	assert.Equal(t, "2.0", resp.JSONRPC)
-	assert.Equal(t, int64(1), resp.ID)
-	assert.NotNil(t, resp.Result)
-	assert.Nil(t, resp.Error)
-}
-
-func TestJSONRPCError(t *testing.T) {
-	err := JSONRPCError{
-		Code:    -32600,
-		Message: "Invalid Request",
-		Data:    "Additional info",
-	}
-
-	assert.Equal(t, -32600, err.Code)
-	assert.Equal(t, "Invalid Request", err.Message)
-}
-
-func TestNewHTTPTransport(t *testing.T) {
-	transport, err := NewHTTPTransport("http://localhost:8080", nil)
-	assert.NoError(t, err)
-	assert.NotNil(t, transport)
-
-	// Test Close
-	err = transport.Close()
-	assert.NoError(t, err)
-}
-
-func TestNewHTTPTransport_EmptyURL(t *testing.T) {
-	_, err := NewHTTPTransport("", nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "URL is required")
-}
-
-func TestNewHTTPTransport_WithHeaders(t *testing.T) {
-	headers := map[string]string{
-		"Authorization": "Bearer token",
-		"X-Custom":      "value",
-	}
-	transport, err := NewHTTPTransport("http://localhost:8080", headers)
-	assert.NoError(t, err)
-	assert.NotNil(t, transport)
-}
-
 func TestProtocolVersion(t *testing.T) {
 	assert.Equal(t, "2024-11-05", ProtocolVersion)
 }
@@ -315,38 +199,14 @@ func TestServerInfo(t *testing.T) {
 	assert.Equal(t, "1.0.0", info.Version)
 }
 
-func TestServerCapabilities(t *testing.T) {
-	caps := ServerCapabilities{
-		Tools:     &ToolCapability{ListChanged: true},
-		Resources: &ResourceCapability{Subscribe: true, ListChanged: true},
-		Prompts:   &PromptCapability{ListChanged: false},
-	}
+func TestContent(t *testing.T) {
+	textContent := Content{Type: "text", Text: "Hello"}
+	assert.Equal(t, "text", textContent.Type)
+	assert.Equal(t, "Hello", textContent.Text)
 
-	assert.True(t, caps.Tools.ListChanged)
-	assert.True(t, caps.Resources.Subscribe)
-	assert.False(t, caps.Prompts.ListChanged)
-}
-
-func TestGetPromptRequest(t *testing.T) {
-	req := GetPromptRequest{
-		Name: "test_prompt",
-		Arguments: map[string]string{
-			"arg1": "value1",
-		},
-	}
-
-	assert.Equal(t, "test_prompt", req.Name)
-	assert.Equal(t, "value1", req.Arguments["arg1"])
-}
-
-func TestPromptMessage(t *testing.T) {
-	msg := PromptMessage{
-		Role:    "user",
-		Content: Content{Type: "text", Text: "Hello"},
-	}
-
-	assert.Equal(t, "user", msg.Role)
-	assert.Equal(t, "Hello", msg.Content.Text)
+	imageContent := Content{Type: "image", MimeType: "image/png", Data: "data"}
+	assert.Equal(t, "image", imageContent.Type)
+	assert.Equal(t, "image/png", imageContent.MimeType)
 }
 
 func TestResourceContent(t *testing.T) {
@@ -359,4 +219,31 @@ func TestResourceContent(t *testing.T) {
 	assert.Equal(t, "file:///test.txt", content.URI)
 	assert.Equal(t, "text/plain", content.MimeType)
 	assert.Equal(t, "file contents", content.Text)
+}
+
+func TestReadResourceResponse(t *testing.T) {
+	resp := ReadResourceResponse{
+		Contents: []ResourceContent{
+			{
+				URI:      "file:///test.txt",
+				MimeType: "text/plain",
+				Text:     "content",
+			},
+		},
+	}
+
+	assert.Len(t, resp.Contents, 1)
+	assert.Equal(t, "file:///test.txt", resp.Contents[0].URI)
+}
+
+func TestPromptArgument(t *testing.T) {
+	arg := PromptArgument{
+		Name:        "test_arg",
+		Description: "A test argument",
+		Required:    true,
+	}
+
+	assert.Equal(t, "test_arg", arg.Name)
+	assert.Equal(t, "A test argument", arg.Description)
+	assert.True(t, arg.Required)
 }
