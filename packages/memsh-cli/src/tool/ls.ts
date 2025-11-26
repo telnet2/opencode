@@ -9,9 +9,10 @@ Usage:
 - Can show hidden files with the 'all' parameter
 - Can show detailed file information with the 'long' parameter`
 
-interface LsMetadata {
+export interface LsMetadata {
   count: number
   truncated: boolean
+  [key: string]: unknown
 }
 
 const LIMIT = 100

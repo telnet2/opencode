@@ -9,11 +9,12 @@ Usage:
 - Use replaceAll for replacing and renaming strings across the file
 - If oldString is empty, the file will be created with newString as content`
 
-interface EditMetadata {
+export interface EditMetadata {
   filepath: string
   diff: string
   additions: number
   deletions: number
+  [key: string]: unknown
 }
 
 /**
