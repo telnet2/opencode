@@ -2,7 +2,7 @@ package commands
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/server"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -46,8 +47,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	log.Printf("Starting OpenCode server v%s", Version)
-	log.Printf("Working directory: %s", workDir)
+	logging.Info().
+		Str("version", Version).
+		Msg("Starting OpenCode server")
+	logging.Info().
+		Str("directory", workDir).
+		Msg("Working directory")
 
 	// Initialize paths
 	paths := config.GetPaths()
@@ -68,7 +73,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	providerReg, err := provider.InitializeProviders(ctx, appConfig)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize some providers: %v", err)
+		logging.Warn().Err(err).Msg("Failed to initialize some providers")
 	}
 
 	// Initialize tool registry
@@ -84,9 +89,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("Server listening on http://%s:%d", serveHostname, servePort)
+		logging.Info().
+			Str("hostname", serveHostname).
+			Int("port", servePort).
+			Str("url", fmt.Sprintf("http://%s:%d", serveHostname, servePort)).
+			Msg("Server listening")
 		if err := srv.Start(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
+			logging.Fatal().Err(err).Msg("Server error")
 		}
 	}()
 
@@ -95,16 +104,16 @@ func runServe(cmd *cobra.Command, args []string) error {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	logging.Info().Msg("Shutting down server...")
 
 	// Graceful shutdown with timeout
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Server shutdown error: %v", err)
+		logging.Error().Err(err).Msg("Server shutdown error")
 	}
 
-	log.Println("Server stopped")
+	logging.Info().Msg("Server stopped")
 	return nil
 }

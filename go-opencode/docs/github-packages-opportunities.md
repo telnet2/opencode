@@ -9,7 +9,7 @@ This document identifies custom implementations in go-opencode that could be rep
 | Custom Event Bus/Pub-Sub | `internal/event/bus.go:1-182` | [ThreeDotsLabs/watermill](https://github.com/ThreeDotsLabs/watermill) or [asaskevich/EventBus](https://github.com/asaskevich/EventBus) |
 | File-Based Storage with Locking | `internal/storage/storage.go`, `lock.go` | [etcd-io/bbolt](https://github.com/etcd-io/bbolt) or [dgraph-io/badger](https://github.com/dgraph-io/badger) |
 | Custom Permission System | `internal/permission/checker.go:1-214` | [casbin/casbin](https://github.com/casbin/casbin) |
-| No Structured Logging | Throughout codebase | `logrus` (already in go.mod!) or [uber-go/zap](https://github.com/uber-go/zap) |
+| ~~No Structured Logging~~ | ~~Throughout codebase~~ | **DONE**: Implemented with [rs/zerolog](https://github.com/rs/zerolog) |
 
 ### Details
 
@@ -60,14 +60,19 @@ This document identifies custom implementations in go-opencode that could be rep
 - Easy to audit and modify permissions
 - Extensible with custom functions
 
-#### 4. Structured Logging
+#### 4. ~~Structured Logging~~ (COMPLETED)
 
-**Current Implementation:**
+**Previous Implementation:**
 - No structured logging library detected
 - Uses standard `fmt` and `log` packages
 - Missing proper log levels, structured fields
 
-**Note:** `logrus` is already a transitive dependency and should be integrated.
+**Implementation (COMPLETED):**
+- Added `internal/logging` package using [rs/zerolog](https://github.com/rs/zerolog)
+- Structured JSON logging with proper log levels (DEBUG, INFO, WARN, ERROR, FATAL)
+- Pretty-print console output mode for development
+- Global logger with convenient helper functions
+- Integrated with CLI via `--print-logs` and `--log-level` flags
 
 ---
 
@@ -75,7 +80,7 @@ This document identifies custom implementations in go-opencode that could be rep
 
 | Current Implementation | File Location | Recommended Package |
 |------------------------|---------------|---------------------|
-| Custom Levenshtein Distance | `internal/tool/edit.go:232-281` | [agnivade/levenshtein](https://github.com/agnivade/levenshtein) |
+| ~~Custom Levenshtein Distance~~ | ~~`internal/tool/edit.go:232-281`~~ | **DONE**: [agnivade/levenshtein](https://github.com/agnivade/levenshtein) |
 | Manual JSON-RPC (LSP) | `internal/lsp/client.go:200-343` | [sourcegraph/jsonrpc2](https://github.com/sourcegraph/jsonrpc2) |
 | Manual JSON-RPC (MCP) | `internal/mcp/transport.go:1-334` | [sourcegraph/jsonrpc2](https://github.com/sourcegraph/jsonrpc2) |
 | Custom Config with Interpolation | `internal/config/config.go:1-364` | [spf13/viper](https://github.com/spf13/viper) |
@@ -147,7 +152,7 @@ This document identifies custom implementations in go-opencode that could be rep
 
 | Current Implementation | File Location | Recommended Package |
 |------------------------|---------------|---------------------|
-| Manual Exponential Backoff | `internal/session/loop.go:164-199` | [cenkalti/backoff](https://github.com/cenkalti/backoff) |
+| ~~Manual Exponential Backoff~~ | ~~`internal/session/loop.go:164-199`~~ | **DONE**: [cenkalti/backoff](https://github.com/cenkalti/backoff) |
 | Custom SSE Implementation | `internal/server/sse.go:1-178` | [r3labs/sse](https://github.com/r3labs/sse) |
 | Manual Process Management | `internal/tool/bash.go:162-260` | [creack/pty](https://github.com/creack/pty), [oklog/run](https://github.com/oklog/run) |
 
@@ -216,23 +221,23 @@ These implementations are already using appropriate packages:
 ### Priority Matrix
 
 1. **High Priority** - Significant improvements in reliability, maintainability, and features:
-   - Structured logging (easy win - logrus already available)
+   - ~~Structured logging~~ - **DONE** (zerolog)
    - Storage layer (ACID compliance, transactions)
    - Event bus (scalability, middleware support)
    - Permissions (policy-based, auditable)
 
 2. **Medium Priority** - Code quality and standardization:
    - JSON-RPC implementations (LSP/MCP)
-   - Levenshtein distance
+   - ~~Levenshtein distance~~ - **DONE** (agnivade/levenshtein)
    - Configuration management
 
 3. **Low Priority** - Nice to have improvements:
-   - Exponential backoff
+   - ~~Exponential backoff~~ - **DONE** (cenkalti/backoff)
    - SSE implementation
    - Process management
 
 ### Quick Wins
 
-1. **Integrate logrus** - Already a transitive dependency
+1. ~~**Integrate logrus**~~ - **DONE**: Implemented with zerolog instead
 2. **Use doublestar/v4 more** - Already in go.mod but underutilized
-3. **Replace Levenshtein** - Simple swap, single file change
+3. ~~**Replace Levenshtein**~~ - **DONE**: Replaced with agnivade/levenshtein

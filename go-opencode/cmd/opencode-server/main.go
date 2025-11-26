@@ -5,7 +5,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/server"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -23,6 +23,8 @@ var (
 	port      = flag.Int("port", 8080, "Server port")
 	directory = flag.String("directory", "", "Working directory")
 	version   = flag.Bool("version", false, "Print version and exit")
+	logLevel  = flag.String("log-level", "INFO", "Log level (DEBUG|INFO|WARN|ERROR)")
+	printLogs = flag.Bool("print-logs", false, "Enable log output to stderr")
 )
 
 const (
@@ -38,29 +40,48 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Initialize logging
+	if *printLogs {
+		logging.Init(logging.Config{
+			Level:  logging.ParseLevel(*logLevel),
+			Output: os.Stderr,
+			Pretty: true,
+		})
+	} else {
+		// Disable logging output by default
+		logging.Init(logging.Config{
+			Level:  logging.FatalLevel,
+			Output: os.Stderr,
+		})
+	}
+
 	// Determine working directory
 	workDir := *directory
 	if workDir == "" {
 		var err error
 		workDir, err = os.Getwd()
 		if err != nil {
-			log.Fatalf("Failed to get working directory: %v", err)
+			logging.Fatal().Err(err).Msg("Failed to get working directory")
 		}
 	}
 
-	log.Printf("Starting OpenCode server v%s", Version)
-	log.Printf("Working directory: %s", workDir)
+	logging.Info().
+		Str("version", Version).
+		Msg("Starting OpenCode server")
+	logging.Info().
+		Str("directory", workDir).
+		Msg("Working directory")
 
 	// Initialize paths
 	paths := config.GetPaths()
 	if err := paths.EnsurePaths(); err != nil {
-		log.Fatalf("Failed to create data directories: %v", err)
+		logging.Fatal().Err(err).Msg("Failed to create data directories")
 	}
 
 	// Load configuration
 	appConfig, err := config.Load(workDir)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		logging.Fatal().Err(err).Msg("Failed to load configuration")
 	}
 
 	// Initialize storage
@@ -70,7 +91,7 @@ func main() {
 	ctx := context.Background()
 	providerReg, err := provider.InitializeProviders(ctx, appConfig)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize some providers: %v", err)
+		logging.Warn().Err(err).Msg("Failed to initialize some providers")
 	}
 
 	// Initialize tool registry
@@ -86,9 +107,12 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("Server listening on http://localhost:%d", *port)
+		logging.Info().
+			Int("port", *port).
+			Str("url", fmt.Sprintf("http://localhost:%d", *port)).
+			Msg("Server listening")
 		if err := srv.Start(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
+			logging.Fatal().Err(err).Msg("Server error")
 		}
 	}()
 
@@ -97,15 +121,15 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	logging.Info().Msg("Shutting down server...")
 
 	// Graceful shutdown with timeout
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Server shutdown error: %v", err)
+		logging.Error().Err(err).Msg("Server shutdown error")
 	}
 
-	log.Println("Server stopped")
+	logging.Info().Msg("Server stopped")
 }

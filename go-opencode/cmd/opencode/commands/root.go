@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +30,22 @@ understand, and improve code through natural language interaction.
 Run 'opencode run' to start an interactive session, or 'opencode serve'
 to start a headless server.`,
 	Version: Version,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Initialize logging based on flags
+		if printLogs {
+			logging.Init(logging.Config{
+				Level:  logging.ParseLevel(logLevel),
+				Output: os.Stderr,
+				Pretty: true,
+			})
+		} else {
+			// Disable logging output by default (only show fatal errors)
+			logging.Init(logging.Config{
+				Level:  logging.FatalLevel,
+				Output: os.Stderr,
+			})
+		}
+	},
 	// Run serve by default if no subcommand specified
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand, show help
