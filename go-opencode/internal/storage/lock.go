@@ -2,6 +2,7 @@ package storage
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 )
@@ -22,8 +23,15 @@ func NewFileLock(path string) *FileLock {
 func (l *FileLock) Lock() error {
 	l.mu.Lock()
 
+	// Ensure directory exists for lock file
+	lockPath := l.path + ".lock"
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0755); err != nil {
+		l.mu.Unlock()
+		return err
+	}
+
 	var err error
-	l.file, err = os.OpenFile(l.path+".lock", os.O_CREATE|os.O_RDWR, 0600)
+	l.file, err = os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		l.mu.Unlock()
 		return err
