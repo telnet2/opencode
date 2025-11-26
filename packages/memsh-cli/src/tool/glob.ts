@@ -8,9 +8,10 @@ Usage:
 - Returns matching file paths
 - Use this tool when you need to find files by name patterns`
 
-interface GlobMetadata {
+export interface GlobMetadata {
   count: number
   truncated: boolean
+  [key: string]: unknown
 }
 
 const LIMIT = 100

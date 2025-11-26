@@ -8,10 +8,11 @@ Usage:
 - If the parent directory doesn't exist, it will be created
 - The filePath should be an absolute path or relative to the current working directory`
 
-interface WriteMetadata {
+export interface WriteMetadata {
   filepath: string
   exists: boolean
   size: number
+  [key: string]: unknown
 }
 
 export const WriteTool = Tool.define<
