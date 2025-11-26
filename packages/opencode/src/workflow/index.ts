@@ -72,8 +72,8 @@ export namespace Workflow {
             const definition = WorkflowParser.validate({ id, ...workflowCfg.definition }, `config:${id}`)
             workflows.set(id, definition)
           } else if ("steps" in workflowCfg) {
-            // Direct workflow definition
-            const definition = WorkflowParser.validate({ id, ...workflowCfg }, `config:${id}`)
+            // Direct workflow definition - spread first then override id
+            const definition = WorkflowParser.validate({ ...workflowCfg, id }, `config:${id}`)
             workflows.set(id, definition)
           }
         } catch (error) {
@@ -259,10 +259,4 @@ export namespace Workflow {
     return WorkflowExecutor.remove(instanceId)
   }
 
-  /**
-   * Reload workflow definitions (clear cache)
-   */
-  export function reload(): void {
-    Instance.reset()
-  }
 }

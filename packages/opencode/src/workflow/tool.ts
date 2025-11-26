@@ -90,7 +90,7 @@ async function handleStart(
   log.info("starting workflow", { instanceId: instance.id, workflowId: definition.id })
 
   // Set up pause handler for interactive mode
-  let pausedStep: { stepId: string; message: string; options: any } | null = null
+  let pausedStep: { stepId: string; message: string; options: any } | undefined
 
   const executionCtx: WorkflowExecutor.ExecutionContext = {
     instance,
@@ -196,7 +196,7 @@ async function handleResume(
   log.info("resuming workflow", { instanceId: params.instanceId, approved: params.approved })
 
   // Set up pause handler for next pause
-  let pausedStep: { stepId: string; message: string; options: any } | null = null
+  let pausedStep: { stepId: string; message: string; options: any } | undefined
 
   const executionCtx: WorkflowExecutor.ExecutionContext = {
     instance,
@@ -310,13 +310,13 @@ async function handleStatus(
       variables: instance.variables,
       stepStates: instance.stepStates,
     },
-    output: formatWorkflowResult(instance, null),
+    output: formatWorkflowResult(instance, undefined),
   }
 }
 
 function formatWorkflowResult(
   instance: WorkflowInstance,
-  pausedStep: { stepId: string; message: string; options: any } | null,
+  pausedStep: { stepId: string; message: string; options: any } | undefined,
 ): string {
   const lines: string[] = []
 

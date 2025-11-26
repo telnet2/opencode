@@ -166,8 +166,9 @@ export namespace WorkflowExecutor {
       // Execute from start step
       await executeFromStep(ctx, startStepId)
 
-      // Check if completed
-      if (instance.status !== "paused" && instance.status !== "cancelled") {
+      // Check if completed (status may have changed during execution)
+      const currentStatus = instance.status as WorkflowStatus
+      if (currentStatus !== "paused" && currentStatus !== "cancelled") {
         instance.status = "completed"
         instance.time.completed = Date.now()
         instance.time.updated = Date.now()
@@ -313,7 +314,13 @@ export namespace WorkflowExecutor {
   async function executeFromStep(ctx: ExecutionContext, stepId: string): Promise<void> {
     const { instance, abort } = ctx
     const stepMap = new Map(instance.definition.steps.map((s) => [s.id, s]))
-    const orchestrator = instance.definition.orchestrator ?? {}
+    const orchestrator = instance.definition.orchestrator ?? {
+      mode: "guided" as const,
+      onError: "pause" as const,
+      maxRetries: 3,
+      defaultTimeout: 300000,
+      verbose: false,
+    }
 
     // Build execution order respecting dependencies
     const executionOrder = buildExecutionOrder(instance.definition, stepId)
@@ -934,7 +941,13 @@ export namespace WorkflowExecutor {
   async function handleStepError(ctx: ExecutionContext, step: WorkflowStep, error: unknown): Promise<void> {
     const { instance } = ctx
     const stepState = instance.stepStates[step.id]
-    const orchestrator = instance.definition.orchestrator ?? {}
+    const orchestrator = instance.definition.orchestrator ?? {
+      mode: "guided" as const,
+      onError: "pause" as const,
+      maxRetries: 3,
+      defaultTimeout: 300000,
+      verbose: false,
+    }
 
     const errorMessage = error instanceof Error ? error.message : String(error)
 
