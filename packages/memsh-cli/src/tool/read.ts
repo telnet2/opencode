@@ -13,11 +13,12 @@ Usage:
 - Any lines longer than 2000 characters will be truncated
 - Results are returned with line numbers starting at 1`
 
-interface ReadMetadata {
+export interface ReadMetadata {
   preview: string
   filepath: string
   lines: number
   truncated: boolean
+  [key: string]: unknown
 }
 
 export const ReadTool = Tool.define<
@@ -31,8 +32,8 @@ export const ReadTool = Tool.define<
   description: DESCRIPTION,
   parameters: z.object({
     filePath: z.string().describe("The path to the file to read"),
-    offset: z.coerce.number().describe("The line number to start reading from (0-based)").optional(),
-    limit: z.coerce.number().describe("The number of lines to read (defaults to 2000)").optional(),
+    offset: z.number().describe("The line number to start reading from (0-based)").optional(),
+    limit: z.number().describe("The number of lines to read (defaults to 2000)").optional(),
   }),
   async execute(params, ctx) {
     const filepath = params.filePath

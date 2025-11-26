@@ -79,6 +79,7 @@ export interface ExecuteCommandParams {
   session_id: string
   command: string
   args?: string[]
+  [key: string]: unknown
 }
 
 /**

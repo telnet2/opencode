@@ -30,8 +30,10 @@ function parseArgs(): CliArgs {
     switch (arg) {
       case "--server":
       case "-s":
-        args.server = next
-        i++
+        if (next) {
+          args.server = next
+          i++
+        }
         break
       case "--command":
       case "-c":
