@@ -182,8 +182,18 @@ export type ParallelStep = z.infer<typeof ParallelStep>
 export const ConditionalStep = StepBase.extend({
   type: z.literal("conditional"),
 
-  /** Condition expression to evaluate */
+  /** Condition expression or prompt to evaluate */
   condition: z.string(),
+
+  /**
+   * How to evaluate the condition:
+   * - "expression": JavaScript-like expression (default)
+   * - "llm": Use an LLM to evaluate the condition as a yes/no question
+   */
+  conditionType: z.enum(["expression", "llm"]).default("expression"),
+
+  /** Model to use for LLM evaluation (optional, uses default if not specified) */
+  model: z.string().optional(),
 
   /** Step ID to execute if condition is true */
   then: z.string(),
@@ -211,6 +221,16 @@ export const LoopStep = StepBase.extend({
   /** Condition to check after each iteration (continues until true) */
   until: z.string().optional(),
 
+  /**
+   * How to evaluate while/until conditions:
+   * - "expression": JavaScript-like expression (default)
+   * - "llm": Use an LLM to evaluate the condition as a yes/no question
+   */
+  conditionType: z.enum(["expression", "llm"]).default("expression"),
+
+  /** Model to use for LLM evaluation (optional) */
+  model: z.string().optional(),
+
   /** Maximum number of iterations */
   maxIterations: z.number().min(1).default(10),
 
@@ -221,6 +241,45 @@ export const LoopStep = StepBase.extend({
 })
 
 export type LoopStep = z.infer<typeof LoopStep>
+
+/**
+ * LLM Evaluation step - uses an LLM to make decisions or evaluate complex conditions
+ */
+export const LLMEvalStep = StepBase.extend({
+  type: z.literal("llm_eval"),
+
+  /** The prompt/question for the LLM to evaluate */
+  prompt: z.string(),
+
+  /** Expected output format */
+  outputFormat: z
+    .enum([
+      "boolean", // yes/no, true/false
+      "choice", // select from options
+      "text", // free text response
+      "json", // structured JSON output
+    ])
+    .default("boolean"),
+
+  /** For 'choice' format: available options */
+  choices: z.array(z.string()).optional(),
+
+  /** For 'json' format: expected schema description */
+  schema: z.string().optional(),
+
+  /** Variable name to store the result */
+  output: z.string(),
+
+  /** Model to use (optional, uses default if not specified) */
+  model: z.string().optional(),
+
+  /** Temperature for generation */
+  temperature: z.number().min(0).max(2).optional(),
+}).meta({
+  ref: "LLMEvalStep",
+})
+
+export type LLMEvalStep = z.infer<typeof LLMEvalStep>
 
 /**
  * Transform step - transforms data between steps
@@ -260,7 +319,7 @@ export type TransformStep = z.infer<typeof TransformStep>
  * Union of all step types
  */
 export const WorkflowStep = z
-  .discriminatedUnion("type", [AgentStep, PauseStep, ParallelStep, ConditionalStep, LoopStep, TransformStep])
+  .discriminatedUnion("type", [AgentStep, PauseStep, ParallelStep, ConditionalStep, LoopStep, TransformStep, LLMEvalStep])
   .meta({
     ref: "WorkflowStep",
   })
