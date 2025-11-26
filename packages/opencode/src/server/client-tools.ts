@@ -58,7 +58,7 @@ export const ClientToolsRoute = new Hono()
       requestBody: {
         content: {
           "application/json": {
-            schema: resolver(RegisterRequest),
+            schema: resolver(RegisterRequest) as any,
           },
         },
       },
@@ -93,7 +93,7 @@ export const ClientToolsRoute = new Hono()
       requestBody: {
         content: {
           "application/json": {
-            schema: resolver(UnregisterRequest),
+            schema: resolver(UnregisterRequest) as any,
           },
         },
       },
@@ -128,7 +128,7 @@ export const ClientToolsRoute = new Hono()
       requestBody: {
         content: {
           "application/json": {
-            schema: resolver(SubmitResultRequest),
+            schema: resolver(SubmitResultRequest) as any,
           },
         },
       },

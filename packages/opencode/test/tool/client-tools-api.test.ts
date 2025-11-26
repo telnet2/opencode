@@ -33,7 +33,8 @@ describe.skip("Client Tools API (requires live server)", () => {
     const timeout = 15000
     const startTime = Date.now()
 
-    const reader = serverProcess.stdout.getReader()
+    const stdout = serverProcess.stdout as ReadableStream<Uint8Array>
+    const reader = stdout.getReader()
     let buffer = ""
 
     while (Date.now() - startTime < timeout) {

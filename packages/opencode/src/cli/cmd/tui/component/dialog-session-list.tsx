@@ -34,18 +34,8 @@ export function DialogSessionList() {
         }
         const isDeleting = toDelete() === x.id
 
-        // Add custom prompt indicator
-        let subtitle: string | undefined
-        if (x.customPrompt) {
-          const promptLabel = x.customPrompt.type === "file"
-            ? `📄 ${x.customPrompt.value}`
-            : "📝 Custom prompt"
-          subtitle = promptLabel
-        }
-
         return {
           title: isDeleting ? `Press ${deleteKeybind} again to confirm` : x.title,
-          subtitle: isDeleting ? undefined : subtitle,
           bg: isDeleting ? theme.error : undefined,
           value: x.id,
           category,
