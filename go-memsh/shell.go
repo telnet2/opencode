@@ -25,6 +25,7 @@ type Shell struct {
 	stdout      io.Writer
 	stderr      io.Writer
 	pipeManager *PipeManager // Manages virtual pipes for process substitution
+	cowManager  *CowManager  // Manages copy-on-write filesystem mounts
 	config      ShellConfig
 }
 
@@ -56,6 +57,7 @@ func NewShellWithConfig(fs afero.Fs, cfg ShellConfig) (*Shell, error) {
 		stderr:      os.Stderr,
 		env:         NewEnvironMap(os.Environ()),
 		pipeManager: NewPipeManager(),
+		cowManager:  NewCowManager(),
 		config:      cfg,
 	}
 
@@ -353,6 +355,19 @@ func (s *Shell) execHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc 
 			return s.cmdGrepEx(ctx, args)
 		case "exists":
 			return s.cmdExists(ctx, args)
+		// Copy-on-write filesystem commands
+		case "cow-mount":
+			return s.cmdCowMount(ctx, args)
+		case "cow-unmount":
+			return s.cmdCowUnmount(ctx, args)
+		case "cow-status":
+			return s.cmdCowStatus(ctx, args)
+		case "cow-flush":
+			return s.cmdCowFlush(ctx, args)
+		case "cow-reset":
+			return s.cmdCowReset(ctx, args)
+		case "cow-diff":
+			return s.cmdCowDiff(ctx, args)
 		default:
 			return fmt.Errorf("%s: command not found", args[0])
 		}
