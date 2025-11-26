@@ -2,8 +2,10 @@
 package logging
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -12,6 +14,9 @@ import (
 
 // Logger is the global logger instance.
 var Logger zerolog.Logger
+
+// logFile holds the current log file if logging to file.
+var logFile *os.File
 
 // Level represents log levels.
 type Level = zerolog.Level
@@ -35,6 +40,10 @@ type Config struct {
 	Pretty bool
 	// TimeFormat specifies the time format. Defaults to RFC3339.
 	TimeFormat string
+	// LogToFile enables logging to a timestamped file in /tmp.
+	LogToFile bool
+	// LogDir is the directory for log files. Defaults to /tmp.
+	LogDir string
 }
 
 // DefaultConfig returns a default configuration.
@@ -44,6 +53,8 @@ func DefaultConfig() Config {
 		Output:     os.Stderr,
 		Pretty:     false,
 		TimeFormat: time.RFC3339,
+		LogToFile:  false,
+		LogDir:     "/tmp",
 	}
 }
 
@@ -55,15 +66,48 @@ func Init(cfg Config) {
 	if cfg.TimeFormat == "" {
 		cfg.TimeFormat = time.RFC3339
 	}
+	if cfg.LogDir == "" {
+		cfg.LogDir = "/tmp"
+	}
 
 	zerolog.TimeFieldFormat = cfg.TimeFormat
 
-	var output io.Writer = cfg.Output
+	var writers []io.Writer
+
+	// Console output
+	var consoleOutput io.Writer = cfg.Output
 	if cfg.Pretty {
-		output = zerolog.ConsoleWriter{
+		consoleOutput = zerolog.ConsoleWriter{
 			Out:        cfg.Output,
 			TimeFormat: cfg.TimeFormat,
 		}
+	}
+	writers = append(writers, consoleOutput)
+
+	// File output
+	if cfg.LogToFile {
+		// Close previous log file if any
+		if logFile != nil {
+			logFile.Close()
+		}
+
+		// Create timestamped log file
+		timestamp := time.Now().Format("20060102-150405")
+		logPath := filepath.Join(cfg.LogDir, fmt.Sprintf("opencode-%s.log", timestamp))
+
+		var err error
+		logFile, err = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err == nil {
+			writers = append(writers, logFile)
+		}
+	}
+
+	// Create multi-writer
+	var output io.Writer
+	if len(writers) == 1 {
+		output = writers[0]
+	} else {
+		output = zerolog.MultiLevelWriter(writers...)
 	}
 
 	Logger = zerolog.New(output).
@@ -71,6 +115,22 @@ func Init(cfg Config) {
 		With().
 		Timestamp().
 		Logger()
+}
+
+// GetLogFilePath returns the current log file path, or empty string if not logging to file.
+func GetLogFilePath() string {
+	if logFile != nil {
+		return logFile.Name()
+	}
+	return ""
+}
+
+// Close closes the log file if one is open.
+func Close() {
+	if logFile != nil {
+		logFile.Close()
+		logFile = nil
+	}
 }
 
 // ParseLevel parses a log level string (case-insensitive).

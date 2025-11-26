@@ -19,6 +19,7 @@ var (
 var (
 	printLogs bool
 	logLevel  string
+	logFile   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -32,18 +33,26 @@ to start a headless server.`,
 	Version: Version,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Initialize logging based on flags
-		if printLogs {
-			logging.Init(logging.Config{
-				Level:  logging.ParseLevel(logLevel),
-				Output: os.Stderr,
-				Pretty: true,
-			})
-		} else {
+		cfg := logging.Config{
+			Level:     logging.ParseLevel(logLevel),
+			Output:    os.Stderr,
+			Pretty:    printLogs,
+			LogToFile: logFile,
+		}
+
+		if !printLogs && !logFile {
 			// Disable logging output by default (only show fatal errors)
-			logging.Init(logging.Config{
-				Level:  logging.FatalLevel,
-				Output: os.Stderr,
-			})
+			cfg.Level = logging.FatalLevel
+		}
+
+		logging.Init(cfg)
+
+		// Log startup info if file logging is enabled
+		if logFile {
+			logging.Info().
+				Str("version", Version).
+				Str("logFile", logging.GetLogFilePath()).
+				Msg("OpenCode started with file logging")
 		}
 	},
 	// Run serve by default if no subcommand specified
@@ -57,6 +66,7 @@ func init() {
 	// Global flags available to all commands
 	rootCmd.PersistentFlags().BoolVar(&printLogs, "print-logs", false, "Print logs to stderr")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "INFO", "Log level (DEBUG|INFO|WARN|ERROR)")
+	rootCmd.PersistentFlags().BoolVar(&logFile, "log-file", false, "Write logs to /tmp/opencode-YYYYMMDD-HHMMSS.log")
 
 	// Version template
 	rootCmd.SetVersionTemplate(fmt.Sprintf("opencode %s (%s)\n", Version, BuildTime))
