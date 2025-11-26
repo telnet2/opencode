@@ -4,22 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Client manages MCP server connections.
+// Client manages MCP server connections using the official MCP SDK.
 type Client struct {
-	mu      sync.RWMutex
-	servers map[string]*mcpServer
+	mu        sync.RWMutex
+	servers   map[string]*mcpServer
+	sdkClient *sdkmcp.Client
 }
 
 // mcpServer represents a connected MCP server.
 type mcpServer struct {
 	name       string
 	config     *Config
-	transport  Transport
+	session    *sdkmcp.ClientSession
 	tools      []Tool
 	resources  []Resource
 	prompts    []Prompt
@@ -30,8 +36,14 @@ type mcpServer struct {
 
 // NewClient creates a new MCP client.
 func NewClient() *Client {
+	sdkClient := sdkmcp.NewClient(&sdkmcp.Implementation{
+		Name:    "opencode",
+		Version: "1.0.0",
+	}, nil)
+
 	return &Client{
-		servers: make(map[string]*mcpServer),
+		servers:   make(map[string]*mcpServer),
+		sdkClient: sdkClient,
 	}
 }
 
@@ -69,11 +81,8 @@ func (c *Client) AddServer(ctx context.Context, name string, config *Config) err
 	return nil
 }
 
-// connectServer establishes connection to an MCP server.
+// connectServer establishes connection to an MCP server using the SDK.
 func (c *Client) connectServer(ctx context.Context, name string, config *Config) (*mcpServer, error) {
-	var transport Transport
-	var err error
-
 	timeout := time.Duration(config.Timeout) * time.Millisecond
 	if timeout == 0 {
 		timeout = 5 * time.Second
@@ -82,89 +91,85 @@ func (c *Client) connectServer(ctx context.Context, name string, config *Config)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	var transport sdkmcp.Transport
+
 	switch config.Type {
 	case TransportTypeRemote:
-		transport, err = NewHTTPTransport(config.URL, config.Headers)
+		// Use SSE transport for remote HTTP servers
+		httpClient := &http.Client{Timeout: timeout}
+		transport = &sdkmcp.SSEClientTransport{
+			Endpoint:   config.URL,
+			HTTPClient: httpClient,
+		}
+
 	case TransportTypeLocal, TransportTypeStdio:
-		transport, err = NewStdioTransport(ctx, config.Command, config.Environment)
+		if len(config.Command) == 0 {
+			return nil, fmt.Errorf("empty command")
+		}
+
+		cmd := exec.Command(config.Command[0], config.Command[1:]...)
+
+		// Set environment
+		cmd.Env = os.Environ()
+		for k, v := range config.Environment {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+		}
+
+		transport = &sdkmcp.CommandTransport{Command: cmd}
+
 	default:
 		return nil, fmt.Errorf("unknown transport type: %s", config.Type)
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	server := &mcpServer{
-		name:      name,
-		config:    config,
-		transport: transport,
-		status:    StatusConnecting,
+		name:   name,
+		config: config,
+		status: StatusConnecting,
 	}
 
-	// Initialize and get capabilities
-	if err := server.initialize(ctx); err != nil {
-		transport.Close()
-		return nil, err
+	// Connect using the SDK client
+	session, err := c.sdkClient.Connect(ctx, transport, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
+	}
+
+	server.session = session
+
+	// Get server info from initialization result
+	initResult := session.InitializeResult()
+	if initResult != nil {
+		server.serverInfo = &ServerInfo{
+			Name:    initResult.ServerInfo.Name,
+			Version: initResult.ServerInfo.Version,
+		}
+	}
+
+	// List tools
+	if err := server.listTools(ctx); err != nil {
+		// Non-fatal, tools might not be supported
+		server.tools = []Tool{}
 	}
 
 	server.status = StatusConnected
 	return server, nil
 }
 
-// initialize sends the initialize request and lists tools.
-func (s *mcpServer) initialize(ctx context.Context) error {
-	// Initialize
-	initReq := InitializeRequest{
-		ProtocolVersion: ProtocolVersion,
-		Capabilities: ClientCapabilities{
-			Roots: &RootsCapability{ListChanged: false},
-		},
-		ClientInfo: ClientInfo{
-			Name:    "opencode",
-			Version: "1.0.0",
-		},
-	}
-
-	result, err := s.transport.Send(ctx, "initialize", initReq)
-	if err != nil {
-		return fmt.Errorf("initialize failed: %w", err)
-	}
-
-	var initResp InitializeResponse
-	if err := json.Unmarshal(result, &initResp); err != nil {
-		return fmt.Errorf("failed to parse initialize response: %w", err)
-	}
-
-	s.serverInfo = &initResp.ServerInfo
-
-	// Send initialized notification
-	if err := s.transport.Notify(ctx, "notifications/initialized", nil); err != nil {
-		return fmt.Errorf("initialized notification failed: %w", err)
-	}
-
-	// List tools
-	if err := s.listTools(ctx); err != nil {
-		// Non-fatal, tools might not be supported
-		s.tools = []Tool{}
-	}
-
-	return nil
-}
-
-// listTools lists available tools from the server.
+// listTools lists available tools from the server using the SDK.
 func (s *mcpServer) listTools(ctx context.Context) error {
-	result, err := s.transport.Send(ctx, "tools/list", nil)
+	if s.session == nil {
+		return fmt.Errorf("not connected")
+	}
+
+	result, err := s.session.ListTools(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	var toolsResp ListToolsResponse
-	if err := json.Unmarshal(result, &toolsResp); err != nil {
-		return err
+	s.tools = make([]Tool, len(result.Tools))
+	for i, t := range result.Tools {
+		s.tools[i] = FromSDKTool(t)
 	}
 
-	s.tools = toolsResp.Tools
 	return nil
 }
 
@@ -226,27 +231,34 @@ func (c *Client) ExecuteTool(ctx context.Context, toolName string, args json.Raw
 		return "", fmt.Errorf("no server found for tool: %s", toolName)
 	}
 
-	// Execute tool
-	callReq := CallToolRequest{
-		Name:      originalToolName,
-		Arguments: args,
+	if targetServer.session == nil {
+		return "", fmt.Errorf("server not connected: %s", targetServer.name)
 	}
 
-	result, err := targetServer.transport.Send(ctx, "tools/call", callReq)
+	// Parse arguments into a map
+	var argsMap map[string]any
+	if len(args) > 0 {
+		if err := json.Unmarshal(args, &argsMap); err != nil {
+			return "", fmt.Errorf("failed to parse arguments: %w", err)
+		}
+	}
+
+	// Execute tool using SDK
+	params := &sdkmcp.CallToolParams{
+		Name:      originalToolName,
+		Arguments: argsMap,
+	}
+
+	result, err := targetServer.session.CallTool(ctx, params)
 	if err != nil {
 		return "", err
 	}
 
-	var callResp CallToolResponse
-	if err := json.Unmarshal(result, &callResp); err != nil {
-		return string(result), nil
-	}
-
-	if callResp.IsError {
+	if result.IsError {
 		// Extract error message from content
-		for _, c := range callResp.Content {
-			if c.Type == "text" {
-				return "", fmt.Errorf("tool error: %s", c.Text)
+		for _, content := range result.Content {
+			if textContent, ok := content.(*sdkmcp.TextContent); ok {
+				return "", fmt.Errorf("tool error: %s", textContent.Text)
 			}
 		}
 		return "", fmt.Errorf("tool execution failed")
@@ -254,9 +266,9 @@ func (c *Client) ExecuteTool(ctx context.Context, toolName string, args json.Raw
 
 	// Extract text content
 	var output strings.Builder
-	for _, c := range callResp.Content {
-		if c.Type == "text" {
-			output.WriteString(c.Text)
+	for _, content := range result.Content {
+		if textContent, ok := content.(*sdkmcp.TextContent); ok {
+			output.WriteString(textContent.Text)
 		}
 	}
 
@@ -271,7 +283,7 @@ func (c *Client) ListResources(ctx context.Context) ([]Resource, error) {
 	var allResources []Resource
 
 	for name, server := range c.servers {
-		if server.status != StatusConnected {
+		if server.status != StatusConnected || server.session == nil {
 			continue
 		}
 
@@ -296,17 +308,21 @@ func (c *Client) ListResources(ctx context.Context) ([]Resource, error) {
 }
 
 func (s *mcpServer) listResources(ctx context.Context) ([]Resource, error) {
-	result, err := s.transport.Send(ctx, "resources/list", nil)
+	if s.session == nil {
+		return nil, fmt.Errorf("not connected")
+	}
+
+	result, err := s.session.ListResources(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var resp ListResourcesResponse
-	if err := json.Unmarshal(result, &resp); err != nil {
-		return nil, err
+	resources := make([]Resource, len(result.Resources))
+	for i, r := range result.Resources {
+		resources[i] = FromSDKResource(r)
 	}
 
-	return resp.Resources, nil
+	return resources, nil
 }
 
 // ReadResource reads a resource from a server.
@@ -336,19 +352,36 @@ func (c *Client) ReadResource(ctx context.Context, uri string) (*ReadResourceRes
 }
 
 func (s *mcpServer) readResource(ctx context.Context, uri string) (*ReadResourceResponse, error) {
-	req := ReadResourceRequest{URI: uri}
+	if s.session == nil {
+		return nil, fmt.Errorf("not connected")
+	}
 
-	result, err := s.transport.Send(ctx, "resources/read", req)
+	params := &sdkmcp.ReadResourceParams{URI: uri}
+	result, err := s.session.ReadResource(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 
-	var resp ReadResourceResponse
-	if err := json.Unmarshal(result, &resp); err != nil {
-		return nil, err
+	resp := &ReadResourceResponse{
+		Contents: make([]ResourceContent, len(result.Contents)),
 	}
 
-	return &resp, nil
+	for i, c := range result.Contents {
+		content := ResourceContent{
+			URI:      c.URI,
+			MimeType: c.MIMEType,
+			Text:     c.Text,
+		}
+
+		// Handle blob content
+		if len(c.Blob) > 0 {
+			content.Blob = string(c.Blob)
+		}
+
+		resp.Contents[i] = content
+	}
+
+	return resp, nil
 }
 
 // Status returns status of all MCP servers.
@@ -403,8 +436,8 @@ func (c *Client) RemoveServer(name string) error {
 		return fmt.Errorf("server not found: %s", name)
 	}
 
-	if server.transport != nil {
-		server.transport.Close()
+	if server.session != nil {
+		server.session.Close()
 	}
 
 	delete(c.servers, name)
@@ -417,8 +450,8 @@ func (c *Client) Close() error {
 	defer c.mu.Unlock()
 
 	for _, server := range c.servers {
-		if server.transport != nil {
-			server.transport.Close()
+		if server.session != nil {
+			server.session.Close()
 		}
 	}
 
