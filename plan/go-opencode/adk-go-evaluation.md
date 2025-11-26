@@ -1,1204 +1,1108 @@
-# ADK-Go SDK Evaluation for OpenCode Server
+# Go LLM SDK Evaluation for OpenCode Server
 
 ## Executive Summary
 
-This document evaluates Google's Agent Development Kit (ADK) for Go (`google.golang.org/adk`) as a potential replacement for the Vercel AI SDK in the OpenCode server implementation. While ADK-Go provides a solid foundation for building AI agents, it has significant gaps compared to the Vercel AI SDK's comprehensive feature set.
+This document evaluates Go LLM frameworks as potential replacements for the Vercel AI SDK in the OpenCode server implementation. We analyzed two major frameworks:
 
-**Recommendation**: ADK-Go is **not a direct replacement** for the Vercel AI SDK, but can serve as **inspiration for architecture patterns** and may be useful for specific components. A custom Go implementation leveraging direct provider SDKs is recommended.
+1. **Google ADK-Go** (`google.golang.org/adk`) - Agent Development Kit
+2. **CloudWeGo Eino** (`github.com/cloudwego/eino`) - LLM Application Framework
 
----
-
-## 1. Feature Comparison Matrix
-
-| Feature | Vercel AI SDK | ADK-Go | Gap Analysis |
-|---------|---------------|--------|--------------|
-| **Multi-Provider Support** | ✅ 10+ providers bundled | ⚠️ Gemini only | Major gap - need custom provider implementations |
-| **Streaming Text Generation** | ✅ `streamText()` | ✅ `GenerateContent(stream=true)` | Conceptually similar |
-| **Non-Streaming Generation** | ✅ `generateText()` | ✅ `GenerateContent(stream=false)` | Equivalent |
-| **Tool/Function Calling** | ✅ `tool()` with execute | ✅ `functiontool.New()` | Similar approach |
-| **Model Middleware** | ✅ `wrapLanguageModel()` | ⚠️ Callbacks only | Different pattern, achievable |
-| **Provider Options** | ✅ Per-provider config | ⚠️ Generic config | Need custom handling |
-| **Cache Control** | ✅ Built-in ephemeral cache | ❌ Not supported | Need to implement |
-| **MCP Client** | ✅ `@ai-sdk/mcp` | ✅ `mcptoolset` | Good parity |
-| **Session Management** | ❌ External | ✅ Built-in | ADK advantage |
-| **Agent Orchestration** | ❌ External | ✅ Built-in | ADK advantage |
-| **JSON Schema for Tools** | ✅ `jsonSchema()` | ✅ Auto-inference | Similar |
-| **Error Handling** | ✅ Typed errors | ✅ Go errors | Different patterns |
-| **Token Usage Tracking** | ✅ Built-in | ✅ UsageMetadata | Equivalent |
+**Recommendation**: **Eino is the recommended choice** for the OpenCode Go implementation. It provides comprehensive multi-provider support, streaming, tool calling, MCP integration, and agent orchestration - all features needed for OpenCode.
 
 ---
 
-## 2. Vercel AI SDK Features Used in OpenCode
+## Framework Comparison Overview
 
-### 2.1 Core Text Generation
+| Feature | Vercel AI SDK | ADK-Go | Eino |
+|---------|---------------|--------|------|
+| **Multi-Provider Support** | 10+ providers | Gemini only | 10+ providers |
+| **Streaming** | streamText() | GenerateContent(stream) | Stream() |
+| **Tool Calling** | tool() | functiontool.New() | InvokableTool |
+| **MCP Integration** | @ai-sdk/mcp | mcptoolset | officialmcp |
+| **Agent Framework** | External | Built-in | ReAct, Workflows |
+| **Graph Orchestration** | External | Basic | Chain, Graph, Workflow |
+| **Cache Control** | Built-in | None | Built-in (Claude) |
+| **Extended Thinking** | Built-in | None | Built-in (Claude) |
+| **AWS Bedrock** | Built-in | None | Built-in (Claude) |
+| **Callbacks/Tracing** | Basic | Callbacks | Comprehensive aspects |
+| **Production Ready** | Yes | Alpha | Yes (ByteDance) |
 
+---
+
+## 1. Eino Framework Analysis
+
+### 1.1 Why Eino?
+
+Eino (pronounced "I know") is developed by ByteDance/CloudWeGo and provides:
+
+- **Comprehensive provider support**: OpenAI, Claude, Gemini, Ollama, DeepSeek, Qwen, and more
+- **Production-tested**: Used in ByteDance production systems
+- **Go-idiomatic**: Follows Go conventions with strong type checking
+- **Feature-rich**: Streaming, tools, MCP, agents, graph orchestration
+- **Active development**: Regular updates and community support
+
+### 1.2 Eino Architecture
+
+```
+github.com/cloudwego/eino/
+├── schema/              # Core types (Message, Tool, Stream)
+├── components/
+│   ├── model/          # ChatModel interface
+│   └── tool/           # Tool interfaces
+├── compose/            # Graph orchestration
+├── flow/agent/         # Agent implementations
+│   └── react/          # ReAct agent
+├── callbacks/          # Aspect-oriented handlers
+└── adk/                # Agent Development Kit
+
+github.com/cloudwego/eino-ext/
+├── components/model/   # Provider implementations
+│   ├── openai/         # OpenAI/Azure
+│   ├── claude/         # Anthropic/Bedrock
+│   ├── gemini/         # Google
+│   ├── ollama/         # Ollama
+│   ├── deepseek/       # DeepSeek
+│   └── qwen/           # Alibaba Qwen
+├── components/tool/
+│   └── mcp/            # MCP integration
+└── callbacks/          # Tracing handlers (Langfuse)
+```
+
+### 1.3 Key Interfaces
+
+```go
+// ChatModel - Core model interface
+type BaseChatModel interface {
+    Generate(ctx context.Context, input []*schema.Message, opts ...Option) (*schema.Message, error)
+    Stream(ctx context.Context, input []*schema.Message, opts ...Option) (*schema.StreamReader[*schema.Message], error)
+}
+
+// ToolCallingChatModel - Model with tool support
+type ToolCallingChatModel interface {
+    BaseChatModel
+    WithTools(tools []*schema.ToolInfo) (ToolCallingChatModel, error)
+}
+
+// Tool - Tool interface
+type InvokableTool interface {
+    Info(ctx context.Context) (*schema.ToolInfo, error)
+    InvokableRun(ctx context.Context, argumentsInJSON string, opts ...Option) (string, error)
+}
+```
+
+---
+
+## 2. Feature Parity Analysis
+
+### 2.1 Multi-Provider Support
+
+**Vercel AI SDK:**
 ```typescript
-// OpenCode uses streamText for main chat loop
-import { streamText, generateText, type ModelMessage } from "ai"
+import { createAnthropic } from "@ai-sdk/anthropic"
+import { createOpenAI } from "@ai-sdk/openai"
+const model = createAnthropic({ apiKey })("claude-sonnet-4")
+```
 
-const result = await streamText({
-  model: wrapLanguageModel({ model: provider.language, middleware: [...] }),
-  messages: [...],
-  tools: {...},
-  maxOutputTokens: 32000,
-  abortSignal: abort,
-  providerOptions: {...},
-  temperature: 0.7,
-  topP: 0.9,
-  stopWhen: stepCountIs(1),
-  onError(error) { ... },
-  experimental_repairToolCall(input) { ... },
+**Eino Equivalent:**
+```go
+import (
+    "github.com/cloudwego/eino-ext/components/model/claude"
+    "github.com/cloudwego/eino-ext/components/model/openai"
+)
+
+// Claude/Anthropic
+claudeModel, err := claude.NewChatModel(ctx, &claude.Config{
+    APIKey:    os.Getenv("ANTHROPIC_API_KEY"),
+    Model:     "claude-sonnet-4-20250514",
+    MaxTokens: 8192,
+})
+
+// Claude via AWS Bedrock
+bedrockModel, err := claude.NewChatModel(ctx, &claude.Config{
+    ByBedrock:       true,
+    Region:          "us-east-1",
+    AccessKey:       os.Getenv("AWS_ACCESS_KEY_ID"),
+    SecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+    Model:           "anthropic.claude-sonnet-4-20250514-v1:0",
+    MaxTokens:       8192,
+})
+
+// OpenAI
+openaiModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+    APIKey: os.Getenv("OPENAI_API_KEY"),
+    Model:  "gpt-4o",
+})
+
+// Azure OpenAI
+azureModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+    ByAzure:    true,
+    APIKey:     os.Getenv("AZURE_OPENAI_API_KEY"),
+    BaseURL:    "https://your-resource.openai.azure.com",
+    APIVersion: "2024-02-15-preview",
+    Model:      "gpt-4o",
 })
 ```
 
-### 2.2 Tool Definition
+### 2.2 Streaming Text Generation
 
+**Vercel AI SDK:**
+```typescript
+const result = await streamText({
+    model: languageModel,
+    messages: messages,
+    tools: tools,
+    maxOutputTokens: 32000,
+})
+
+for await (const chunk of result.textStream) {
+    process.stdout.write(chunk)
+}
+```
+
+**Eino Equivalent:**
+```go
+// Stream generates streaming response
+stream, err := model.Stream(ctx, messages, model.WithMaxTokens(32000))
+if err != nil {
+    return err
+}
+defer stream.Close()
+
+for {
+    msg, err := stream.Recv()
+    if err == io.EOF {
+        break
+    }
+    if err != nil {
+        return err
+    }
+    fmt.Print(msg.Content)
+}
+
+// Or use ConcatMessageStream to get full message
+fullMsg, err := schema.ConcatMessageStream(stream)
+```
+
+### 2.3 Tool Calling
+
+**Vercel AI SDK:**
 ```typescript
 import { tool, jsonSchema } from "ai"
 
-tools[item.id] = tool({
-  id: item.id,
-  description: item.description,
-  inputSchema: jsonSchema(schema),
-  async execute(args, options) {
-    // Tool execution logic
-    return result
-  },
-  toModelOutput(result) {
-    return { type: "text", value: result.output }
-  },
+const readTool = tool({
+    id: "read",
+    description: "Read a file",
+    inputSchema: jsonSchema({
+        type: "object",
+        properties: { file_path: { type: "string" } },
+        required: ["file_path"],
+    }),
+    async execute(args) {
+        return { output: await fs.readFile(args.file_path, "utf-8") }
+    },
 })
 ```
 
-### 2.3 Multi-Provider Support
+**Eino Equivalent:**
+```go
+import (
+    "github.com/cloudwego/eino/components/tool"
+    toolutils "github.com/cloudwego/eino/components/tool/utils"
+    "github.com/cloudwego/eino/schema"
+)
 
-```typescript
-// OpenCode supports 10+ providers via @ai-sdk/*
-import { createAnthropic } from "@ai-sdk/anthropic"
-import { createOpenAI } from "@ai-sdk/openai"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
-// ... and more
+// Using InvokableLambda for simple tools
+type ReadArgs struct {
+    FilePath string `json:"file_path" jsonschema:"description=The file path to read"`
+}
 
-const sdk = providerFactory({ apiKey, baseURL, ... })
-const model = sdk.languageModel(modelID)
+readTool := toolutils.InvokableLambda(func(ctx context.Context, args *ReadArgs) (string, error) {
+    content, err := os.ReadFile(args.FilePath)
+    if err != nil {
+        return "", err
+    }
+    return string(content), nil
+}, toolutils.WithToolName("read"), toolutils.WithToolDesc("Read a file"))
+
+// Or implement the interface directly
+type ReadTool struct{}
+
+func (t *ReadTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+    return &schema.ToolInfo{
+        Name: "read",
+        Desc: "Read a file from the filesystem",
+        ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+            "file_path": {
+                Type:     schema.String,
+                Desc:     "The absolute path to the file to read",
+                Required: true,
+            },
+        }),
+    }, nil
+}
+
+func (t *ReadTool) InvokableRun(ctx context.Context, argsJSON string, opts ...tool.Option) (string, error) {
+    var args ReadArgs
+    if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+        return "", err
+    }
+    content, err := os.ReadFile(args.FilePath)
+    if err != nil {
+        return "", err
+    }
+    return string(content), nil
+}
+
+// Bind tools to model
+modelWithTools, err := model.WithTools([]*schema.ToolInfo{toolInfo})
 ```
 
-### 2.4 MCP Integration
+### 2.4 Cache Control (Anthropic Ephemeral Cache)
 
+**Vercel AI SDK:**
+```typescript
+const result = await streamText({
+    model,
+    messages,
+    providerOptions: {
+        anthropic: { cacheControl: { type: "ephemeral" } }
+    }
+})
+```
+
+**Eino Equivalent:**
+```go
+import "github.com/cloudwego/eino-ext/components/model/claude"
+
+// Eino's Claude implementation supports automatic cache control
+// Set breakpoints on messages via Extra field
+msg := &schema.Message{
+    Role:    schema.System,
+    Content: systemPrompt,
+    Extra: map[string]any{
+        claude.ExtraKeyBreakpoint: true, // Mark for ephemeral caching
+    },
+}
+
+// Or enable auto-caching for system messages and tools
+model.Stream(ctx, messages, claude.WithEnableAutoCache(true))
+```
+
+### 2.5 Extended Thinking (Claude)
+
+**Vercel AI SDK:**
+```typescript
+const result = await streamText({
+    model,
+    messages,
+    providerOptions: {
+        anthropic: { thinking: { type: "enabled", budgetTokens: 10000 } }
+    }
+})
+```
+
+**Eino Equivalent:**
+```go
+import "github.com/cloudwego/eino-ext/components/model/claude"
+
+// Configure thinking in model creation
+model, err := claude.NewChatModel(ctx, &claude.Config{
+    APIKey:    apiKey,
+    Model:     "claude-sonnet-4-20250514",
+    MaxTokens: 16000,
+    Thinking: &claude.Thinking{
+        Enable:       true,
+        BudgetTokens: 10000,
+    },
+})
+
+// Or configure per-request
+model.Stream(ctx, messages, claude.WithThinking(&claude.Thinking{
+    Enable:       true,
+    BudgetTokens: 10000,
+}))
+
+// Access thinking content from response
+msg, _ := model.Generate(ctx, messages)
+thinking, ok := claude.GetThinking(msg)
+// msg.ReasoningContent also contains thinking
+```
+
+### 2.6 MCP Integration
+
+**Vercel AI SDK:**
 ```typescript
 import { experimental_createMCPClient } from "@ai-sdk/mcp"
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const mcpClient = await experimental_createMCPClient({
-  name: "opencode",
-  transport: new StdioClientTransport({ command, args, env }),
+    name: "server",
+    transport: new StdioClientTransport({ command: "npx", args: ["-y", "server"] }),
 })
 const tools = await mcpClient.tools()
 ```
 
----
-
-## 3. ADK-Go Architecture Overview
-
-### 3.1 Core Components
-
-```
-google.golang.org/adk/
-├── agent/           # Agent interface and implementations
-│   ├── agent.go     # Base Agent interface
-│   ├── llmagent/    # LLM-powered agent
-│   ├── remoteagent/ # A2A remote agents
-│   └── workflowagents/  # Sequential, parallel, loop agents
-├── model/           # LLM interface
-│   ├── llm.go       # model.LLM interface
-│   └── gemini/      # Gemini implementation
-├── tool/            # Tool interfaces
-│   ├── tool.go      # tool.Tool interface
-│   ├── functiontool/ # Function wrapper
-│   └── mcptoolset/  # MCP integration
-├── session/         # Session management
-├── runner/          # Agent execution
-├── memory/          # Agent memory
-└── server/          # HTTP server
-    ├── adkrest/     # REST API
-    └── adka2a/      # Agent-to-Agent protocol
-```
-
-### 3.2 Key Interfaces
-
+**Eino Equivalent:**
 ```go
-// Agent interface
-type Agent interface {
-    Name() string
-    Description() string
-    Run(InvocationContext) iter.Seq2[*session.Event, error]
-    SubAgents() []Agent
-}
-
-// LLM interface
-type LLM interface {
-    Name() string
-    GenerateContent(ctx context.Context, req *LLMRequest, stream bool) iter.Seq2[*LLMResponse, error]
-}
-
-// Tool interface
-type Tool interface {
-    Name() string
-    Description() string
-    IsLongRunning() bool
-}
-```
-
----
-
-## 4. How to Implement OpenCode Features in Go
-
-### 4.1 Streaming Text Generation
-
-**Vercel AI SDK Approach:**
-```typescript
-const result = await streamText({
-  model: languageModel,
-  messages: messages,
-  tools: tools,
-})
-
-for await (const chunk of result.textStream) {
-  // Handle streaming chunk
-}
-```
-
-**Go Implementation with ADK-Go Pattern:**
-
-```go
-package streaming
-
 import (
-    "context"
-    "iter"
-
-    "google.golang.org/genai"
+    "github.com/modelcontextprotocol/go-sdk/mcp"
+    "github.com/cloudwego/eino-ext/components/tool/mcp/officialmcp"
 )
 
-// LLMRequest represents the request to the language model
-type LLMRequest struct {
-    Model       string
-    Messages    []*Message
-    Tools       []Tool
-    MaxTokens   int
-    Temperature float64
-    TopP        float64
+// Create MCP client session
+cli, err := mcp.NewStdioClient(ctx, mcp.StdioClientParams{
+    Command: "npx",
+    Args:    []string{"-y", "server"},
+})
+if err != nil {
+    return err
+}
+defer cli.Close()
+
+// Initialize connection
+_, err = cli.Initialize(ctx, &mcp.InitializeParams{
+    ClientInfo: mcp.ClientInfo{Name: "opencode", Version: "1.0"},
+})
+if err != nil {
+    return err
 }
 
-// LLMResponse represents streaming response chunks
-type LLMResponse struct {
-    Content       *genai.Content
-    UsageMetadata *UsageMetadata
-    Partial       bool       // True for intermediate chunks
-    TurnComplete  bool       // True when generation is complete
-    FinishReason  string
-}
-
-// Provider interface for different LLM providers
-type Provider interface {
-    Name() string
-    GenerateContent(ctx context.Context, req *LLMRequest, stream bool) iter.Seq2[*LLMResponse, error]
-}
-
-// StreamText is the main streaming function similar to Vercel's streamText
-func StreamText(ctx context.Context, opts StreamOptions) (*StreamResult, error) {
-    provider := opts.Provider
-
-    req := &LLMRequest{
-        Model:       opts.Model,
-        Messages:    opts.Messages,
-        Tools:       opts.Tools,
-        MaxTokens:   opts.MaxOutputTokens,
-        Temperature: opts.Temperature,
-        TopP:        opts.TopP,
-    }
-
-    // Create streaming iterator
-    stream := provider.GenerateContent(ctx, req, true)
-
-    return &StreamResult{
-        stream:   stream,
-        provider: provider,
-    }, nil
-}
-
-// StreamResult wraps the streaming response
-type StreamResult struct {
-    stream   iter.Seq2[*LLMResponse, error]
-    provider Provider
-}
-
-// TextStream returns an iterator for streaming text chunks
-func (r *StreamResult) TextStream() iter.Seq2[string, error] {
-    return func(yield func(string, error) bool) {
-        for resp, err := range r.stream {
-            if err != nil {
-                yield("", err)
-                return
-            }
-
-            // Extract text from response
-            if resp.Content != nil {
-                for _, part := range resp.Content.Parts {
-                    if part.Text != "" {
-                        if !yield(part.Text, nil) {
-                            return
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Usage example
-func ExampleStreamText() {
-    ctx := context.Background()
-
-    result, err := StreamText(ctx, StreamOptions{
-        Provider:        anthropicProvider,
-        Model:          "claude-sonnet-4",
-        Messages:       messages,
-        Tools:          tools,
-        MaxOutputTokens: 32000,
-    })
-    if err != nil {
-        // Handle error
-    }
-
-    for text, err := range result.TextStream() {
-        if err != nil {
-            // Handle error
-            break
-        }
-        fmt.Print(text)
-    }
-}
+// Get tools from MCP server
+tools, err := officialmcp.GetTools(ctx, &officialmcp.Config{
+    Cli: cli,
+    // Optionally filter tools
+    ToolNameList: []string{"read_file", "write_file"},
+    // Optional result handler
+    ToolCallResultHandler: func(ctx context.Context, name string, result *mcp.CallToolResult) (*mcp.CallToolResult, error) {
+        // Custom processing
+        return result, nil
+    },
+})
 ```
 
-### 4.2 Multi-Provider Architecture
+### 2.7 ReAct Agent
 
-**Go Implementation:**
+**Eino provides a built-in ReAct agent:**
+
+```go
+import (
+    "github.com/cloudwego/eino/compose"
+    "github.com/cloudwego/eino/flow/agent/react"
+)
+
+// Create ReAct agent
+agent, err := react.NewAgent(ctx, &react.AgentConfig{
+    ToolCallingModel: model,
+    ToolsConfig: compose.ToolsNodeConfig{
+        Tools: []tool.BaseTool{readTool, writeTool, bashTool},
+    },
+    MaxStep: 20,
+    MessageModifier: func(ctx context.Context, msgs []*schema.Message) []*schema.Message {
+        // Add system prompt
+        return append([]*schema.Message{schema.SystemMessage(systemPrompt)}, msgs...)
+    },
+    // Tools that return directly without model loop
+    ToolReturnDirectly: map[string]struct{}{
+        "final_answer": {},
+    },
+})
+
+// Generate response
+response, err := agent.Generate(ctx, []*schema.Message{
+    schema.UserMessage("Help me write a function that calculates fibonacci"),
+})
+
+// Or stream
+stream, err := agent.Stream(ctx, messages)
+```
+
+### 2.8 Graph Orchestration
+
+**Eino provides powerful graph orchestration:**
+
+```go
+import "github.com/cloudwego/eino/compose"
+
+// Create a graph for complex workflows
+graph := compose.NewGraph[map[string]any, *schema.Message]()
+
+// Add nodes
+graph.AddChatTemplateNode("template", chatTemplate)
+graph.AddChatModelNode("model", chatModel)
+graph.AddToolsNode("tools", toolsNode)
+graph.AddLambdaNode("converter", convertFunc)
+
+// Add edges
+graph.AddEdge(compose.START, "template")
+graph.AddEdge("template", "model")
+graph.AddBranch("model", branch) // Conditional branching
+graph.AddEdge("tools", "converter")
+graph.AddEdge("converter", compose.END)
+
+// Compile and run
+runnable, err := graph.Compile(ctx)
+result, err := runnable.Invoke(ctx, input)
+```
+
+### 2.9 Callbacks/Aspects for Tracing
+
+```go
+import "github.com/cloudwego/eino/callbacks"
+
+// Create callback handler
+handler := callbacks.NewHandlerBuilder().
+    OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+        log.Printf("Starting %s: %v", info.Name, input)
+        return ctx
+    }).
+    OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+        log.Printf("Completed %s: %v", info.Name, output)
+        return ctx
+    }).
+    OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+        log.Printf("Error in %s: %v", info.Name, err)
+        return ctx
+    }).
+    Build()
+
+// Use with model
+model.Generate(ctx, messages, model.WithCallbacks(handler))
+
+// Or use with graph
+graph.Invoke(ctx, input, compose.WithCallbacks(handler))
+```
+
+---
+
+## 3. Implementation Guide for OpenCode
+
+### 3.1 Provider Abstraction Layer
 
 ```go
 package provider
 
 import (
     "context"
-    "fmt"
-    "iter"
 
-    "github.com/anthropics/anthropic-sdk-go"
-    "github.com/openai/openai-go"
+    "github.com/cloudwego/eino/components/model"
+    "github.com/cloudwego/eino/schema"
+    "github.com/cloudwego/eino-ext/components/model/claude"
+    "github.com/cloudwego/eino-ext/components/model/openai"
 )
 
-// Provider is the interface all LLM providers must implement
-type Provider interface {
-    ID() string
-    Name() string
-    Models() []ModelInfo
-    GenerateContent(ctx context.Context, req *LLMRequest, stream bool) iter.Seq2[*LLMResponse, error]
+// Provider wraps an Eino ChatModel with additional metadata
+type Provider struct {
+    ID          string
+    Name        string
+    ChatModel   model.ToolCallingChatModel
 }
 
-// ProviderConfig holds configuration for a provider
+// ProviderConfig holds configuration for creating providers
 type ProviderConfig struct {
-    APIKey     string
-    BaseURL    string
-    Headers    map[string]string
-    Options    map[string]any
+    ID          string
+    Type        string // "anthropic", "openai", "bedrock", etc.
+    APIKey      string
+    BaseURL     string
+    Model       string
+    MaxTokens   int
+
+    // Anthropic-specific
+    Thinking    *claude.Thinking
+
+    // Bedrock-specific
+    Region      string
+    Profile     string
 }
 
 // Registry manages provider instances
 type Registry struct {
-    providers map[string]Provider
+    providers map[string]*Provider
 }
 
 func NewRegistry() *Registry {
-    return &Registry{
-        providers: make(map[string]Provider),
+    return &Registry{providers: make(map[string]*Provider)}
+}
+
+func (r *Registry) Register(ctx context.Context, cfg ProviderConfig) error {
+    var chatModel model.ToolCallingChatModel
+    var err error
+
+    switch cfg.Type {
+    case "anthropic":
+        chatModel, err = claude.NewChatModel(ctx, &claude.Config{
+            APIKey:    cfg.APIKey,
+            BaseURL:   &cfg.BaseURL,
+            Model:     cfg.Model,
+            MaxTokens: cfg.MaxTokens,
+            Thinking:  cfg.Thinking,
+        })
+
+    case "bedrock":
+        chatModel, err = claude.NewChatModel(ctx, &claude.Config{
+            ByBedrock: true,
+            Region:    cfg.Region,
+            Profile:   cfg.Profile,
+            Model:     cfg.Model,
+            MaxTokens: cfg.MaxTokens,
+            Thinking:  cfg.Thinking,
+        })
+
+    case "openai":
+        maxTokens := cfg.MaxTokens
+        cm, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+            APIKey:    cfg.APIKey,
+            BaseURL:   cfg.BaseURL,
+            Model:     cfg.Model,
+            MaxTokens: &maxTokens,
+        })
+        if err != nil {
+            return err
+        }
+        chatModel = cm
+
+    case "azure":
+        maxTokens := cfg.MaxTokens
+        cm, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+            ByAzure:    true,
+            APIKey:     cfg.APIKey,
+            BaseURL:    cfg.BaseURL,
+            APIVersion: "2024-02-15-preview",
+            Model:      cfg.Model,
+            MaxTokens:  &maxTokens,
+        })
+        if err != nil {
+            return err
+        }
+        chatModel = cm
+
+    default:
+        return fmt.Errorf("unknown provider type: %s", cfg.Type)
     }
+
+    if err != nil {
+        return err
+    }
+
+    r.providers[cfg.ID] = &Provider{
+        ID:        cfg.ID,
+        Name:      cfg.Type,
+        ChatModel: chatModel,
+    }
+
+    return nil
 }
 
-func (r *Registry) Register(p Provider) {
-    r.providers[p.ID()] = p
-}
-
-func (r *Registry) Get(id string) (Provider, bool) {
+func (r *Registry) Get(id string) (*Provider, bool) {
     p, ok := r.providers[id]
     return p, ok
 }
-
-// AnthropicProvider implements Provider for Anthropic/Claude
-type AnthropicProvider struct {
-    client *anthropic.Client
-    config ProviderConfig
-}
-
-func NewAnthropicProvider(cfg ProviderConfig) (*AnthropicProvider, error) {
-    client := anthropic.NewClient(
-        anthropic.WithAPIKey(cfg.APIKey),
-        anthropic.WithBaseURL(cfg.BaseURL),
-    )
-
-    return &AnthropicProvider{
-        client: client,
-        config: cfg,
-    }, nil
-}
-
-func (p *AnthropicProvider) ID() string   { return "anthropic" }
-func (p *AnthropicProvider) Name() string { return "Anthropic" }
-
-func (p *AnthropicProvider) GenerateContent(ctx context.Context, req *LLMRequest, stream bool) iter.Seq2[*LLMResponse, error] {
-    return func(yield func(*LLMResponse, error) bool) {
-        // Convert messages to Anthropic format
-        anthropicMessages := convertToAnthropicMessages(req.Messages)
-
-        // Convert tools to Anthropic format
-        anthropicTools := convertToAnthropicTools(req.Tools)
-
-        if stream {
-            // Streaming request
-            stream, err := p.client.Messages.Stream(ctx, anthropic.MessagesStreamParams{
-                Model:     req.Model,
-                Messages:  anthropicMessages,
-                Tools:     anthropicTools,
-                MaxTokens: int64(req.MaxTokens),
-            })
-            if err != nil {
-                yield(nil, err)
-                return
-            }
-            defer stream.Close()
-
-            for event := range stream.Events() {
-                resp := convertAnthropicStreamEvent(event)
-                if !yield(resp, nil) {
-                    return
-                }
-            }
-        } else {
-            // Non-streaming request
-            resp, err := p.client.Messages.Create(ctx, anthropic.MessagesParams{
-                Model:     req.Model,
-                Messages:  anthropicMessages,
-                Tools:     anthropicTools,
-                MaxTokens: int64(req.MaxTokens),
-            })
-            if err != nil {
-                yield(nil, err)
-                return
-            }
-            yield(convertAnthropicResponse(resp), nil)
-        }
-    }
-}
-
-// OpenAIProvider implements Provider for OpenAI
-type OpenAIProvider struct {
-    client *openai.Client
-    config ProviderConfig
-}
-
-func NewOpenAIProvider(cfg ProviderConfig) (*OpenAIProvider, error) {
-    client := openai.NewClient(
-        openai.WithAPIKey(cfg.APIKey),
-    )
-
-    return &OpenAIProvider{
-        client: client,
-        config: cfg,
-    }, nil
-}
-
-func (p *OpenAIProvider) ID() string   { return "openai" }
-func (p *OpenAIProvider) Name() string { return "OpenAI" }
-
-func (p *OpenAIProvider) GenerateContent(ctx context.Context, req *LLMRequest, stream bool) iter.Seq2[*LLMResponse, error] {
-    return func(yield func(*LLMResponse, error) bool) {
-        // Convert messages to OpenAI format
-        openaiMessages := convertToOpenAIMessages(req.Messages)
-
-        // Convert tools to OpenAI format
-        openaiTools := convertToOpenAITools(req.Tools)
-
-        if stream {
-            stream := p.client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
-                Model:     req.Model,
-                Messages:  openaiMessages,
-                Tools:     openaiTools,
-                MaxTokens: openai.Int(int64(req.MaxTokens)),
-            })
-
-            for stream.Next() {
-                chunk := stream.Current()
-                resp := convertOpenAIStreamChunk(chunk)
-                if !yield(resp, nil) {
-                    return
-                }
-            }
-
-            if err := stream.Err(); err != nil {
-                yield(nil, err)
-            }
-        } else {
-            resp, err := p.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-                Model:     req.Model,
-                Messages:  openaiMessages,
-                Tools:     openaiTools,
-                MaxTokens: openai.Int(int64(req.MaxTokens)),
-            })
-            if err != nil {
-                yield(nil, err)
-                return
-            }
-            yield(convertOpenAIResponse(resp), nil)
-        }
-    }
-}
 ```
 
-### 4.3 Tool System
-
-**Go Implementation:**
+### 3.2 Tool System Integration
 
 ```go
-package tool
+package tools
 
 import (
     "context"
     "encoding/json"
-    "fmt"
+    "os"
+
+    "github.com/cloudwego/eino/components/tool"
+    "github.com/cloudwego/eino/schema"
 )
 
-// Tool defines the interface for all tools
-type Tool interface {
-    ID() string
-    Description() string
-    Parameters() json.RawMessage // JSON Schema
-    Execute(ctx context.Context, args json.RawMessage, opts ExecuteOptions) (*Result, error)
+// BaseTool extends Eino's tool interface with OpenCode-specific features
+type BaseTool interface {
+    tool.InvokableTool
+
+    // Additional OpenCode features
+    RequiresPermission() bool
+    Category() string
 }
 
-// ExecuteOptions provides context for tool execution
-type ExecuteOptions struct {
-    SessionID   string
-    MessageID   string
-    CallID      string
-    Agent       string
-    AbortSignal context.Context
+// ReadTool implements file reading
+type ReadTool struct{}
 
-    // Metadata callback for real-time updates
-    OnMetadata func(title string, metadata map[string]any)
+func (t *ReadTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+    return &schema.ToolInfo{
+        Name: "Read",
+        Desc: "Reads a file from the local filesystem. Returns the file contents with line numbers.",
+        ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+            "file_path": {
+                Type:     schema.String,
+                Desc:     "The absolute path to the file to read",
+                Required: true,
+            },
+            "offset": {
+                Type: schema.Integer,
+                Desc: "The line number to start reading from (1-indexed)",
+            },
+            "limit": {
+                Type: schema.Integer,
+                Desc: "The number of lines to read",
+            },
+        }),
+    }, nil
 }
 
-// Result represents the output of a tool execution
-type Result struct {
-    Title       string         `json:"title"`
-    Output      string         `json:"output"`
-    Metadata    map[string]any `json:"metadata,omitempty"`
-    Attachments []Attachment   `json:"attachments,omitempty"`
+func (t *ReadTool) InvokableRun(ctx context.Context, argsJSON string, opts ...tool.Option) (string, error) {
+    var args struct {
+        FilePath string `json:"file_path"`
+        Offset   int    `json:"offset"`
+        Limit    int    `json:"limit"`
+    }
+
+    if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+        return "", err
+    }
+
+    content, err := os.ReadFile(args.FilePath)
+    if err != nil {
+        return "", err
+    }
+
+    // Apply offset/limit logic
+    lines := strings.Split(string(content), "\n")
+    if args.Offset > 0 {
+        if args.Offset > len(lines) {
+            lines = []string{}
+        } else {
+            lines = lines[args.Offset-1:]
+        }
+    }
+    if args.Limit > 0 && args.Limit < len(lines) {
+        lines = lines[:args.Limit]
+    }
+
+    // Format with line numbers
+    var result strings.Builder
+    startLine := 1
+    if args.Offset > 0 {
+        startLine = args.Offset
+    }
+    for i, line := range lines {
+        fmt.Fprintf(&result, "%d\t%s\n", startLine+i, line)
+    }
+
+    return result.String(), nil
 }
 
-// Attachment represents a file attachment
-type Attachment struct {
-    Filename  string `json:"filename"`
-    MediaType string `json:"mediaType"`
-    URL       string `json:"url"`
+func (t *ReadTool) RequiresPermission() bool { return false }
+func (t *ReadTool) Category() string         { return "filesystem" }
+
+// BashTool implements shell command execution
+type BashTool struct {
+    sandbox bool
 }
 
-// Registry manages tool registration
+func (t *BashTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+    return &schema.ToolInfo{
+        Name: "Bash",
+        Desc: "Executes a bash command in a persistent shell session",
+        ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+            "command": {
+                Type:     schema.String,
+                Desc:     "The command to execute",
+                Required: true,
+            },
+            "timeout": {
+                Type: schema.Integer,
+                Desc: "Optional timeout in milliseconds (max 600000)",
+            },
+        }),
+    }, nil
+}
+
+func (t *BashTool) InvokableRun(ctx context.Context, argsJSON string, opts ...tool.Option) (string, error) {
+    var args struct {
+        Command string `json:"command"`
+        Timeout int    `json:"timeout"`
+    }
+
+    if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+        return "", err
+    }
+
+    // Execute command with timeout
+    timeout := time.Duration(args.Timeout) * time.Millisecond
+    if timeout == 0 {
+        timeout = 120 * time.Second
+    }
+
+    execCtx, cancel := context.WithTimeout(ctx, timeout)
+    defer cancel()
+
+    cmd := exec.CommandContext(execCtx, "bash", "-c", args.Command)
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        return string(output) + "\n" + err.Error(), nil
+    }
+
+    return string(output), nil
+}
+
+func (t *BashTool) RequiresPermission() bool { return true }
+func (t *BashTool) Category() string         { return "execution" }
+
+// Registry for OpenCode tools
 type Registry struct {
-    tools map[string]Tool
+    tools map[string]BaseTool
 }
 
 func NewRegistry() *Registry {
-    return &Registry{
-        tools: make(map[string]Tool),
+    return &Registry{tools: make(map[string]BaseTool)}
+}
+
+func (r *Registry) Register(t BaseTool) {
+    info, _ := t.Info(context.Background())
+    r.tools[info.Name] = t
+}
+
+func (r *Registry) GetEinoTools(ctx context.Context) []tool.BaseTool {
+    result := make([]tool.BaseTool, 0, len(r.tools))
+    for _, t := range r.tools {
+        result = append(result, t)
     }
+    return result
 }
 
-func (r *Registry) Register(tool Tool) {
-    r.tools[tool.ID()] = tool
-}
-
-func (r *Registry) Get(id string) (Tool, bool) {
-    t, ok := r.tools[id]
-    return t, ok
-}
-
-func (r *Registry) All() map[string]Tool {
-    return r.tools
-}
-
-// ToProviderFormat converts tools to provider-specific format
-func (r *Registry) ToProviderFormat(providerID string) ([]any, error) {
-    var result []any
-
-    for _, tool := range r.tools {
-        switch providerID {
-        case "anthropic":
-            result = append(result, map[string]any{
-                "name":        tool.ID(),
-                "description": tool.Description(),
-                "input_schema": json.RawMessage(tool.Parameters()),
-            })
-        case "openai":
-            result = append(result, map[string]any{
-                "type": "function",
-                "function": map[string]any{
-                    "name":        tool.ID(),
-                    "description": tool.Description(),
-                    "parameters":  json.RawMessage(tool.Parameters()),
-                },
-            })
-        default:
-            // Generic format
-            result = append(result, map[string]any{
-                "name":        tool.ID(),
-                "description": tool.Description(),
-                "parameters":  json.RawMessage(tool.Parameters()),
-            })
+func (r *Registry) GetToolInfos(ctx context.Context) ([]*schema.ToolInfo, error) {
+    result := make([]*schema.ToolInfo, 0, len(r.tools))
+    for _, t := range r.tools {
+        info, err := t.Info(ctx)
+        if err != nil {
+            return nil, err
         }
+        result = append(result, info)
     }
-
     return result, nil
-}
-
-// FunctionTool wraps a Go function as a Tool
-type FunctionTool[TArgs, TResult any] struct {
-    id          string
-    description string
-    handler     func(ctx context.Context, args TArgs, opts ExecuteOptions) (*TResult, error)
-    schema      json.RawMessage
-}
-
-func NewFunctionTool[TArgs, TResult any](
-    id string,
-    description string,
-    schema json.RawMessage,
-    handler func(ctx context.Context, args TArgs, opts ExecuteOptions) (*TResult, error),
-) *FunctionTool[TArgs, TResult] {
-    return &FunctionTool[TArgs, TResult]{
-        id:          id,
-        description: description,
-        handler:     handler,
-        schema:      schema,
-    }
-}
-
-func (t *FunctionTool[TArgs, TResult]) ID() string {
-    return t.id
-}
-
-func (t *FunctionTool[TArgs, TResult]) Description() string {
-    return t.description
-}
-
-func (t *FunctionTool[TArgs, TResult]) Parameters() json.RawMessage {
-    return t.schema
-}
-
-func (t *FunctionTool[TArgs, TResult]) Execute(ctx context.Context, args json.RawMessage, opts ExecuteOptions) (*Result, error) {
-    var typedArgs TArgs
-    if err := json.Unmarshal(args, &typedArgs); err != nil {
-        return nil, fmt.Errorf("failed to unmarshal args: %w", err)
-    }
-
-    result, err := t.handler(ctx, typedArgs, opts)
-    if err != nil {
-        return nil, err
-    }
-
-    // Convert result to generic Result type
-    output, err := json.Marshal(result)
-    if err != nil {
-        return nil, fmt.Errorf("failed to marshal result: %w", err)
-    }
-
-    return &Result{
-        Output: string(output),
-    }, nil
 }
 ```
 
-### 4.4 MCP Integration
-
-**Go Implementation (leveraging ADK-Go's mcptoolset):**
-
-```go
-package mcp
-
-import (
-    "context"
-    "fmt"
-    "os/exec"
-    "sync"
-
-    mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
-    "google.golang.org/adk/tool/mcptoolset"
-)
-
-// Config represents MCP server configuration
-type Config struct {
-    Type        string            `json:"type"` // "local" or "remote"
-    Command     []string          `json:"command,omitempty"`
-    URL         string            `json:"url,omitempty"`
-    Headers     map[string]string `json:"headers,omitempty"`
-    Environment map[string]string `json:"environment,omitempty"`
-    Enabled     *bool             `json:"enabled,omitempty"`
-    Timeout     int               `json:"timeout,omitempty"`
-}
-
-// Status represents the connection status of an MCP server
-type Status struct {
-    Status string `json:"status"` // "connected", "disabled", "failed"
-    Error  string `json:"error,omitempty"`
-}
-
-// Client wraps an MCP connection
-type Client struct {
-    name    string
-    config  Config
-    toolset *mcptoolset.Set
-    status  Status
-    mu      sync.RWMutex
-}
-
-// Manager handles multiple MCP connections
-type Manager struct {
-    clients map[string]*Client
-    mu      sync.RWMutex
-}
-
-func NewManager() *Manager {
-    return &Manager{
-        clients: make(map[string]*Client),
-    }
-}
-
-// Connect establishes connection to an MCP server
-func (m *Manager) Connect(ctx context.Context, name string, cfg Config) (*Status, error) {
-    m.mu.Lock()
-    defer m.mu.Unlock()
-
-    if cfg.Enabled != nil && !*cfg.Enabled {
-        status := Status{Status: "disabled"}
-        m.clients[name] = &Client{name: name, config: cfg, status: status}
-        return &status, nil
-    }
-
-    var transport mcpsdk.Transport
-    var err error
-
-    switch cfg.Type {
-    case "local":
-        if len(cfg.Command) == 0 {
-            return nil, fmt.Errorf("command required for local MCP server")
-        }
-        cmd := exec.Command(cfg.Command[0], cfg.Command[1:]...)
-        for k, v := range cfg.Environment {
-            cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-        }
-        transport = &mcpsdk.CommandTransport{Command: cmd}
-
-    case "remote":
-        if cfg.URL == "" {
-            return nil, fmt.Errorf("URL required for remote MCP server")
-        }
-        transport, err = newHTTPTransport(cfg.URL, cfg.Headers)
-        if err != nil {
-            return nil, fmt.Errorf("failed to create HTTP transport: %w", err)
-        }
-
-    default:
-        return nil, fmt.Errorf("unknown MCP type: %s", cfg.Type)
-    }
-
-    // Create toolset using ADK-Go's mcptoolset
-    toolset, err := mcptoolset.New(mcptoolset.Config{
-        Transport: transport,
-    })
-    if err != nil {
-        status := Status{Status: "failed", Error: err.Error()}
-        m.clients[name] = &Client{name: name, config: cfg, status: status}
-        return &status, nil
-    }
-
-    status := Status{Status: "connected"}
-    m.clients[name] = &Client{
-        name:    name,
-        config:  cfg,
-        toolset: toolset,
-        status:  status,
-    }
-
-    return &status, nil
-}
-
-// Tools returns all tools from connected MCP servers
-func (m *Manager) Tools(ctx context.Context) (map[string]Tool, error) {
-    m.mu.RLock()
-    defer m.mu.RUnlock()
-
-    result := make(map[string]Tool)
-
-    for name, client := range m.clients {
-        if client.toolset == nil {
-            continue
-        }
-
-        tools, err := client.toolset.Tools(nil) // ReadonlyContext
-        if err != nil {
-            continue
-        }
-
-        for _, tool := range tools {
-            key := fmt.Sprintf("mcp__%s__%s", name, tool.Name())
-            result[key] = &mcpToolWrapper{
-                client: client,
-                tool:   tool,
-            }
-        }
-    }
-
-    return result, nil
-}
-
-// mcpToolWrapper wraps an MCP tool to implement our Tool interface
-type mcpToolWrapper struct {
-    client *Client
-    tool   tool.Tool
-}
-
-func (w *mcpToolWrapper) ID() string {
-    return w.tool.Name()
-}
-
-func (w *mcpToolWrapper) Description() string {
-    return w.tool.Description()
-}
-
-func (w *mcpToolWrapper) Parameters() json.RawMessage {
-    // Get parameters from the MCP tool
-    // This depends on the underlying tool implementation
-    return nil
-}
-
-func (w *mcpToolWrapper) Execute(ctx context.Context, args json.RawMessage, opts ExecuteOptions) (*Result, error) {
-    // Execute via MCP protocol
-    // Implementation depends on mcptoolset internals
-    return nil, fmt.Errorf("not implemented")
-}
-```
-
-### 4.5 Session Management
-
-**Go Implementation:**
+### 3.3 Session/Message Management
 
 ```go
 package session
 
 import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "os"
-    "path/filepath"
-    "sync"
-    "time"
+    "github.com/cloudwego/eino/schema"
 )
 
 // Session represents a conversation session
 type Session struct {
-    ID        string       `json:"id"`
-    ProjectID string       `json:"projectID"`
-    Directory string       `json:"directory"`
-    ParentID  *string      `json:"parentID,omitempty"`
-    Title     string       `json:"title"`
-    Version   string       `json:"version"`
-    Summary   Summary      `json:"summary"`
-    Time      TimeInfo     `json:"time"`
+    ID        string        `json:"id"`
+    ProjectID string        `json:"projectID"`
+    Title     string        `json:"title"`
+    Messages  []*Message    `json:"messages"`
+    CreatedAt int64         `json:"createdAt"`
+    UpdatedAt int64         `json:"updatedAt"`
 }
 
-// Summary holds session statistics
-type Summary struct {
-    Additions int `json:"additions"`
-    Deletions int `json:"deletions"`
-    Files     int `json:"files"`
-}
-
-// TimeInfo holds timestamps
-type TimeInfo struct {
-    Created int64 `json:"created"`
-    Updated int64 `json:"updated"`
-}
-
-// Message represents a conversation message
+// Message wraps Eino's schema.Message with OpenCode metadata
 type Message struct {
-    ID         string       `json:"id"`
-    SessionID  string       `json:"sessionID"`
-    Role       string       `json:"role"` // "user" or "assistant"
-    ParentID   *string      `json:"parentID,omitempty"`
-    Time       MessageTime  `json:"time"`
+    *schema.Message
 
-    // User-specific
-    Agent  string             `json:"agent,omitempty"`
-    Model  *ModelRef          `json:"model,omitempty"`
-    System *string            `json:"system,omitempty"`
-    Tools  map[string]bool    `json:"tools,omitempty"`
+    ID         string         `json:"id"`
+    SessionID  string         `json:"sessionID"`
+    ParentID   *string        `json:"parentID,omitempty"`
 
-    // Assistant-specific
-    ModelID    string       `json:"modelID,omitempty"`
-    ProviderID string       `json:"providerID,omitempty"`
-    Mode       string       `json:"mode,omitempty"`
-    Finish     *string      `json:"finish,omitempty"`
-    Cost       float64      `json:"cost,omitempty"`
-    Tokens     *TokenUsage  `json:"tokens,omitempty"`
+    // OpenCode-specific fields
+    Agent      string         `json:"agent,omitempty"`
+    ModelID    string         `json:"modelID,omitempty"`
+    ProviderID string         `json:"providerID,omitempty"`
+    Cost       float64        `json:"cost,omitempty"`
+
+    // Parts for structured content
+    Parts      []Part         `json:"parts,omitempty"`
+
+    Time       MessageTime    `json:"time"`
 }
 
-// Part represents a message component
+// Part represents a message component (text, tool call, etc.)
 type Part interface {
     PartType() string
-    PartID() string
 }
 
-// TextPart represents text content
+// TextPart for text content
 type TextPart struct {
-    ID        string `json:"id"`
-    Type      string `json:"type"` // "text"
-    Text      string `json:"text"`
-    Synthetic bool   `json:"synthetic,omitempty"`
+    ID   string `json:"id"`
+    Type string `json:"type"` // "text"
+    Text string `json:"text"`
 }
 
-// ToolPart represents a tool invocation
+// ToolPart for tool invocations
 type ToolPart struct {
-    ID       string         `json:"id"`
-    Type     string         `json:"type"` // "tool"
-    CallID   string         `json:"callID"`
-    Tool     string         `json:"tool"`
-    State    ToolState      `json:"state"`
+    ID     string    `json:"id"`
+    Type   string    `json:"type"` // "tool"
+    CallID string    `json:"callID"`
+    Tool   string    `json:"tool"`
+    State  ToolState `json:"state"`
 }
 
-// ToolState represents tool execution state
-type ToolState struct {
-    Status   string         `json:"status"` // "pending", "running", "completed", "error"
-    Input    map[string]any `json:"input,omitempty"`
-    Output   string         `json:"output,omitempty"`
-    Error    string         `json:"error,omitempty"`
-    Title    string         `json:"title,omitempty"`
-    Metadata map[string]any `json:"metadata,omitempty"`
-    Time     ToolTime       `json:"time"`
-}
-
-// Store provides persistent session storage
-type Store struct {
-    basePath string
-    mu       sync.RWMutex
-}
-
-func NewStore(basePath string) *Store {
-    return &Store{basePath: basePath}
-}
-
-func (s *Store) Create(ctx context.Context, session *Session) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-
-    session.Time.Created = time.Now().UnixMilli()
-    session.Time.Updated = session.Time.Created
-
-    return s.save(session)
-}
-
-func (s *Store) Get(ctx context.Context, sessionID string) (*Session, error) {
-    s.mu.RLock()
-    defer s.mu.RUnlock()
-
-    path := s.sessionPath(sessionID)
-    data, err := os.ReadFile(path)
-    if err != nil {
-        return nil, fmt.Errorf("session not found: %s", sessionID)
-    }
-
-    var session Session
-    if err := json.Unmarshal(data, &session); err != nil {
-        return nil, err
-    }
-
-    return &session, nil
-}
-
-func (s *Store) Update(ctx context.Context, session *Session) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-
-    session.Time.Updated = time.Now().UnixMilli()
-    return s.save(session)
-}
-
-func (s *Store) Delete(ctx context.Context, sessionID string) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-
-    return os.Remove(s.sessionPath(sessionID))
-}
-
-func (s *Store) List(ctx context.Context, projectID string) ([]*Session, error) {
-    s.mu.RLock()
-    defer s.mu.RUnlock()
-
-    dir := filepath.Join(s.basePath, "session", projectID)
-    entries, err := os.ReadDir(dir)
-    if err != nil {
-        return nil, err
-    }
-
-    var sessions []*Session
-    for _, entry := range entries {
-        if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-            continue
-        }
-
-        data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
-        if err != nil {
-            continue
-        }
-
-        var session Session
-        if err := json.Unmarshal(data, &session); err != nil {
-            continue
-        }
-
-        sessions = append(sessions, &session)
-    }
-
-    return sessions, nil
-}
-
-func (s *Store) save(session *Session) error {
-    dir := filepath.Join(s.basePath, "session", session.ProjectID)
-    if err := os.MkdirAll(dir, 0755); err != nil {
-        return err
-    }
-
-    data, err := json.MarshalIndent(session, "", "  ")
-    if err != nil {
-        return err
-    }
-
-    return os.WriteFile(s.sessionPath(session.ID), data, 0644)
-}
-
-func (s *Store) sessionPath(sessionID string) string {
-    // Note: In production, you'd need to look up the projectID
-    return filepath.Join(s.basePath, "session", sessionID+".json")
-}
-```
-
----
-
-## 5. Gaps and Custom Implementation Requirements
-
-### 5.1 Provider-Specific Features Not in ADK-Go
-
-| Feature | Required For | Implementation Approach |
-|---------|--------------|------------------------|
-| **Anthropic Beta Headers** | Extended thinking, tool streaming | Custom Anthropic provider |
-| **OpenAI Responses API** | o1/o3 reasoning models | Custom OpenAI provider |
-| **Cache Control** | Token cost optimization | Provider-specific headers |
-| **Azure Cognitive Services** | Enterprise deployments | Custom Azure provider |
-| **AWS Bedrock Credentials** | Bedrock deployments | AWS credential chain |
-| **Vertex AI** | Google Cloud | Custom Vertex provider |
-
-### 5.2 Missing Abstractions
-
-1. **Model Middleware**: ADK-Go uses callbacks instead of middleware. Need wrapper pattern:
-
-```go
-type ModelMiddleware func(next Provider) Provider
-
-func WrapProvider(provider Provider, middleware ...ModelMiddleware) Provider {
-    for i := len(middleware) - 1; i >= 0; i-- {
-        provider = middleware[i](provider)
-    }
-    return provider
-}
-
-// Example: Cache control middleware
-func CacheControlMiddleware(next Provider) Provider {
-    return &cacheProvider{next: next}
-}
-```
-
-2. **Provider Options**: Need unified options handling:
-
-```go
-type ProviderOptions struct {
-    Anthropic  *AnthropicOptions
-    OpenAI     *OpenAIOptions
-    Google     *GoogleOptions
-    Bedrock    *BedrockOptions
-    // ... etc
-}
-
-func ApplyProviderOptions(req *LLMRequest, opts ProviderOptions) {
-    // Apply provider-specific options
-}
-```
-
----
-
-## 6. Recommendations
-
-### 6.1 What to Use from ADK-Go
-
-1. **Architecture Patterns**
-   - Agent interface design
-   - Iterator-based streaming (`iter.Seq2`)
-   - Tool interface pattern
-   - Session/Event model
-
-2. **MCP Integration**
-   - Use `mcptoolset` directly or as reference
-   - MCP SDK Go integration patterns
-
-3. **Server Components**
-   - REST API handler patterns from `adkrest`
-   - Event streaming patterns from `adka2a`
-
-### 6.2 What to Build Custom
-
-1. **Multi-Provider LLM Interface**
-   - Custom implementations for Anthropic, OpenAI, Google, Azure, Bedrock
-   - Provider-specific option handling
-   - Cache control support
-
-2. **Tool System**
-   - Extend ADK-Go's pattern with OpenCode-specific requirements
-   - Permission checking integration
-   - Real-time metadata updates
-
-3. **Session Management**
-   - File-based storage (matching TypeScript implementation)
-   - Message/Part storage
-   - Event bus integration
-
-### 6.3 Implementation Priority
-
-1. **Phase 1**: Core Provider Abstraction
-   - Base `Provider` interface
-   - Anthropic implementation (primary)
-   - OpenAI implementation
-   - Streaming support
-
-2. **Phase 2**: Tool System
-   - Tool interface
-   - Registry
-   - Built-in tools (read, write, edit, bash, glob, grep)
-
-3. **Phase 3**: Session Management
-   - Storage layer
-   - Message handling
-   - Event bus
-
-4. **Phase 4**: MCP Integration
-   - Leverage ADK-Go's mcptoolset
-   - Custom transport implementations
-
----
-
-## 7. Code Examples for Migration
-
-### 7.1 Migrating streamText
-
-**TypeScript (Vercel AI SDK):**
-```typescript
-const result = await streamText({
-  model: wrapLanguageModel({ model, middleware }),
-  messages,
-  tools,
-  maxOutputTokens: 32000,
-  providerOptions: { anthropic: { thinking: { type: "enabled" } } },
-})
-```
-
-**Go Equivalent:**
-```go
-result, err := streaming.StreamText(ctx, streaming.StreamOptions{
-    Provider:        anthropicProvider,
-    Model:          "claude-sonnet-4",
-    Messages:       messages,
-    Tools:          tools,
-    MaxOutputTokens: 32000,
-    ProviderOptions: provider.Options{
-        Anthropic: &provider.AnthropicOptions{
-            Thinking: &provider.ThinkingConfig{Type: "enabled"},
+// Convert Eino Message to OpenCode Message
+func FromEinoMessage(msg *schema.Message, sessionID string) *Message {
+    m := &Message{
+        Message:   msg,
+        ID:        generateID(),
+        SessionID: sessionID,
+        Time: MessageTime{
+            Created: time.Now().UnixMilli(),
         },
-    },
-})
-```
+    }
 
-### 7.2 Migrating Tool Definitions
+    // Extract parts from message content
+    if msg.Content != "" {
+        m.Parts = append(m.Parts, &TextPart{
+            ID:   generateID(),
+            Type: "text",
+            Text: msg.Content,
+        })
+    }
 
-**TypeScript:**
-```typescript
-const readTool = tool({
-  id: "read",
-  description: "Read a file",
-  inputSchema: jsonSchema({
-    type: "object",
-    properties: { file_path: { type: "string" } },
-    required: ["file_path"],
-  }),
-  async execute(args) {
-    return { output: await fs.readFile(args.file_path, "utf-8") }
-  },
-})
-```
+    // Extract tool calls
+    for _, tc := range msg.ToolCalls {
+        m.Parts = append(m.Parts, &ToolPart{
+            ID:     generateID(),
+            Type:   "tool",
+            CallID: tc.ID,
+            Tool:   tc.Function.Name,
+            State: ToolState{
+                Status: "pending",
+                Input:  json.RawMessage(tc.Function.Arguments),
+            },
+        })
+    }
 
-**Go Equivalent:**
-```go
-type ReadArgs struct {
-    FilePath string `json:"file_path"`
+    return m
 }
 
-readTool := tool.NewFunctionTool[ReadArgs, tool.Result](
-    "read",
-    "Read a file",
-    json.RawMessage(`{
-        "type": "object",
-        "properties": {"file_path": {"type": "string"}},
-        "required": ["file_path"]
-    }`),
-    func(ctx context.Context, args ReadArgs, opts tool.ExecuteOptions) (*tool.Result, error) {
-        content, err := os.ReadFile(args.FilePath)
-        if err != nil {
-            return nil, err
-        }
-        return &tool.Result{Output: string(content)}, nil
-    },
+// ToEinoMessages converts OpenCode messages for Eino
+func ToEinoMessages(messages []*Message) []*schema.Message {
+    result := make([]*schema.Message, len(messages))
+    for i, m := range messages {
+        result[i] = m.Message
+    }
+    return result
+}
+```
+
+### 3.4 Main Agent Loop
+
+```go
+package agent
+
+import (
+    "context"
+    "io"
+
+    "github.com/cloudwego/eino/components/model"
+    "github.com/cloudwego/eino/schema"
 )
+
+// Agent handles the main conversation loop
+type Agent struct {
+    provider *provider.Provider
+    tools    *tools.Registry
+    session  *session.Session
+}
+
+// StreamResponse generates a streaming response
+func (a *Agent) StreamResponse(ctx context.Context, userMessage string) (<-chan *StreamEvent, error) {
+    events := make(chan *StreamEvent, 100)
+
+    go func() {
+        defer close(events)
+
+        // Add user message to session
+        userMsg := schema.UserMessage(userMessage)
+        a.session.Messages = append(a.session.Messages, session.FromEinoMessage(userMsg, a.session.ID))
+
+        // Get tool infos and bind to model
+        toolInfos, err := a.tools.GetToolInfos(ctx)
+        if err != nil {
+            events <- &StreamEvent{Type: "error", Error: err}
+            return
+        }
+
+        modelWithTools, err := a.provider.ChatModel.WithTools(toolInfos)
+        if err != nil {
+            events <- &StreamEvent{Type: "error", Error: err}
+            return
+        }
+
+        // Convert messages for Eino
+        messages := session.ToEinoMessages(a.session.Messages)
+
+        // Agent loop
+        for {
+            // Stream response from model
+            stream, err := modelWithTools.Stream(ctx, messages)
+            if err != nil {
+                events <- &StreamEvent{Type: "error", Error: err}
+                return
+            }
+
+            var fullMsg *schema.Message
+            for {
+                chunk, err := stream.Recv()
+                if err == io.EOF {
+                    break
+                }
+                if err != nil {
+                    events <- &StreamEvent{Type: "error", Error: err}
+                    stream.Close()
+                    return
+                }
+
+                // Send text chunks
+                if chunk.Content != "" {
+                    events <- &StreamEvent{Type: "text", Text: chunk.Content}
+                }
+
+                // Accumulate full message
+                if fullMsg == nil {
+                    fullMsg = chunk
+                } else {
+                    fullMsg, _ = schema.ConcatMessages([]*schema.Message{fullMsg, chunk})
+                }
+            }
+            stream.Close()
+
+            // Add assistant message to session
+            a.session.Messages = append(a.session.Messages, session.FromEinoMessage(fullMsg, a.session.ID))
+            messages = append(messages, fullMsg)
+
+            // Check for tool calls
+            if len(fullMsg.ToolCalls) == 0 {
+                // No tool calls, we're done
+                events <- &StreamEvent{Type: "complete"}
+                return
+            }
+
+            // Execute tools
+            var toolResults []*schema.Message
+            for _, tc := range fullMsg.ToolCalls {
+                events <- &StreamEvent{Type: "tool_start", ToolCall: &tc}
+
+                t, ok := a.tools.Get(tc.Function.Name)
+                if !ok {
+                    result := schema.ToolMessage(
+                        fmt.Sprintf("Tool not found: %s", tc.Function.Name),
+                        tc.ID,
+                    )
+                    toolResults = append(toolResults, result)
+                    continue
+                }
+
+                output, err := t.InvokableRun(ctx, tc.Function.Arguments)
+                if err != nil {
+                    result := schema.ToolMessage(err.Error(), tc.ID)
+                    toolResults = append(toolResults, result)
+                } else {
+                    result := schema.ToolMessage(output, tc.ID)
+                    toolResults = append(toolResults, result)
+                }
+
+                events <- &StreamEvent{Type: "tool_end", ToolCall: &tc, Output: output}
+            }
+
+            // Add tool results to messages
+            for _, tr := range toolResults {
+                a.session.Messages = append(a.session.Messages, session.FromEinoMessage(tr, a.session.ID))
+                messages = append(messages, tr)
+            }
+        }
+    }()
+
+    return events, nil
+}
+
+// StreamEvent represents an event in the response stream
+type StreamEvent struct {
+    Type     string           `json:"type"` // "text", "tool_start", "tool_end", "error", "complete"
+    Text     string           `json:"text,omitempty"`
+    ToolCall *schema.ToolCall `json:"toolCall,omitempty"`
+    Output   string           `json:"output,omitempty"`
+    Error    error            `json:"error,omitempty"`
+}
 ```
 
 ---
 
-## 8. Conclusion
+## 4. ADK-Go Analysis (For Reference)
 
-ADK-Go provides valuable architectural patterns but is not a drop-in replacement for the Vercel AI SDK. The recommended approach is:
+ADK-Go is Google's Agent Development Kit for Go. While it provides useful patterns, it has limitations compared to Eino:
 
-1. **Use ADK-Go as reference** for Go-idiomatic patterns
-2. **Build custom provider implementations** using direct Go SDKs
-3. **Leverage ADK-Go's mcptoolset** for MCP integration
-4. **Implement OpenCode-specific features** (session storage, event bus, tool permissions)
+### 4.1 Limitations
 
-This hybrid approach provides the best balance of leveraging existing work while meeting OpenCode's specific requirements.
+| Limitation | Impact |
+|------------|--------|
+| Gemini only | Cannot use Claude, OpenAI |
+| No cache control | Higher API costs |
+| No extended thinking | Limited for complex reasoning |
+| Less mature | Fewer production deployments |
+| Limited streaming | Different patterns than Eino |
+
+### 4.2 Useful Patterns to Borrow
+
+1. **Iterator-based streaming** (`iter.Seq2`)
+2. **Agent interface design**
+3. **REST API handler patterns** from `adkrest`
 
 ---
 
-*Document Version: 1.0*
+## 5. Recommendations
+
+### 5.1 Primary Recommendation: Use Eino
+
+Eino provides the most comprehensive feature parity with the Vercel AI SDK:
+
+1. **Multi-provider support** - Claude, OpenAI, Gemini, Ollama, and more
+2. **AWS Bedrock** - Native support for Claude on Bedrock
+3. **Cache control** - Ephemeral caching for Claude
+4. **Extended thinking** - Built-in support for reasoning
+5. **MCP integration** - Official MCP SDK integration
+6. **ReAct agent** - Built-in agent framework
+7. **Graph orchestration** - Complex workflow support
+8. **Production-tested** - Used at ByteDance scale
+
+### 5.2 Implementation Phases
+
+**Phase 1: Core Infrastructure**
+- Provider registry with Eino models
+- Tool system integration
+- Session management
+
+**Phase 2: Agent Loop**
+- Streaming response handling
+- Tool execution loop
+- Message history management
+
+**Phase 3: MCP Integration**
+- MCP server connections
+- Tool discovery and binding
+- Custom transports
+
+**Phase 4: Advanced Features**
+- ReAct agent for complex tasks
+- Graph orchestration for workflows
+- Callback handlers for tracing
+
+---
+
+## 6. Conclusion
+
+**Eino is the recommended framework** for implementing the OpenCode server in Go. It provides:
+
+- Near feature parity with Vercel AI SDK
+- Production-ready code from ByteDance
+- Comprehensive provider support
+- Strong type safety and Go idioms
+- Active development and community
+
+ADK-Go should be considered for reference patterns but not as the primary framework due to its Gemini-only limitation.
+
+---
+
+*Document Version: 2.0*
 *Last Updated: 2025-11-26*
