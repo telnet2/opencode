@@ -22,9 +22,11 @@ import {
   ConditionalStep,
   LoopStep,
   TransformStep,
+  LLMEvalStep,
   WorkflowAgentConfig,
   WorkflowEventPayloads,
 } from "./schema"
+import { generateText } from "ai"
 
 const log = Log.create({ service: "workflow.executor" })
 
@@ -429,6 +431,9 @@ export namespace WorkflowExecutor {
         case "transform":
           await executeTransformStep(ctx, step)
           break
+        case "llm_eval":
+          await executeLLMEvalStep(ctx, step)
+          break
         default:
           throw new Error(`Unknown step type: ${(step as any).type}`)
       }
@@ -650,9 +655,17 @@ export namespace WorkflowExecutor {
     const { instance } = ctx
     const stepState = instance.stepStates[step.id]
 
-    const conditionMet = evaluateCondition(step.condition, instance.variables)
+    // Evaluate condition based on type
+    let conditionMet: boolean
+    if (step.conditionType === "llm") {
+      addLog(instance, "info", `Evaluating LLM condition: ${step.condition.slice(0, 100)}...`)
+      conditionMet = await evaluateLLMCondition(step.condition, instance.variables, step.model)
+    } else {
+      conditionMet = evaluateCondition(step.condition, instance.variables)
+    }
 
-    stepState.metadata = { conditionMet }
+    stepState.metadata = { conditionMet, conditionType: step.conditionType }
+    addLog(instance, "info", `Condition evaluated to: ${conditionMet}`)
 
     const nextStepId = conditionMet ? step.then : step.else
     if (nextStepId) {
@@ -671,17 +684,33 @@ export namespace WorkflowExecutor {
     const stepState = instance.stepStates[step.id]
     const stepMap = new Map(instance.definition.steps.map((s) => [s.id, s]))
 
+    // Helper to evaluate loop conditions
+    const evalCondition = async (condition: string): Promise<boolean> => {
+      if (step.conditionType === "llm") {
+        return evaluateLLMCondition(condition, instance.variables, step.model)
+      }
+      return evaluateCondition(condition, instance.variables)
+    }
+
     let iteration = 0
     const iterationResults: any[] = []
+
+    addLog(instance, "info", `Starting loop (max ${step.maxIterations} iterations)`)
 
     while (iteration < step.maxIterations) {
       // Set loop index variable
       instance.variables[step.indexVariable] = iteration
 
       // Check while condition (before iteration)
-      if (step.while && !evaluateCondition(step.while, instance.variables)) {
-        break
+      if (step.while) {
+        const shouldContinue = await evalCondition(step.while)
+        if (!shouldContinue) {
+          addLog(instance, "info", `Loop exiting: 'while' condition no longer true at iteration ${iteration}`)
+          break
+        }
       }
+
+      addLog(instance, "info", `Loop iteration ${iteration + 1}`)
 
       // Execute loop body steps
       for (const childStepId of step.steps) {
@@ -692,8 +721,12 @@ export namespace WorkflowExecutor {
       }
 
       // Check until condition (after iteration)
-      if (step.until && evaluateCondition(step.until, instance.variables)) {
-        break
+      if (step.until) {
+        const shouldStop = await evalCondition(step.until)
+        if (shouldStop) {
+          addLog(instance, "info", `Loop exiting: 'until' condition met at iteration ${iteration}`)
+          break
+        }
       }
 
       iterationResults.push({
@@ -704,8 +737,12 @@ export namespace WorkflowExecutor {
       iteration++
     }
 
+    if (iteration >= step.maxIterations) {
+      addLog(instance, "warn", `Loop reached maximum iterations (${step.maxIterations})`)
+    }
+
     stepState.output = iterationResults
-    stepState.metadata = { iterations: iteration }
+    stepState.metadata = { iterations: iteration, conditionType: step.conditionType }
   }
 
   /**
@@ -777,6 +814,114 @@ export namespace WorkflowExecutor {
 
     stepState.output = result
     instance.variables[step.output] = result
+  }
+
+  /**
+   * Execute an LLM evaluation step
+   */
+  async function executeLLMEvalStep(ctx: ExecutionContext, step: LLMEvalStep): Promise<void> {
+    const { instance } = ctx
+    const stepState = instance.stepStates[step.id]
+
+    // Interpolate the prompt with variables
+    const prompt = interpolateTemplate(step.prompt, instance.variables)
+
+    // Get model
+    const modelSpec = step.model
+      ? Provider.parseModel(step.model)
+      : await Provider.defaultModel().then((m) => ({ providerID: m.providerID, modelID: m.modelID }))
+
+    const model = await Provider.getModel(modelSpec.providerID, modelSpec.modelID)
+
+    // Build the system prompt based on output format
+    let systemPrompt: string
+    switch (step.outputFormat) {
+      case "boolean":
+        systemPrompt = `You are a decision-making assistant. Evaluate the following and respond with ONLY "true" or "false" (no other text).`
+        break
+      case "choice":
+        systemPrompt = `You are a decision-making assistant. Choose the most appropriate option from the following list and respond with ONLY that option (exactly as written, no other text):\n${step.choices?.map((c) => `- ${c}`).join("\n") ?? ""}`
+        break
+      case "json":
+        systemPrompt = `You are a structured output assistant. Respond with ONLY valid JSON that matches this schema:\n${step.schema ?? "{ }"}`
+        break
+      case "text":
+      default:
+        systemPrompt = `You are a helpful assistant. Provide a concise response.`
+    }
+
+    addLog(instance, "info", `LLM evaluation: ${prompt.slice(0, 100)}...`)
+
+    // Call the LLM
+    const result = await generateText({
+      model: model.language,
+      system: systemPrompt,
+      prompt,
+      temperature: step.temperature ?? 0.1,
+    })
+
+    const responseText = result.text.trim()
+
+    // Parse the response based on output format
+    let parsedResult: any
+    switch (step.outputFormat) {
+      case "boolean":
+        parsedResult = responseText.toLowerCase() === "true" || responseText.toLowerCase() === "yes"
+        break
+      case "choice":
+        parsedResult = responseText
+        break
+      case "json":
+        try {
+          parsedResult = JSON.parse(responseText)
+        } catch {
+          // Try to extract JSON from the response
+          const jsonMatch = responseText.match(/\{[\s\S]*\}|\[[\s\S]*\]/)
+          parsedResult = jsonMatch ? JSON.parse(jsonMatch[0]) : responseText
+        }
+        break
+      case "text":
+      default:
+        parsedResult = responseText
+    }
+
+    stepState.output = parsedResult
+    stepState.metadata = { rawResponse: responseText }
+    instance.variables[step.output] = parsedResult
+
+    addLog(instance, "info", `LLM evaluation result: ${JSON.stringify(parsedResult).slice(0, 100)}`)
+  }
+
+  /**
+   * Evaluate a condition using LLM
+   */
+  async function evaluateLLMCondition(
+    condition: string,
+    variables: Record<string, any>,
+    modelSpec?: string,
+  ): Promise<boolean> {
+    // Interpolate variables in the condition
+    const prompt = interpolateTemplate(condition, variables)
+
+    // Get model
+    const model = modelSpec
+      ? Provider.parseModel(modelSpec)
+      : await Provider.defaultModel().then((m) => ({ providerID: m.providerID, modelID: m.modelID }))
+
+    const llmModel = await Provider.getModel(model.providerID, model.modelID)
+
+    log.info("evaluating LLM condition", { prompt: prompt.slice(0, 100) })
+
+    // Call the LLM for yes/no evaluation
+    const result = await generateText({
+      model: llmModel.language,
+      system: `You are a decision-making assistant. Evaluate the following condition/question and respond with ONLY "true" or "false" (no other text, no explanation).`,
+      prompt,
+      temperature: 0.1,
+    })
+
+    const response = result.text.trim().toLowerCase()
+    return response === "true" || response === "yes"
   }
 
   // ===========================================================================
