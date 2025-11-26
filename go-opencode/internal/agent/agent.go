@@ -4,6 +4,7 @@ package agent
 import (
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/opencode-ai/opencode/internal/permission"
 )
 
@@ -166,22 +167,39 @@ func (a *Agent) Clone() *Agent {
 }
 
 // matchWildcard checks if a string matches a wildcard pattern.
-// Supports * at the beginning or end of the pattern.
+// For simple patterns (* at start/end), uses string matching.
+// For complex patterns (containing **), uses doublestar.
 func matchWildcard(pattern, s string) bool {
+	// Global wildcard matches everything
 	if pattern == "*" {
 		return true
 	}
 
-	if strings.HasSuffix(pattern, "*") {
+	// For patterns with **, use doublestar
+	if strings.Contains(pattern, "**") {
+		matched, _ := doublestar.Match(pattern, s)
+		return matched
+	}
+
+	// Simple suffix wildcard (prefix*)
+	if strings.HasSuffix(pattern, "*") && !strings.HasPrefix(pattern, "*") {
 		prefix := strings.TrimSuffix(pattern, "*")
 		return strings.HasPrefix(s, prefix)
 	}
 
-	if strings.HasPrefix(pattern, "*") {
+	// Simple prefix wildcard (*suffix)
+	if strings.HasPrefix(pattern, "*") && !strings.HasSuffix(pattern, "*") {
 		suffix := strings.TrimPrefix(pattern, "*")
 		return strings.HasSuffix(s, suffix)
 	}
 
+	// For patterns with * in the middle or multiple *, use doublestar
+	if strings.Contains(pattern, "*") {
+		matched, _ := doublestar.Match(pattern, s)
+		return matched
+	}
+
+	// Exact match
 	return pattern == s
 }
 
