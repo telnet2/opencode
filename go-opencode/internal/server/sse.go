@@ -1,0 +1,177 @@
+package server
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/opencode-ai/opencode/internal/event"
+)
+
+const (
+	// SSEHeartbeatInterval is the interval for SSE heartbeats.
+	SSEHeartbeatInterval = 30 * time.Second
+)
+
+// sseWriter wraps http.ResponseWriter for SSE.
+type sseWriter struct {
+	w       http.ResponseWriter
+	flusher http.Flusher
+}
+
+// newSSEWriter creates a new SSE writer.
+func newSSEWriter(w http.ResponseWriter) (*sseWriter, error) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return nil, fmt.Errorf("streaming not supported")
+	}
+
+	return &sseWriter{w: w, flusher: flusher}, nil
+}
+
+// writeEvent writes an SSE event.
+func (s *sseWriter) writeEvent(eventType string, data any) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(s.w, "event: %s\n", eventType)
+	fmt.Fprintf(s.w, "data: %s\n\n", jsonData)
+	s.flusher.Flush()
+
+	return nil
+}
+
+// writeHeartbeat writes an SSE heartbeat comment.
+func (s *sseWriter) writeHeartbeat() {
+	fmt.Fprintf(s.w, ": heartbeat\n\n")
+	s.flusher.Flush()
+}
+
+// globalEvents handles SSE for all events.
+func (srv *Server) globalEvents(w http.ResponseWriter, r *http.Request) {
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
+
+	sse, err := newSSEWriter(w)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
+		return
+	}
+
+	// Channel for events
+	events := make(chan event.Event, 100)
+
+	// Subscribe to all events
+	unsub := event.SubscribeAll(func(e event.Event) {
+		select {
+		case events <- e:
+		default:
+			// Drop event if channel is full
+		}
+	})
+	defer unsub()
+
+	// Heartbeat ticker
+	ticker := time.NewTicker(SSEHeartbeatInterval)
+	defer ticker.Stop()
+
+	// Wait for client disconnect or context cancellation
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case e := <-events:
+			data := map[string]any{
+				"type": e.Type,
+				"data": e.Data,
+			}
+			if err := sse.writeEvent("message", data); err != nil {
+				return
+			}
+		case <-ticker.C:
+			sse.writeHeartbeat()
+		}
+	}
+}
+
+// sessionEvents handles SSE for session-specific events.
+func (srv *Server) sessionEvents(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("sessionID")
+	if sessionID == "" {
+		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "sessionID required")
+		return
+	}
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	sse, err := newSSEWriter(w)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
+		return
+	}
+
+	// Channel for events
+	events := make(chan event.Event, 100)
+
+	// Filter for session-specific events
+	unsub := event.SubscribeAll(func(e event.Event) {
+		if srv.eventBelongsToSession(e, sessionID) {
+			select {
+			case events <- e:
+			default:
+				// Drop event if channel is full
+			}
+		}
+	})
+	defer unsub()
+
+	// Heartbeat ticker
+	ticker := time.NewTicker(SSEHeartbeatInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case e := <-events:
+			data := map[string]any{
+				"type": e.Type,
+				"data": e.Data,
+			}
+			if err := sse.writeEvent("message", data); err != nil {
+				return
+			}
+		case <-ticker.C:
+			sse.writeHeartbeat()
+		}
+	}
+}
+
+// eventBelongsToSession checks if an event belongs to a session.
+func (srv *Server) eventBelongsToSession(e event.Event, sessionID string) bool {
+	switch data := e.Data.(type) {
+	case event.MessageUpdatedData:
+		return data.Message.SessionID == sessionID
+	case event.MessageCreatedData:
+		return data.Message.SessionID == sessionID
+	case event.PartUpdatedData:
+		return data.SessionID == sessionID
+	case event.SessionUpdatedData:
+		return data.Session.ID == sessionID
+	case event.PermissionRequiredData:
+		return data.SessionID == sessionID
+	case event.FileEditedData:
+		return data.SessionID == sessionID
+	}
+	return false
+}
