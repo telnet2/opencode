@@ -3,6 +3,8 @@ package client
 import (
 	"fmt"
 	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 const (
@@ -336,25 +338,15 @@ type GlobOptions struct {
 	Path    string // directory to search in
 }
 
-// GlobTool finds files matching a pattern
+// GlobTool finds files matching a pattern using doublestar for ** support
 func GlobTool(session *Session, opts GlobOptions) (*ToolResult, error) {
 	searchPath := opts.Path
 	if searchPath == "" {
 		searchPath = "."
 	}
 
-	// Convert glob pattern to find pattern
-	findPattern := strings.ReplaceAll(opts.Pattern, "**", "*")
-
-	// Use -name for simple patterns, -path for patterns with directories
-	findFlag := "-name"
-	if strings.Contains(opts.Pattern, "/") || strings.Contains(opts.Pattern, "**") {
-		findFlag = "-path"
-	}
-
-	// Find files
-	cmd := fmt.Sprintf("find %s -type f %s '%s' 2>/dev/null | head -%d",
-		escapePath(searchPath), findFlag, findPattern, DefaultSearchLimit+1)
+	// Get all files from the search path
+	cmd := fmt.Sprintf("find %s -type f 2>/dev/null", escapePath(searchPath))
 
 	output, _, _, err := session.RunSafe(cmd)
 	if err != nil {
@@ -363,9 +355,36 @@ func GlobTool(session *Session, opts GlobOptions) (*ToolResult, error) {
 
 	lines := strings.Split(output, "\n")
 	var files []string
+
+	// Build the full pattern for matching
+	// If pattern starts with **, match from anywhere
+	// Otherwise, match relative to searchPath
+	pattern := opts.Pattern
+	if !strings.HasPrefix(pattern, "**/") && !strings.HasPrefix(pattern, "/") {
+		// Make pattern relative to searchPath
+		if searchPath != "." {
+			pattern = searchPath + "/" + pattern
+		}
+	}
+
+	// Filter files using doublestar for proper glob matching including **
 	for _, line := range lines {
-		if line != "" {
+		if line == "" {
+			continue
+		}
+
+		// Try matching with the full pattern
+		matched, _ := doublestar.Match(pattern, line)
+		if !matched && strings.HasPrefix(opts.Pattern, "**/") {
+			// For **/ patterns, also try matching just the filename portion
+			matched, _ = doublestar.Match(opts.Pattern, line)
+		}
+
+		if matched {
 			files = append(files, line)
+			if len(files) > DefaultSearchLimit {
+				break
+			}
 		}
 	}
 

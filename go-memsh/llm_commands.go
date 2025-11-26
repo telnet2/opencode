@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/spf13/afero"
 )
 
@@ -368,28 +369,7 @@ func (s *Shell) cmdFindEx(ctx context.Context, args []string) error {
 		}
 	}
 
-	// Compile name pattern if provided
-	if opts.namePattern != "" {
-		pattern := globToRegex(opts.namePattern)
-		if opts.nameIgnoreCase {
-			pattern = "(?i)" + pattern
-		}
-		var err error
-		opts.nameRe, err = regexp.Compile(pattern)
-		if err != nil {
-			return fmt.Errorf("find: invalid pattern: %v", err)
-		}
-	}
-
-	// Compile path pattern if provided
-	if opts.pathPattern != "" {
-		pattern := globToRegex(opts.pathPattern)
-		var err error
-		opts.pathRe, err = regexp.Compile(pattern)
-		if err != nil {
-			return fmt.Errorf("find: invalid path pattern: %v", err)
-		}
-	}
+	// Name and path patterns will be matched using doublestar in findWalkEx
 
 	// Search each path
 	for _, path := range opts.paths {
@@ -407,9 +387,7 @@ type findOptions struct {
 	paths          []string
 	namePattern    string
 	nameIgnoreCase bool
-	nameRe         *regexp.Regexp
 	pathPattern    string
-	pathRe         *regexp.Regexp
 	fileType       string
 	maxDepth       int
 	minDepth       int
@@ -438,14 +416,20 @@ func (s *Shell) findWalkEx(path string, opts *findOptions, depth int) error {
 		matches = false
 	}
 
-	// Check name pattern
-	if matches && opts.nameRe != nil {
-		matches = opts.nameRe.MatchString(info.Name())
+	// Check name pattern using doublestar
+	if matches && opts.namePattern != "" {
+		name := info.Name()
+		pattern := opts.namePattern
+		if opts.nameIgnoreCase {
+			name = strings.ToLower(name)
+			pattern = strings.ToLower(pattern)
+		}
+		matches, _ = doublestar.Match(pattern, name)
 	}
 
-	// Check path pattern
-	if matches && opts.pathRe != nil {
-		matches = opts.pathRe.MatchString(path)
+	// Check path pattern using doublestar
+	if matches && opts.pathPattern != "" {
+		matches, _ = doublestar.Match(opts.pathPattern, path)
 	}
 
 	// Check file type
@@ -576,12 +560,11 @@ func parseSizeExpr(expr string) (int64, error) {
 	return n * multiplier, nil
 }
 
-// globToRegex converts a shell glob pattern to a regex pattern
-func globToRegex(pattern string) string {
-	pattern = regexp.QuoteMeta(pattern)
-	pattern = strings.ReplaceAll(pattern, `\*`, ".*")
-	pattern = strings.ReplaceAll(pattern, `\?`, ".")
-	return "^" + pattern + "$"
+// matchGlob uses doublestar to match a glob pattern against a string.
+// This replaces the old globToRegex approach with proper glob support including **.
+func matchGlob(pattern, s string) bool {
+	matched, _ := doublestar.Match(pattern, s)
+	return matched
 }
 
 // cmdGrepEx implements enhanced grep command with additional options
@@ -835,15 +818,15 @@ func (s *Shell) collectFiles(dir string, opts *grepOptions) ([]string, error) {
 			}
 			files = append(files, subFiles...)
 		} else {
-			// Apply include/exclude patterns
+			// Apply include/exclude patterns using doublestar for ** support
 			if opts.includeGlob != "" {
-				matched, _ := filepath.Match(opts.includeGlob, entry.Name())
+				matched, _ := doublestar.Match(opts.includeGlob, entry.Name())
 				if !matched {
 					continue
 				}
 			}
 			if opts.excludeGlob != "" {
-				matched, _ := filepath.Match(opts.excludeGlob, entry.Name())
+				matched, _ := doublestar.Match(opts.excludeGlob, entry.Name())
 				if matched {
 					continue
 				}
