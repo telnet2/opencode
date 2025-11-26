@@ -1,0 +1,129 @@
+# Parallel Analysis Workflow
+# Demonstrates parallel execution of multiple analysis tasks
+
+id: parallel-analysis
+name: Parallel Codebase Analysis
+description: Analyze different aspects of a codebase in parallel
+version: 1.0.0
+
+inputs:
+  target:
+    type: string
+    description: Target directory or files to analyze
+    required: true
+
+orchestrator:
+  mode: auto
+  onError: continue
+  maxRetries: 1
+
+agents:
+  security_analyzer:
+    name: security_analyzer
+    description: Analyzes code for security vulnerabilities
+    prompt: |
+      You are a security expert. Analyze the code for:
+      - SQL injection vulnerabilities
+      - XSS vulnerabilities
+      - Authentication/authorization issues
+      - Sensitive data exposure
+      - Insecure dependencies
+    tools:
+      read: true
+      glob: true
+      grep: true
+    temperature: 0.2
+
+  performance_analyzer:
+    name: performance_analyzer
+    description: Analyzes code for performance issues
+    prompt: |
+      You are a performance optimization expert. Analyze the code for:
+      - Inefficient algorithms (O(n²) when O(n) is possible)
+      - Memory leaks
+      - Unnecessary computations
+      - Database query optimization opportunities
+      - Caching opportunities
+    tools:
+      read: true
+      glob: true
+      grep: true
+    temperature: 0.3
+
+  style_analyzer:
+    name: style_analyzer
+    description: Analyzes code style and maintainability
+    prompt: |
+      You are a code quality expert. Analyze the code for:
+      - Code style consistency
+      - Documentation coverage
+      - Function/method complexity
+      - Code duplication
+      - Naming conventions
+    tools:
+      read: true
+      glob: true
+      grep: true
+    temperature: 0.3
+
+steps:
+  - id: security_check
+    type: agent
+    name: Security Analysis
+    agent: security_analyzer
+    input: |
+      Analyze the following for security issues:
+      {{target}}
+    output: security_findings
+
+  - id: performance_check
+    type: agent
+    name: Performance Analysis
+    agent: performance_analyzer
+    input: |
+      Analyze the following for performance issues:
+      {{target}}
+    output: performance_findings
+
+  - id: style_check
+    type: agent
+    name: Style Analysis
+    agent: style_analyzer
+    input: |
+      Analyze the following for code style and maintainability:
+      {{target}}
+    output: style_findings
+
+  - id: run_parallel
+    type: parallel
+    name: Run All Analyses
+    description: Execute all analyses in parallel
+    steps:
+      - security_check
+      - performance_check
+      - style_check
+    onFailure: continue
+    maxConcurrency: 3
+
+  - id: combine_results
+    type: transform
+    name: Combine Results
+    dependsOn: [run_parallel]
+    input: "combined"
+    output: final_report
+    transform: template
+    options:
+      template: |
+        # Codebase Analysis Report
+
+        ## Security Findings
+        {{security_findings}}
+
+        ## Performance Findings
+        {{performance_findings}}
+
+        ## Style Findings
+        {{style_findings}}
+
+        ---
+        Analysis completed at: {{_timestamp}}
