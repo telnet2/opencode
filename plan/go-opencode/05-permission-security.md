@@ -1,8 +1,25 @@
 # Phase 5: Permission & Security (Week 9)
 
+**Status: ✅ COMPLETE** (implemented 2025-11-26)
+
 ## Overview
 
 Implement the permission system for controlling tool execution, with special focus on bash command analysis using **mvdan/sh** (already used in go-memsh).
+
+### Implementation Summary
+
+All Phase 5 deliverables have been implemented:
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `internal/permission/permission.go` | 75 | Permission types and errors |
+| `internal/permission/bash_parser.go` | 145 | mvdan/sh based bash parsing |
+| `internal/permission/checker.go` | 165 | Permission checker with ask flow |
+| `internal/permission/wildcard.go` | 100 | Pattern matching for permissions |
+| `internal/permission/doom_loop.go` | 75 | Doom loop detection |
+| `internal/permission/bash_parser_test.go` | 200 | Parser unit tests |
+| `internal/permission/permission_test.go` | 350 | Permission system tests |
+| **Total** | **~1,100** | **42 tests passing**
 
 ---
 
