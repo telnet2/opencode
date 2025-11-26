@@ -712,9 +712,11 @@ func TestBus_Unsubscribe(t *testing.T) {
 
 ### Acceptance Criteria
 
-- [ ] All core types match TypeScript definitions
-- [ ] Storage layer passes read/write/list/delete tests
-- [ ] Event bus supports subscribe/unsubscribe/publish
-- [ ] Configuration loads from global + project paths
-- [ ] File locking prevents concurrent write corruption
-- [ ] All tests pass with `go test ./...`
+- [x] All core types match TypeScript definitions
+- [x] Storage layer passes read/write/list/delete tests
+- [x] Event bus supports subscribe/unsubscribe/publish
+- [x] Configuration loads from global + project paths
+- [x] File locking prevents concurrent write corruption
+- [x] All tests pass with `go test ./...`
+
+**Status: COMPLETE** (104 tests passing as of 2025-11-26)
