@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cloudwego/eino/schema"
 	"github.com/oklog/ulid/v2"
 
@@ -20,11 +21,29 @@ const (
 	MaxSteps = 50
 	// MaxRetries is the maximum number of retries for API errors.
 	MaxRetries = 3
-	// RetryBaseDelay is the base delay for exponential backoff.
-	RetryBaseDelay = time.Second
+	// RetryInitialInterval is the initial interval for exponential backoff.
+	RetryInitialInterval = time.Second
+	// RetryMaxInterval is the maximum interval for exponential backoff.
+	RetryMaxInterval = 30 * time.Second
+	// RetryMaxElapsedTime is the maximum total time for retries.
+	RetryMaxElapsedTime = 2 * time.Minute
 	// MaxContextTokens is the threshold for triggering context compaction.
 	MaxContextTokens = 150000
 )
+
+// newRetryBackoff creates a new exponential backoff with jitter for API retries.
+// Uses cenkalti/backoff for better retry behavior including jitter to prevent
+// thundering herd problems and context-aware cancellation.
+func newRetryBackoff(ctx context.Context) backoff.BackOff {
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = RetryInitialInterval
+	b.MaxInterval = RetryMaxInterval
+	b.MaxElapsedTime = RetryMaxElapsedTime
+	b.RandomizationFactor = 0.5 // Add jitter
+	b.Multiplier = 2.0
+	b.Reset()
+	return backoff.WithContext(backoff.WithMaxRetries(b, MaxRetries), ctx)
+}
 
 // runLoop executes the agentic loop.
 func (p *Processor) runLoop(
@@ -119,7 +138,7 @@ func (p *Processor) runLoop(
 
 	// Run loop
 	step := 0
-	retries := 0
+	retryBackoff := newRetryBackoff(ctx)
 
 	for {
 		// Check context cancellation
@@ -162,8 +181,9 @@ func (p *Processor) runLoop(
 		// Call LLM with streaming
 		stream, err := prov.CreateCompletion(ctx, req)
 		if err != nil {
-			retries++
-			if retries >= MaxRetries {
+			// Use exponential backoff with jitter for retries
+			nextInterval := retryBackoff.NextBackOff()
+			if nextInterval == backoff.Stop {
 				assistantMsg.Error = &types.MessageError{
 					Type:    "api",
 					Message: err.Error(),
@@ -171,10 +191,7 @@ func (p *Processor) runLoop(
 				p.saveMessage(ctx, sessionID, assistantMsg)
 				return err
 			}
-
-			// Exponential backoff
-			delay := RetryBaseDelay * time.Duration(1<<retries)
-			time.Sleep(delay)
+			time.Sleep(nextInterval)
 			continue
 		}
 
@@ -183,8 +200,9 @@ func (p *Processor) runLoop(
 		stream.Close()
 
 		if err != nil {
-			retries++
-			if retries >= MaxRetries {
+			// Use exponential backoff with jitter for retries
+			nextInterval := retryBackoff.NextBackOff()
+			if nextInterval == backoff.Stop {
 				assistantMsg.Error = &types.MessageError{
 					Type:    "api",
 					Message: err.Error(),
@@ -192,11 +210,12 @@ func (p *Processor) runLoop(
 				p.saveMessage(ctx, sessionID, assistantMsg)
 				return err
 			}
+			time.Sleep(nextInterval)
 			continue
 		}
 
-		// Reset retries on success
-		retries = 0
+		// Reset backoff on success
+		retryBackoff.Reset()
 
 		// Check finish reason
 		switch finishReason {
@@ -228,10 +247,12 @@ func (p *Processor) runLoop(
 			return nil
 
 		case "error":
-			retries++
-			if retries >= MaxRetries {
-				return fmt.Errorf("stream error")
+			// Use exponential backoff with jitter for retries
+			nextInterval := retryBackoff.NextBackOff()
+			if nextInterval == backoff.Stop {
+				return fmt.Errorf("stream error: max retries exceeded")
 			}
+			time.Sleep(nextInterval)
 			continue
 
 		default:

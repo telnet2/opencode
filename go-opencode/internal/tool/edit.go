@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/agnivade/levenshtein"
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/opencode-ai/opencode/internal/event"
 )
@@ -229,55 +230,29 @@ func findBestMatch(text, target string) (string, float64) {
 	return bestMatch, bestSimilarity
 }
 
-// similarity calculates normalized Levenshtein similarity.
+// similarity calculates normalized Levenshtein similarity using the agnivade/levenshtein package.
+// This provides better performance and handles edge cases more robustly than a custom implementation.
 func similarity(a, b string) float64 {
-	dist := levenshtein(a, b)
-	maxLen := max(len(a), len(b))
-	if maxLen == 0 {
+	// Handle empty strings
+	if len(a) == 0 && len(b) == 0 {
 		return 1.0
 	}
+	if len(a) == 0 || len(b) == 0 {
+		return 0.0
+	}
+
+	// For very long strings, use a rough approximation to avoid performance issues
+	// The levenshtein package handles large strings well, but we still cap for extreme cases
+	if len(a) > 10000 || len(b) > 10000 {
+		// Simple length-based approximation for extremely long strings
+		maxLen := max(len(a), len(b))
+		minLen := min(len(a), len(b))
+		return float64(minLen) / float64(maxLen)
+	}
+
+	dist := levenshtein.ComputeDistance(a, b)
+	maxLen := max(len(a), len(b))
 	return 1.0 - float64(dist)/float64(maxLen)
-}
-
-// levenshtein calculates edit distance between two strings.
-func levenshtein(a, b string) int {
-	if len(a) == 0 {
-		return len(b)
-	}
-	if len(b) == 0 {
-		return len(a)
-	}
-
-	// Use optimized version for long strings
-	if len(a) > 1000 || len(b) > 1000 {
-		return len(a) + len(b) // Rough approximation for very long strings
-	}
-
-	// Create distance matrix
-	d := make([][]int, len(a)+1)
-	for i := range d {
-		d[i] = make([]int, len(b)+1)
-		d[i][0] = i
-	}
-	for j := range d[0] {
-		d[0][j] = j
-	}
-
-	for i := 1; i <= len(a); i++ {
-		for j := 1; j <= len(b); j++ {
-			cost := 1
-			if a[i-1] == b[j-1] {
-				cost = 0
-			}
-			d[i][j] = min(
-				d[i-1][j]+1,      // deletion
-				d[i][j-1]+1,      // insertion
-				d[i-1][j-1]+cost, // substitution
-			)
-		}
-	}
-
-	return d[len(a)][len(b)]
 }
 
 func (t *EditTool) EinoTool() einotool.InvokableTool {
