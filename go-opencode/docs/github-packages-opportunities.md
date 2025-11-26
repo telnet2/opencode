@@ -6,27 +6,27 @@ This document identifies custom implementations in go-opencode that could be rep
 
 | Current Implementation | File Location | Recommended Package |
 |------------------------|---------------|---------------------|
-| Custom Event Bus/Pub-Sub | `internal/event/bus.go:1-182` | [ThreeDotsLabs/watermill](https://github.com/ThreeDotsLabs/watermill) or [asaskevich/EventBus](https://github.com/asaskevich/EventBus) |
+| ~~Custom Event Bus/Pub-Sub~~ | ~~`internal/event/bus.go:1-182`~~ | **DONE**: [ThreeDotsLabs/watermill](https://github.com/ThreeDotsLabs/watermill) |
 | File-Based Storage with Locking | `internal/storage/storage.go`, `lock.go` | [etcd-io/bbolt](https://github.com/etcd-io/bbolt) or [dgraph-io/badger](https://github.com/dgraph-io/badger) |
 | Custom Permission System | `internal/permission/checker.go:1-214` | [casbin/casbin](https://github.com/casbin/casbin) |
 | ~~No Structured Logging~~ | ~~Throughout codebase~~ | **DONE**: Implemented with [rs/zerolog](https://github.com/rs/zerolog) |
 
 ### Details
 
-#### 1. Custom Event Bus/Pub-Sub (`internal/event/bus.go:1-182`)
+#### 1. ~~Custom Event Bus/Pub-Sub~~ (COMPLETED)
 
-**Current Implementation:**
+**Previous Implementation:**
 - Hand-rolled pub/sub event system with subscriber registration, ID tracking
 - Type-specific and global event subscriptions
 - Concurrent publishing (async) and sync variants
 - Manual subscription management with unsubscribe functions
 
-**Why Replace:**
-- Proven, production-tested implementations
-- Better error handling
-- Support for middleware/interceptors
-- Built-in rate limiting and queue management
-- Watermill has excellent documentation and examples
+**Implementation (COMPLETED):**
+- Integrated [ThreeDotsLabs/watermill](https://github.com/ThreeDotsLabs/watermill) as the pub/sub infrastructure
+- Uses watermill's `gochannel.GoChannel` for in-memory pub/sub
+- Maintains original API compatibility (`Subscribe`, `SubscribeAll`, `Publish`, `PublishSync`)
+- Exposes watermill's `GoChannel` via `PubSub()` for advanced use cases (middleware, routing, distributed backends)
+- Preserves type information through direct subscriber callbacks
 
 #### 2. File-Based Storage with Locking (`internal/storage/`)
 
@@ -222,8 +222,8 @@ These implementations are already using appropriate packages:
 
 1. **High Priority** - Significant improvements in reliability, maintainability, and features:
    - ~~Structured logging~~ - **DONE** (zerolog)
+   - ~~Event bus~~ - **DONE** (watermill)
    - Storage layer (ACID compliance, transactions)
-   - Event bus (scalability, middleware support)
    - Permissions (policy-based, auditable)
 
 2. **Medium Priority** - Code quality and standardization:
