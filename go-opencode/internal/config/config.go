@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/pkg/types"
 	"github.com/tidwall/jsonc"
 )
@@ -26,6 +27,7 @@ func Load(directory string) (*types.Config, error) {
 
 	// Track loaded files to avoid duplicates
 	loaded := make(map[string]bool)
+	var loadedFiles []string
 
 	loadOnce := func(path string, baseDir string) {
 		absPath, err := filepath.Abs(path)
@@ -37,6 +39,10 @@ func Load(directory string) (*types.Config, error) {
 		}
 		if loadConfigFile(path, config, baseDir) == nil {
 			loaded[absPath] = true
+			loadedFiles = append(loadedFiles, absPath)
+			logging.Debug().
+				Str("path", absPath).
+				Msg("Loaded config file")
 		}
 	}
 
@@ -83,7 +89,51 @@ func Load(directory string) (*types.Config, error) {
 	// Normalize provider config (merge Options into direct fields)
 	normalizeProviderConfig(config)
 
+	// Log configuration summary
+	if len(loadedFiles) > 0 {
+		logging.Info().
+			Strs("configFiles", loadedFiles).
+			Msg("Configuration loaded from files")
+	}
+
+	// Log final configuration (excluding sensitive data)
+	logConfigSummary(config)
+
 	return config, nil
+}
+
+// logConfigSummary logs a summary of the loaded configuration.
+func logConfigSummary(config *types.Config) {
+	// Count configured providers (without exposing API keys)
+	var providers []string
+	for name, p := range config.Provider {
+		if p.APIKey != "" {
+			providers = append(providers, name+" (configured)")
+		} else {
+			providers = append(providers, name+" (no key)")
+		}
+	}
+
+	// Count configured agents
+	var agents []string
+	for name := range config.Agent {
+		agents = append(agents, name)
+	}
+
+	// Count MCP servers
+	var mcpServers []string
+	for name := range config.MCP {
+		mcpServers = append(mcpServers, name)
+	}
+
+	logging.Debug().
+		Str("model", config.Model).
+		Str("smallModel", config.SmallModel).
+		Strs("providers", providers).
+		Strs("agents", agents).
+		Strs("mcpServers", mcpServers).
+		Int("instructionsCount", len(config.Instructions)).
+		Msg("Configuration summary")
 }
 
 // loadConfigFile loads a single config file with interpolation support.
