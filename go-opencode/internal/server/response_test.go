@@ -82,13 +82,14 @@ func TestWriteSuccess(t *testing.T) {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	var result map[string]bool
+	// writeSuccess returns `true` (boolean) to match TypeScript SDK contract
+	var result bool
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	if !result["success"] {
-		t.Error("Expected success: true")
+	if !result {
+		t.Error("Expected true")
 	}
 }
 

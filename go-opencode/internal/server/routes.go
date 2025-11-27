@@ -8,6 +8,12 @@ import (
 func (s *Server) setupRoutes() {
 	r := s.router
 
+	// Project routes
+	r.Route("/project", func(r chi.Router) {
+		r.Get("/", s.listProjects)
+		r.Get("/current", s.getCurrentProject)
+	})
+
 	// Session routes
 	r.Route("/session", func(r chi.Router) {
 		r.Get("/", s.listSessions)
@@ -22,6 +28,7 @@ func (s *Server) setupRoutes() {
 			// Messages
 			r.Get("/message", s.getMessages)
 			r.Post("/message", s.sendMessage) // Streaming response
+			r.Get("/message/{messageID}", s.getMessage)
 
 			// Session operations
 			r.Get("/children", s.getChildren)
@@ -110,6 +117,12 @@ func (s *Server) setupRoutes() {
 		r.Post("/open-models", s.tuiOpenModels)
 		r.Post("/submit-prompt", s.tuiSubmitPrompt)
 		r.Post("/clear-prompt", s.tuiClearPrompt)
+
+		// TUI control queue (for remote TUI control)
+		r.Route("/control", func(r chi.Router) {
+			r.Get("/next", s.tuiControlNext)
+			r.Post("/response", s.tuiControlResponse)
+		})
 	})
 
 	// Client tools (for external tool registration)

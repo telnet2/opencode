@@ -76,3 +76,23 @@ const (
 	ErrorNameMessageAborted      = "MessageAbortedError"
 	ErrorNameAPI                 = "APIError"
 )
+
+// Project represents a project (worktree) that can contain sessions.
+type Project struct {
+	ID       string       `json:"id"`
+	Worktree string       `json:"worktree"`
+	VCS      *string      `json:"vcs,omitempty"` // "git" or nil
+	Time     ProjectTime  `json:"time"`
+}
+
+// ProjectTime contains timestamps for a project.
+type ProjectTime struct {
+	Created     int64  `json:"created"`
+	Initialized *int64 `json:"initialized,omitempty"`
+}
+
+// TUIControlRequest represents a pending TUI control request.
+type TUIControlRequest struct {
+	Path string `json:"path"`
+	Body any    `json:"body"`
+}
