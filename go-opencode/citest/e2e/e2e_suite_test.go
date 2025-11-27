@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,9 +29,13 @@ var _ = BeforeSuite(func() {
 	// Load environment variables from .env file first
 	_ = godotenv.Load("../../.env")
 
-	// Skip if required env vars are missing
-	if testutil.SkipIfMissingEnv("ARK_API_KEY", "ARK_MODEL_ID") {
-		Skip("ARK environment variables not set")
+	// Skip env var check for mockllm provider
+	testProvider := os.Getenv("TEST_PROVIDER")
+	if testProvider != "mockllm" {
+		// Skip if required env vars are missing (only for real providers)
+		if testutil.SkipIfMissingEnv("ARK_API_KEY", "ARK_MODEL_ID") {
+			Skip("ARK environment variables not set")
+		}
 	}
 
 	var err error
