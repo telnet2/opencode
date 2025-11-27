@@ -151,6 +151,11 @@ func (s *Server) setupRoutes() {
 		r.Delete("/unregister", s.unregisterClientTool)
 		r.Post("/execute", s.executeClientTool)
 		r.Post("/result", s.submitClientToolResult)
+
+		// Query and SSE endpoints
+		r.Get("/pending/{clientID}", s.clientToolsPending)
+		r.Get("/tools/{clientID}", s.getClientTools)
+		r.Get("/tools", s.getAllClientTools)
 	})
 
 	// OpenAPI documentation
