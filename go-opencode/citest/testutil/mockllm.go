@@ -64,6 +64,15 @@ func NewMockLLMServerFromFile(configPath string) (*MockLLMServer, error) {
 	return NewMockLLMServerWithConfig(config), nil
 }
 
+// NewMockLLMServerFromDir creates a mock LLM server from a directory containing mockllm.yaml.
+func NewMockLLMServerFromDir(dir string) (*MockLLMServer, error) {
+	config, err := LoadMockLLMConfigFromDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config from dir: %w", err)
+	}
+	return NewMockLLMServerWithConfig(config), nil
+}
+
 // URL returns the mock server's URL.
 func (m *MockLLMServer) URL() string {
 	return m.server.URL
@@ -128,6 +137,19 @@ func (m *MockLLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Validate messages - reject empty content (mimics Anthropic/OpenAI behavior)
+	if err := m.validateMessages(req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": map[string]interface{}{
+				"type":    "invalid_request_error",
+				"message": err.Error(),
+			},
+		})
+		return
+	}
+
 	// Record request
 	m.mu.Lock()
 	m.requests = append(m.requests, MockRequest{
@@ -158,6 +180,49 @@ func (m *MockLLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 	} else {
 		m.writeResponse(w, response)
 	}
+}
+
+// validateMessages checks that all messages have non-empty content.
+// This mimics the behavior of Anthropic and OpenAI APIs which reject empty content.
+func (m *MockLLMServer) validateMessages(req map[string]interface{}) error {
+	messages, ok := req["messages"].([]interface{})
+	if !ok || len(messages) == 0 {
+		return fmt.Errorf("messages: Field required")
+	}
+
+	for i, msg := range messages {
+		msgMap, ok := msg.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		role, _ := msgMap["role"].(string)
+
+		// Check content field
+		content, hasContent := msgMap["content"]
+		if !hasContent {
+			return fmt.Errorf("messages.%d.content: Field required", i)
+		}
+
+		// Content can be nil/null
+		if content == nil {
+			return fmt.Errorf("messages.%d.content: Invalid value for 'content': expected a string, got null", i)
+		}
+
+		// For user and system messages, content must be non-empty string
+		// Assistant messages can have empty content if they have tool_calls
+		if role == "user" || role == "system" {
+			contentStr, ok := content.(string)
+			if !ok {
+				return fmt.Errorf("messages.%d.content: Invalid value for 'content': expected a string", i)
+			}
+			if contentStr == "" {
+				return fmt.Errorf("messages.%d.content: Field required", i)
+			}
+		}
+	}
+
+	return nil
 }
 
 // extractLastPrompt extracts the last user message from OpenAI format.
