@@ -179,6 +179,7 @@ func (s *Server) unregisterClientTool(w http.ResponseWriter, r *http.Request) {
 
 	unregistered := clienttool.Unregister(req.ClientID, req.ToolIDs)
 	writeJSON(w, http.StatusOK, map[string]any{
+		"success":      true,
 		"unregistered": unregistered,
 	})
 }
