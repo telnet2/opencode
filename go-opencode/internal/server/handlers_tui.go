@@ -95,6 +95,31 @@ func (s *Server) tuiClearPrompt(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w)
 }
 
+// tuiControlNext handles GET /tui/control/next
+// Returns the next pending TUI request from the queue.
+func (s *Server) tuiControlNext(w http.ResponseWriter, r *http.Request) {
+	// Return empty request if nothing pending
+	// In a real implementation, this would pull from a queue
+	response := map[string]any{
+		"path": "",
+		"body": nil,
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+// tuiControlResponse handles POST /tui/control/response
+// Submits a response to a TUI control request.
+func (s *Server) tuiControlResponse(w http.ResponseWriter, r *http.Request) {
+	var req any
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Allow empty body
+		req = nil
+	}
+	// In a real implementation, this would process the response
+	_ = req
+	writeSuccess(w)
+}
+
 // Client tool handlers
 
 // registerClientTool handles POST /client-tools/register

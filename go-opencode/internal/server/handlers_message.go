@@ -177,3 +177,22 @@ func (s *Server) getMessages(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, result)
 }
+
+// getMessage handles GET /session/{sessionID}/message/{messageID}
+func (s *Server) getMessage(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionID")
+	messageID := chi.URLParam(r, "messageID")
+
+	msg, err := s.sessionService.GetMessage(r.Context(), sessionID, messageID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, ErrCodeNotFound, "Message not found")
+		return
+	}
+
+	parts, _ := s.sessionService.GetParts(r.Context(), messageID)
+
+	writeJSON(w, http.StatusOK, MessageResponse{
+		Info:  msg,
+		Parts: parts,
+	})
+}
