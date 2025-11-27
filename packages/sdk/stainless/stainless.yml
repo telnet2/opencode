@@ -104,8 +104,11 @@ resources:
   command:
     models:
       command: Command
+      commandResult: CommandResult
     methods:
       list: get /command
+      get: get /command/{name}
+      execute: post /command/{name}
 
   project:
     models:
@@ -150,9 +153,17 @@ resources:
       mcpStatusConnected: McpStatusConnected
       mcpStatusDisabled: McpStatusDisabled
       mcpStatusFailed: McpStatusFailed
+      mcpTool: McpTool
+      mcpResource: McpResource
+      mcpToolResult: McpToolResult
     methods:
       status: get /mcp
       add: post /mcp
+      remove: delete /mcp/{name}
+      tools: get /mcp/tools
+      resources: get /mcp/resources
+      resource: get /mcp/resource
+      execute_tool: post /mcp/tool/{name}
 
   # LSP server status
   lsp:
@@ -161,12 +172,14 @@ resources:
     methods:
       status: get /lsp
 
-  # Formatter status
+  # Formatter management
   formatter:
     models:
       formatterStatus: FormatterStatus
+      formatResult: FormatResult
     methods:
       status: get /formatter
+      format: post /formatter/format
 
   # Authentication
   auth:
@@ -256,6 +269,22 @@ resources:
         methods:
           next: get /tui/control/next
           response: post /tui/control/response
+
+  # Client tools for external tool registration
+  client_tools:
+    models:
+      clientTool: ClientTool
+      clientToolResult: ClientToolResult
+    methods:
+      register: post /client-tools/register
+      unregister: delete /client-tools/unregister
+      execute: post /client-tools/execute
+      result: post /client-tools/result
+
+  # Documentation
+  doc:
+    methods:
+      openapi: get /doc
 
 settings:
   disable_mock_tests: true
