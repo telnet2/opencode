@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/opencode-ai/opencode/internal/event"
+	"github.com/opencode-ai/opencode/internal/project"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -48,6 +49,7 @@ type Server struct {
 	appConfig       *types.Config
 	storage         *storage.Storage
 	sessionService  *session.Service
+	projectService  *project.Service
 	providerReg     *provider.Registry
 	toolReg         *tool.Registry
 	bus             *event.Bus
@@ -74,6 +76,7 @@ func New(cfg *Config, appConfig *types.Config, store *storage.Storage, providerR
 		appConfig:      appConfig,
 		storage:        store,
 		sessionService: session.NewServiceWithProcessor(store, providerReg, toolReg, nil, defaultProviderID, defaultModelID),
+		projectService: project.NewService(cfg.Directory),
 		providerReg:    providerReg,
 		toolReg:        toolReg,
 		bus:            event.NewBus(),

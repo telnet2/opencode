@@ -8,6 +8,12 @@ import (
 func (s *Server) setupRoutes() {
 	r := s.router
 
+	// Project routes
+	r.Route("/project", func(r chi.Router) {
+		r.Get("/", s.listProjects)
+		r.Get("/current", s.getCurrentProject)
+	})
+
 	// Session routes
 	r.Route("/session", func(r chi.Router) {
 		r.Get("/", s.listSessions)
