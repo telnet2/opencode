@@ -13,7 +13,7 @@ import (
 	"github.com/sst/opencode-sdk-go/option"
 )
 
-func TestFindFilesWithOptionalParams(t *testing.T) {
+func TestFindGetWithOptionalParams(t *testing.T) {
 	t.Skip("Prism tests are disabled")
 	baseURL := "http://localhost:4010"
 	if envURL, ok := os.LookupEnv("TEST_API_BASE_URL"); ok {
@@ -24,10 +24,11 @@ func TestFindFilesWithOptionalParams(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
-	_, err := client.Find.Files(context.TODO(), opencode.FindFilesParams{
-		Query:     opencode.F("query"),
-		Directory: opencode.F("directory"),
+	_, err := client.Find.Get(context.TODO(), opencode.FindGetParams{
+		Pattern:   "pattern",
+		Directory: opencode.String("directory"),
 	})
 	if err != nil {
 		var apierr *opencode.Error
@@ -38,7 +39,7 @@ func TestFindFilesWithOptionalParams(t *testing.T) {
 	}
 }
 
-func TestFindSymbolsWithOptionalParams(t *testing.T) {
+func TestFindGetFileWithOptionalParams(t *testing.T) {
 	t.Skip("Prism tests are disabled")
 	baseURL := "http://localhost:4010"
 	if envURL, ok := os.LookupEnv("TEST_API_BASE_URL"); ok {
@@ -49,10 +50,12 @@ func TestFindSymbolsWithOptionalParams(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
-	_, err := client.Find.Symbols(context.TODO(), opencode.FindSymbolsParams{
-		Query:     opencode.F("query"),
-		Directory: opencode.F("directory"),
+	_, err := client.Find.GetFile(context.TODO(), opencode.FindGetFileParams{
+		Query:     "query",
+		Directory: opencode.String("directory"),
+		Dirs:      opencode.FindGetFileParamsDirsTrue,
 	})
 	if err != nil {
 		var apierr *opencode.Error
@@ -63,7 +66,7 @@ func TestFindSymbolsWithOptionalParams(t *testing.T) {
 	}
 }
 
-func TestFindTextWithOptionalParams(t *testing.T) {
+func TestFindGetSymbolWithOptionalParams(t *testing.T) {
 	t.Skip("Prism tests are disabled")
 	baseURL := "http://localhost:4010"
 	if envURL, ok := os.LookupEnv("TEST_API_BASE_URL"); ok {
@@ -74,10 +77,11 @@ func TestFindTextWithOptionalParams(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
-	_, err := client.Find.Text(context.TODO(), opencode.FindTextParams{
-		Pattern:   opencode.F("pattern"),
-		Directory: opencode.F("directory"),
+	_, err := client.Find.GetSymbol(context.TODO(), opencode.FindGetSymbolParams{
+		Query:     "query",
+		Directory: opencode.String("directory"),
 	})
 	if err != nil {
 		var apierr *opencode.Error

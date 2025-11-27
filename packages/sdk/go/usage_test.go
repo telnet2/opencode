@@ -22,11 +22,14 @@ func TestUsage(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
-	sessions, err := client.Session.List(context.TODO(), opencode.SessionListParams{})
-	if err != nil {
-		t.Error(err)
-		return
+	stream := client.Global.GetEventsStreaming(context.TODO())
+	for stream.Next() {
+		t.Logf("%+v\n", stream.Current())
 	}
-	t.Logf("%+v\n", sessions)
+	err := stream.Err()
+	if err != nil {
+		t.Fatalf("err should be nil: %s", err.Error())
+	}
 }

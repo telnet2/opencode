@@ -24,9 +24,10 @@ func TestCommandListWithOptionalParams(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
 	_, err := client.Command.List(context.TODO(), opencode.CommandListParams{
-		Directory: opencode.F("directory"),
+		Directory: opencode.String("directory"),
 	})
 	if err != nil {
 		var apierr *opencode.Error
