@@ -3,9 +3,12 @@ package types
 import "encoding/json"
 
 // Part represents a component of an assistant message.
+// SDK compatible: all parts must have sessionID and messageID fields.
 type Part interface {
 	PartType() string
 	PartID() string
+	PartSessionID() string
+	PartMessageID() string
 }
 
 // PartTime contains timing information for a message part.
@@ -15,32 +18,45 @@ type PartTime struct {
 }
 
 // TextPart represents a text content part.
+// SDK compatible: includes sessionID and messageID fields.
 type TextPart struct {
-	ID       string         `json:"id"`
-	Type     string         `json:"type"` // always "text"
-	Text     string         `json:"text"`
-	Time     PartTime       `json:"time,omitempty"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	ID        string         `json:"id"`
+	SessionID string         `json:"sessionID"` // SDK compatible
+	MessageID string         `json:"messageID"` // SDK compatible
+	Type      string         `json:"type"`      // always "text"
+	Text      string         `json:"text"`
+	Time      PartTime       `json:"time,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
 }
 
-func (p *TextPart) PartType() string { return "text" }
-func (p *TextPart) PartID() string   { return p.ID }
+func (p *TextPart) PartType() string      { return "text" }
+func (p *TextPart) PartID() string        { return p.ID }
+func (p *TextPart) PartSessionID() string { return p.SessionID }
+func (p *TextPart) PartMessageID() string { return p.MessageID }
 
 // ReasoningPart represents extended thinking/reasoning content.
+// SDK compatible: includes sessionID and messageID fields.
 type ReasoningPart struct {
-	ID   string   `json:"id"`
-	Type string   `json:"type"` // always "reasoning"
-	Text string   `json:"text"`
-	Time PartTime `json:"time,omitempty"`
+	ID        string   `json:"id"`
+	SessionID string   `json:"sessionID"` // SDK compatible
+	MessageID string   `json:"messageID"` // SDK compatible
+	Type      string   `json:"type"`      // always "reasoning"
+	Text      string   `json:"text"`
+	Time      PartTime `json:"time,omitempty"`
 }
 
-func (p *ReasoningPart) PartType() string { return "reasoning" }
-func (p *ReasoningPart) PartID() string   { return p.ID }
+func (p *ReasoningPart) PartType() string      { return "reasoning" }
+func (p *ReasoningPart) PartID() string        { return p.ID }
+func (p *ReasoningPart) PartSessionID() string { return p.SessionID }
+func (p *ReasoningPart) PartMessageID() string { return p.MessageID }
 
 // ToolPart represents a tool call and its result.
+// SDK compatible: includes sessionID and messageID fields.
 type ToolPart struct {
 	ID         string         `json:"id"`
-	Type       string         `json:"type"` // always "tool"
+	SessionID  string         `json:"sessionID"` // SDK compatible
+	MessageID  string         `json:"messageID"` // SDK compatible
+	Type       string         `json:"type"`      // always "tool"
 	ToolCallID string         `json:"toolCallID"`
 	ToolName   string         `json:"toolName"`
 	Input      map[string]any `json:"input"`
@@ -52,20 +68,27 @@ type ToolPart struct {
 	Time       PartTime       `json:"time,omitempty"`
 }
 
-func (p *ToolPart) PartType() string { return "tool" }
-func (p *ToolPart) PartID() string   { return p.ID }
+func (p *ToolPart) PartType() string      { return "tool" }
+func (p *ToolPart) PartID() string        { return p.ID }
+func (p *ToolPart) PartSessionID() string { return p.SessionID }
+func (p *ToolPart) PartMessageID() string { return p.MessageID }
 
 // FilePart represents a file attachment.
+// SDK compatible: includes sessionID and messageID fields.
 type FilePart struct {
 	ID        string `json:"id"`
-	Type      string `json:"type"` // always "file"
+	SessionID string `json:"sessionID"` // SDK compatible
+	MessageID string `json:"messageID"` // SDK compatible
+	Type      string `json:"type"`      // always "file"
 	Filename  string `json:"filename"`
 	MediaType string `json:"mediaType"`
 	URL       string `json:"url"`
 }
 
-func (p *FilePart) PartType() string { return "file" }
-func (p *FilePart) PartID() string   { return p.ID }
+func (p *FilePart) PartType() string      { return "file" }
+func (p *FilePart) PartID() string        { return p.ID }
+func (p *FilePart) PartSessionID() string { return p.SessionID }
+func (p *FilePart) PartMessageID() string { return p.MessageID }
 
 // RawPart is used for JSON unmarshaling of parts.
 type RawPart struct {

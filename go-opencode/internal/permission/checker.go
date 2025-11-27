@@ -8,12 +8,18 @@ import (
 	"github.com/opencode-ai/opencode/internal/event"
 )
 
+// pendingRequest stores a permission request and its response channel.
+type pendingRequest struct {
+	Request Request
+	RespCh  chan Response
+}
+
 // Checker handles permission checks and approvals.
 type Checker struct {
 	mu       sync.RWMutex
-	approved map[string]map[PermissionType]bool   // sessionID -> type -> approved
-	patterns map[string]map[string]bool           // sessionID -> pattern -> approved (for bash patterns)
-	pending  map[string]chan Response             // requestID -> response channel
+	approved map[string]map[PermissionType]bool // sessionID -> type -> approved
+	patterns map[string]map[string]bool         // sessionID -> pattern -> approved (for bash patterns)
+	pending  map[string]*pendingRequest         // requestID -> pending request (SDK compatible: stores sessionID)
 }
 
 // NewChecker creates a new permission checker.
@@ -21,7 +27,7 @@ func NewChecker() *Checker {
 	return &Checker{
 		approved: make(map[string]map[PermissionType]bool),
 		patterns: make(map[string]map[string]bool),
-		pending:  make(map[string]chan Response),
+		pending:  make(map[string]*pendingRequest),
 	}
 }
 
@@ -78,10 +84,13 @@ func (c *Checker) Ask(ctx context.Context, req Request) error {
 		req.ID = ulid.Make().String()
 	}
 
-	// Create response channel
+	// Create pending request with response channel (SDK compatible: stores full request)
 	respChan := make(chan Response, 1)
 	c.mu.Lock()
-	c.pending[req.ID] = respChan
+	c.pending[req.ID] = &pendingRequest{
+		Request: req,
+		RespCh:  respChan,
+	}
 	c.mu.Unlock()
 
 	defer func() {
@@ -90,10 +99,10 @@ func (c *Checker) Ask(ctx context.Context, req Request) error {
 		c.mu.Unlock()
 	}()
 
-	// Publish permission request event
+	// Publish permission request event (SDK compatible: uses PermissionUpdated)
 	event.Publish(event.Event{
-		Type: event.PermissionRequired,
-		Data: event.PermissionRequiredData{
+		Type: event.PermissionUpdated,
+		Data: event.PermissionUpdatedData{
 			ID:             req.ID,
 			SessionID:      req.SessionID,
 			PermissionType: string(req.Type),
@@ -129,22 +138,25 @@ func (c *Checker) Ask(ctx context.Context, req Request) error {
 // Respond handles a user's response to a permission request.
 func (c *Checker) Respond(requestID string, action string) {
 	c.mu.RLock()
-	ch, ok := c.pending[requestID]
+	pending, ok := c.pending[requestID]
 	c.mu.RUnlock()
 
+	var sessionID string
 	if ok {
-		ch <- Response{
+		sessionID = pending.Request.SessionID
+		pending.RespCh <- Response{
 			RequestID: requestID,
 			Action:    action,
 		}
 	}
 
-	// Publish resolved event
+	// Publish resolved event (SDK compatible: uses PermissionReplied with sessionID)
 	event.Publish(event.Event{
-		Type: event.PermissionResolved,
-		Data: event.PermissionResolvedData{
-			ID:      requestID,
-			Granted: action != "reject",
+		Type: event.PermissionReplied,
+		Data: event.PermissionRepliedData{
+			PermissionID: requestID,
+			SessionID:    sessionID,
+			Response:     action,
 		},
 	})
 }
