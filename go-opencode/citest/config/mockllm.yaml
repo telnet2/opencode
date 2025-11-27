@@ -9,6 +9,15 @@ settings:
   enable_streaming: true
   # Delay between streaming chunks in milliseconds
   chunk_delay_ms: 5
+  # How to split content into chunks: "word" (default), "char", "fixed"
+  # - word: split by whitespace (each word is a chunk)
+  # - char: split by character count (use chunk_size)
+  # - fixed: split into exactly max_chunks chunks
+  chunk_mode: word
+  # Characters per chunk (for "char" mode)
+  chunk_size: 10
+  # Max number of chunks (0 = unlimited, or target count for "fixed" mode)
+  max_chunks: 0
 
 defaults:
   # Response when no rules match the prompt
