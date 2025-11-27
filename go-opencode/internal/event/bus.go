@@ -29,6 +29,14 @@ const (
 	PermissionUpdated  EventType = "permission.updated" // SDK compatible (was permission.required)
 	PermissionReplied  EventType = "permission.replied" // SDK compatible (was permission.resolved)
 
+	// Client Tool Events
+	ClientToolRequest      EventType = "client-tool.request"
+	ClientToolRegistered   EventType = "client-tool.registered"
+	ClientToolUnregistered EventType = "client-tool.unregistered"
+	ClientToolExecuting    EventType = "client-tool.executing"
+	ClientToolCompleted    EventType = "client-tool.completed"
+	ClientToolFailed       EventType = "client-tool.failed"
+
 	// Deprecated: Use MessagePartUpdated instead
 	PartUpdated EventType = "message.part.updated"
 	// Deprecated: Use PermissionUpdated instead
