@@ -35,11 +35,18 @@ var _ = Describe("SSE Event Streaming", func() {
 
 	Describe("GET /event", func() {
 		It("should return SSE content-type header", func() {
+			// SSE connections stay open, so we need to handle properly
+			// Headers should be flushed immediately by server
 			req, err := http.NewRequest("GET", testServer.BaseURL+"/event?sessionID="+session.ID, nil)
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("Accept", "text/event-stream")
 
-			httpClient := &http.Client{Timeout: 5 * time.Second}
+			// Use transport with short response header timeout
+			transport := &http.Transport{
+				ResponseHeaderTimeout: 5 * time.Second,
+			}
+			httpClient := &http.Client{Transport: transport}
+
 			resp, err := httpClient.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
@@ -52,7 +59,11 @@ var _ = Describe("SSE Event Streaming", func() {
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("Accept", "text/event-stream")
 
-			httpClient := &http.Client{Timeout: 5 * time.Second}
+			transport := &http.Transport{
+				ResponseHeaderTimeout: 5 * time.Second,
+			}
+			httpClient := &http.Client{Transport: transport}
+
 			resp, err := httpClient.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()

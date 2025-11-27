@@ -161,6 +161,7 @@ func InitializeProviders(ctx context.Context, config *types.Config) (*Registry, 
 		provider, err := NewOpenAIProvider(ctx, &OpenAIConfig{
 			APIKey:    cfg.APIKey,
 			BaseURL:   cfg.BaseURL,
+			Model:     cfg.Model,
 			MaxTokens: 4096,
 		})
 		if err == nil {

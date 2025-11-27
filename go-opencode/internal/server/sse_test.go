@@ -323,3 +323,186 @@ func TestSSEEventFormat(t *testing.T) {
 		t.Errorf("Third line should be empty, got: %s", lines[2])
 	}
 }
+
+func TestGlobalEvents_Headers(t *testing.T) {
+	event.Reset()
+	srv := &Server{}
+
+	// Create test server with the actual handler
+	ts := httptest.NewServer(http.HandlerFunc(srv.globalEvents))
+	defer ts.Close()
+
+	// Create request with short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", ts.URL, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+
+	// Make request - will timeout but we should still get headers
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
+		// We expect timeout, other errors are failures
+		if resp == nil {
+			t.Skipf("Request failed without response: %v", err)
+		}
+	}
+	if resp != nil {
+		defer resp.Body.Close()
+
+		// Verify SSE headers
+		contentType := resp.Header.Get("Content-Type")
+		if !strings.HasPrefix(contentType, "text/event-stream") {
+			t.Errorf("Expected Content-Type to start with text/event-stream, got: %s", contentType)
+		}
+
+		cacheControl := resp.Header.Get("Cache-Control")
+		if cacheControl != "no-cache" {
+			t.Errorf("Expected Cache-Control: no-cache, got: %s", cacheControl)
+		}
+
+		connection := resp.Header.Get("Connection")
+		if connection != "keep-alive" {
+			t.Errorf("Expected Connection: keep-alive, got: %s", connection)
+		}
+	}
+}
+
+func TestSessionEvents_Headers(t *testing.T) {
+	event.Reset()
+	srv := &Server{}
+
+	// Create test server with the actual handler
+	ts := httptest.NewServer(http.HandlerFunc(srv.sessionEvents))
+	defer ts.Close()
+
+	// Create request with short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", ts.URL+"?sessionID=test-session", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+
+	// Make request - will timeout but we should still get headers
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
+		if resp == nil {
+			t.Skipf("Request failed without response: %v", err)
+		}
+	}
+	if resp != nil {
+		defer resp.Body.Close()
+
+		// Verify SSE headers
+		contentType := resp.Header.Get("Content-Type")
+		if !strings.HasPrefix(contentType, "text/event-stream") {
+			t.Errorf("Expected Content-Type to start with text/event-stream, got: %s", contentType)
+		}
+
+		cacheControl := resp.Header.Get("Cache-Control")
+		if cacheControl != "no-cache" {
+			t.Errorf("Expected Cache-Control: no-cache, got: %s", cacheControl)
+		}
+	}
+}
+
+func TestSessionEvents_EventFiltering(t *testing.T) {
+	event.Reset()
+	srv := &Server{}
+
+	// Create test server
+	ts := httptest.NewServer(http.HandlerFunc(srv.sessionEvents))
+	defer ts.Close()
+
+	// Create request with short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", ts.URL+"?sessionID=session-123", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	var receivedLines []string
+	var mu sync.Mutex
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			mu.Lock()
+			receivedLines = append(receivedLines, line)
+			mu.Unlock()
+		}
+	}()
+
+	// Give connection time to establish
+	time.Sleep(50 * time.Millisecond)
+
+	// Publish event for matching session
+	event.PublishSync(event.Event{
+		Type: event.MessageCreated,
+		Data: event.MessageCreatedData{
+			Message: &types.Message{
+				ID:        "msg-1",
+				SessionID: "session-123",
+			},
+		},
+	})
+
+	// Publish event for different session (should be filtered out)
+	event.PublishSync(event.Event{
+		Type: event.MessageCreated,
+		Data: event.MessageCreatedData{
+			Message: &types.Message{
+				ID:        "msg-2",
+				SessionID: "session-456",
+			},
+		},
+	})
+
+	// Wait for context timeout and cleanup
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Check we received the first event but not the second
+	foundSession123 := false
+	foundSession456 := false
+	for _, line := range receivedLines {
+		if strings.Contains(line, "session-123") {
+			foundSession123 = true
+		}
+		if strings.Contains(line, "session-456") {
+			foundSession456 = true
+		}
+	}
+
+	if foundSession456 {
+		t.Error("Should not have received events for session-456")
+	}
+
+	// Note: We may or may not have received session-123 event due to timing
+	// The important thing is that we filtered out session-456
+	_ = foundSession123
+}

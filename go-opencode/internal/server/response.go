@@ -60,8 +60,9 @@ func writeErrorWithDetails(w http.ResponseWriter, status int, code, message stri
 }
 
 // writeSuccess writes a success response.
+// Match TypeScript API: returns `true` (boolean) not `{"success": true}`
 func writeSuccess(w http.ResponseWriter) {
-	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+	writeJSON(w, http.StatusOK, true)
 }
 
 // notImplemented writes a not implemented response.

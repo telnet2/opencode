@@ -98,7 +98,7 @@ func TestGetSession(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a session first
-	session, err := srv.sessionService.Create(ctx, "/tmp/test")
+	session, err := srv.sessionService.Create(ctx, "/tmp/test", "")
 	if err != nil {
 		t.Fatalf("Failed to create session: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestDeleteSession(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a session first
-	session, err := srv.sessionService.Create(ctx, "/tmp/test")
+	session, err := srv.sessionService.Create(ctx, "/tmp/test", "")
 	if err != nil {
 		t.Fatalf("Failed to create session: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestUpdateSession(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a session first
-	session, err := srv.sessionService.Create(ctx, "/tmp/test")
+	session, err := srv.sessionService.Create(ctx, "/tmp/test", "")
 	if err != nil {
 		t.Fatalf("Failed to create session: %v", err)
 	}
