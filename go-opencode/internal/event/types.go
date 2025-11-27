@@ -97,3 +97,32 @@ type PermissionResolvedData struct {
 	SessionID string `json:"sessionID"`
 	Granted   bool   `json:"granted"`
 }
+
+// ClientToolRequestData is the data for client-tool.request events.
+type ClientToolRequestData struct {
+	ClientID string `json:"clientID"`
+	Request  any    `json:"request"` // ExecutionRequest from clienttool package
+}
+
+// ClientToolRegisteredData is the data for client-tool.registered events.
+type ClientToolRegisteredData struct {
+	ClientID string   `json:"clientID"`
+	ToolIDs  []string `json:"toolIDs"`
+}
+
+// ClientToolUnregisteredData is the data for client-tool.unregistered events.
+type ClientToolUnregisteredData struct {
+	ClientID string   `json:"clientID"`
+	ToolIDs  []string `json:"toolIDs"`
+}
+
+// ClientToolStatusData is the data for client-tool.executing/completed/failed events.
+type ClientToolStatusData struct {
+	SessionID string `json:"sessionID"`
+	MessageID string `json:"messageID"`
+	CallID    string `json:"callID"`
+	Tool      string `json:"tool"`
+	ClientID  string `json:"clientID"`
+	Error     string `json:"error,omitempty"`
+	Success   bool   `json:"success,omitempty"`
+}
