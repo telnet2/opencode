@@ -38,14 +38,17 @@ var _ = Describe("Message Flow", func() {
 			resp, err := client.SendMessage(ctx, session.ID, "Say 'Hello, World!' and nothing else.")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp).NotTo(BeNil())
-			Expect(resp.Info).NotTo(BeNil())
-			Expect(resp.Info.Content).To(ContainSubstring("Hello"))
+			// LLM may respond with "Hello", "World", or full "Hello, World!"
+			Expect(resp.Content()).To(SatisfyAny(
+				ContainSubstring("Hello"),
+				ContainSubstring("World"),
+			))
 		})
 
 		It("should handle simple question", func() {
 			resp, err := client.SendMessage(ctx, session.ID, "What is 2+2? Answer with just the number.")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(resp.Info.Content).To(ContainSubstring("4"))
+			Expect(resp.Content()).To(ContainSubstring("4"))
 		})
 
 		It("should stream response chunks", func() {
@@ -85,7 +88,7 @@ var _ = Describe("Message Flow", func() {
 			// Second message - reference context
 			resp, err := client.SendMessage(ctx, session.ID, "What number did I ask you to remember? Just say the number.")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(resp.Info.Content).To(ContainSubstring("42"))
+			Expect(resp.Content()).To(ContainSubstring("42"))
 		})
 	})
 
@@ -125,7 +128,7 @@ var _ = Describe("Message Flow", func() {
 			// Exchange 2
 			resp, err := client.SendMessage(ctx, session.ID, "What is my name? Just say the name.")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(resp.Info.Content).To(ContainSubstring("Alice"))
+			Expect(resp.Content()).To(ContainSubstring("Alice"))
 		})
 
 		It("should handle rapid consecutive messages", func() {

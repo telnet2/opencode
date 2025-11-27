@@ -9,21 +9,30 @@ import (
 	"github.com/oklog/ulid/v2"
 
 	"github.com/opencode-ai/opencode/internal/event"
+	"github.com/opencode-ai/opencode/pkg/types"
 )
 
 // CreateSessionRequest represents the request body for creating a session.
 type CreateSessionRequest struct {
 	Directory string `json:"directory"`
+	Title     string `json:"title,omitempty"`
 }
 
 // listSessions handles GET /session
 func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
-	directory := getDirectory(r.Context())
+	// Only use explicitly provided directory query parameter
+	// If not provided, list all sessions (directory = "")
+	directory := r.URL.Query().Get("directory")
 
 	sessions, err := s.sessionService.List(r.Context(), directory)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 		return
+	}
+
+	// Ensure we return an empty array [] instead of null
+	if sessions == nil {
+		sessions = []*types.Session{}
 	}
 
 	writeJSON(w, http.StatusOK, sessions)
@@ -47,7 +56,7 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := s.sessionService.Create(r.Context(), directory)
+	session, err := s.sessionService.Create(r.Context(), directory, req.Title)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 		return

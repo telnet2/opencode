@@ -116,14 +116,12 @@ var _ = Describe("Message Workflows", func() {
 			hasUser := false
 			hasAssistant := false
 			for _, m := range *messages {
-				msg := m.AsUnion()
-				switch v := msg.(type) {
-				case opencode.UserMessage:
+				// Check role from Info.Role
+				if m.Info.Role == opencode.MessageRoleUser {
 					hasUser = true
-					_ = v
-				case opencode.AssistantMessage:
+				}
+				if m.Info.Role == opencode.MessageRoleAssistant {
 					hasAssistant = true
-					_ = v
 				}
 			}
 			Expect(hasUser).To(BeTrue(), "Should have user message")

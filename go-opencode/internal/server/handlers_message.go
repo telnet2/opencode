@@ -9,13 +9,35 @@ import (
 	"github.com/opencode-ai/opencode/pkg/types"
 )
 
+// TextPartInput represents a text part in the SDK format.
+type TextPartInput struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
 // SendMessageRequest represents the request to send a message.
+// Supports both legacy "content" field and SDK "parts" array format.
 type SendMessageRequest struct {
 	Content string           `json:"content"`
+	Parts   []TextPartInput  `json:"parts,omitempty"` // SDK format
 	Agent   string           `json:"agent,omitempty"`
 	Model   *types.ModelRef  `json:"model,omitempty"`
 	Tools   map[string]bool  `json:"tools,omitempty"`
 	Files   []types.FilePart `json:"files,omitempty"`
+}
+
+// GetContent returns the message content from either Content or Parts.
+func (r *SendMessageRequest) GetContent() string {
+	if r.Content != "" {
+		return r.Content
+	}
+	// Extract text from parts (SDK format)
+	for _, part := range r.Parts {
+		if part.Type == "text" && part.Text != "" {
+			return part.Text
+		}
+	}
+	return ""
 }
 
 // MessageResponse represents a message with its parts.
@@ -35,7 +57,8 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Content == "" {
+	content := req.GetContent()
+	if content == "" {
 		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "content is required")
 		return
 	}
@@ -83,7 +106,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		&types.TextPart{
 			ID:   generateID(),
 			Type: "text",
-			Text: req.Content,
+			Text: content,
 		},
 	}
 
@@ -104,7 +127,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Process message and generate response
 	// This is where the LLM provider is called
-	assistantMsg, parts, err := s.sessionService.ProcessMessage(r.Context(), session, req.Content, req.Model, func(msg *types.Message, parts []types.Part) {
+	assistantMsg, parts, err := s.sessionService.ProcessMessage(r.Context(), session, content, req.Model, func(msg *types.Message, parts []types.Part) {
 		// Stream each update
 		encoder.Encode(MessageResponse{
 			Info:  msg,
@@ -114,13 +137,12 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		// Write error in stream
-		encoder.Encode(map[string]any{
-			"error": map[string]string{
-				"code":    "PROCESSING_ERROR",
-				"message": err.Error(),
-			},
-		})
+		// Send final message with error - still include collected parts
+		errResp := MessageResponse{
+			Info:  assistantMsg,
+			Parts: parts,
+		}
+		encoder.Encode(errResp)
 		flusher.Flush()
 		return
 	}

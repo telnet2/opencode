@@ -172,8 +172,27 @@ func (ts *TestServer) SSEClient() *SSEClient {
 	return NewSSEClient(ts.BaseURL)
 }
 
-// buildTestConfig creates a test configuration with ARK provider
+// buildTestConfig creates a test configuration based on TEST_PROVIDER env var.
+// Supported providers: "openai" (default), "ark"
 func buildTestConfig() *types.Config {
+	testProvider := os.Getenv("TEST_PROVIDER")
+	if testProvider == "" {
+		testProvider = "openai" // Default to OpenAI
+	}
+
+	switch testProvider {
+	case "ark":
+		return buildArkConfig()
+	case "openai":
+		return buildOpenAIConfig()
+	default:
+		// Default to OpenAI
+		return buildOpenAIConfig()
+	}
+}
+
+// buildArkConfig creates a config for ARK provider
+func buildArkConfig() *types.Config {
 	apiKey := os.Getenv("ARK_API_KEY")
 	baseURL := os.Getenv("ARK_BASE_URL")
 	modelID := os.Getenv("ARK_MODEL_ID")
@@ -185,6 +204,29 @@ func buildTestConfig() *types.Config {
 				APIKey:  apiKey,
 				BaseURL: baseURL,
 				Model:   modelID,
+			},
+		},
+		Permission: &types.PermissionConfig{
+			Edit: "allow",
+			Bash: "allow",
+		},
+	}
+}
+
+// buildOpenAIConfig creates a config for OpenAI provider
+func buildOpenAIConfig() *types.Config {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	modelID := os.Getenv("OPENAI_MODEL_ID")
+	if modelID == "" {
+		modelID = "gpt-4o-mini"
+	}
+
+	return &types.Config{
+		Model: fmt.Sprintf("openai/%s", modelID),
+		Provider: map[string]types.ProviderConfig{
+			"openai": {
+				APIKey: apiKey,
+				Model:  modelID,
 			},
 		},
 		Permission: &types.PermissionConfig{
@@ -210,7 +252,7 @@ func waitForServer(baseURL string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
-		resp, err := client.Get(context.Background(), "/config", nil)
+		resp, err := client.Get(context.Background(), "/config")
 		if err == nil && resp.IsSuccess() {
 			return nil
 		}
