@@ -88,11 +88,31 @@ func (s *Server) setupRoutes() {
 
 	// Advanced features
 	r.Get("/lsp", s.getLSPStatus)
-	r.Get("/mcp", s.getMCPStatus)
-	r.Post("/mcp", s.addMCPServer)
 	r.Get("/agent", s.listAgents)
-	r.Get("/formatter", s.getFormatterStatus)
-	r.Get("/command", s.listCommands)
+
+	// MCP routes
+	r.Route("/mcp", func(r chi.Router) {
+		r.Get("/", s.getMCPStatus)
+		r.Post("/", s.addMCPServer)
+		r.Delete("/{name}", s.removeMCPServer)
+		r.Get("/tools", s.getMCPTools)
+		r.Post("/tool/{name}", s.executeMCPTool)
+		r.Get("/resources", s.getMCPResources)
+		r.Get("/resource", s.readMCPResource)
+	})
+
+	// Formatter routes
+	r.Route("/formatter", func(r chi.Router) {
+		r.Get("/", s.getFormatterStatus)
+		r.Post("/format", s.formatFile)
+	})
+
+	// Command routes
+	r.Route("/command", func(r chi.Router) {
+		r.Get("/", s.listCommands)
+		r.Get("/{name}", s.getCommand)
+		r.Post("/{name}", s.executeCommand)
+	})
 
 	// Instance management
 	r.Get("/path", s.getPath)
