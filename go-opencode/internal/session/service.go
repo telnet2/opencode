@@ -54,13 +54,15 @@ func NewServiceWithProcessor(
 	providerReg *provider.Registry,
 	toolReg *tool.Registry,
 	permChecker *permission.Checker,
+	defaultProviderID string,
+	defaultModelID string,
 ) *Service {
 	s := &Service{
 		storage:  store,
 		active:   make(map[string]*ActiveSession),
 		abortChs: make(map[string]chan struct{}),
 	}
-	s.processor = NewProcessor(providerReg, toolReg, store, permChecker)
+	s.processor = NewProcessor(providerReg, toolReg, store, permChecker, defaultProviderID, defaultModelID)
 	return s
 }
 
@@ -70,15 +72,20 @@ func (s *Service) GetProcessor() *Processor {
 }
 
 // Create creates a new session.
-func (s *Service) Create(ctx context.Context, directory string) (*types.Session, error) {
+func (s *Service) Create(ctx context.Context, directory string, title string) (*types.Session, error) {
 	now := time.Now().UnixMilli()
 	projectID := hashDirectory(directory)
+
+	// Use default title if not provided
+	if title == "" {
+		title = "New Session"
+	}
 
 	session := &types.Session{
 		ID:        generateID(),
 		ProjectID: projectID,
 		Directory: directory,
-		Title:     "New Session",
+		Title:     title,
 		Version:   "1",
 		Summary: types.SessionSummary{
 			Additions: 0,
@@ -159,10 +166,36 @@ func (s *Service) Delete(ctx context.Context, sessionID string) error {
 }
 
 // List lists sessions for a directory.
+// If directory is empty, lists all sessions across all projects.
 func (s *Service) List(ctx context.Context, directory string) ([]*types.Session, error) {
-	projectID := hashDirectory(directory)
-
 	var sessions []*types.Session
+
+	if directory == "" {
+		// List ALL sessions across all projects
+		projects, err := s.storage.List(ctx, []string{"session"})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, projectID := range projects {
+			err := s.storage.Scan(ctx, []string{"session", projectID}, func(key string, data json.RawMessage) error {
+				var session types.Session
+				if err := json.Unmarshal(data, &session); err != nil {
+					return err
+				}
+				sessions = append(sessions, &session)
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return sessions, nil
+	}
+
+	// List sessions for a specific directory/project
+	projectID := hashDirectory(directory)
 	err := s.storage.Scan(ctx, []string{"session", projectID}, func(key string, data json.RawMessage) error {
 		var session types.Session
 		if err := json.Unmarshal(data, &session); err != nil {
@@ -204,15 +237,14 @@ func (s *Service) Fork(ctx context.Context, sessionID, messageID string) (*types
 		return nil, err
 	}
 
-	// Create new session
-	newSession, err := s.Create(ctx, session.Directory)
+	// Create new session with fork title
+	newSession, err := s.Create(ctx, session.Directory, session.Title+" (fork)")
 	if err != nil {
 		return nil, err
 	}
 
 	// Set parent
 	newSession.ParentID = &sessionID
-	newSession.Title = session.Title + " (fork)"
 
 	// Copy messages up to the fork point
 	messages, err := s.GetMessages(ctx, sessionID)

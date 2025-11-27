@@ -81,8 +81,8 @@ func (p *Processor) runLoop(
 	}
 
 	// Get provider and model
-	providerID := "anthropic"
-	modelID := "claude-sonnet-4-20250514"
+	providerID := p.defaultProviderID
+	modelID := p.defaultModelID
 
 	if lastMsg.Model != nil {
 		providerID = lastMsg.Model.ProviderID
@@ -433,6 +433,30 @@ func (p *Processor) buildCompletionRequest(
 
 		einoMsg := p.convertMessage(msg, parts)
 		einoMessages = append(einoMessages, einoMsg)
+
+		// For assistant messages with tool parts, add separate tool result messages
+		if msg.Role == "assistant" {
+			for _, part := range parts {
+				if toolPart, ok := part.(*types.ToolPart); ok {
+					// Only completed or errored tool parts should be added as results
+					if toolPart.State == "completed" || toolPart.State == "error" {
+						var toolContent string
+						if toolPart.Output != nil {
+							toolContent = *toolPart.Output
+						} else if toolPart.Error != nil {
+							toolContent = "Error: " + *toolPart.Error
+						}
+
+						toolMsg := &schema.Message{
+							Role:       schema.Tool,
+							Content:    toolContent,
+							ToolCallID: toolPart.ToolCallID,
+						}
+						einoMessages = append(einoMessages, toolMsg)
+					}
+				}
+			}
+		}
 	}
 
 	// Get enabled tools
@@ -505,6 +529,9 @@ func (p *Processor) convertMessage(msg *types.Message, parts []types.Part) *sche
 			content += pt.Text
 		case *types.ToolPart:
 			if msg.Role == "assistant" {
+				// For assistant messages, include all tool calls (even completed ones)
+				// because the LLM needs to know what tools were called.
+				// Tool results are added as separate tool messages in buildCompletionRequest.
 				inputJSON, _ := json.Marshal(pt.Input)
 				toolCalls = append(toolCalls, schema.ToolCall{
 					ID: pt.ToolCallID,
@@ -514,7 +541,7 @@ func (p *Processor) convertMessage(msg *types.Message, parts []types.Part) *sche
 					},
 				})
 			} else {
-				// Tool result
+				// Tool result (for messages with role: tool)
 				toolCallID = pt.ToolCallID
 				if pt.Output != nil {
 					content = *pt.Output

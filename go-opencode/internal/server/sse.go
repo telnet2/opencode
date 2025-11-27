@@ -77,6 +77,11 @@ func (srv *Server) globalEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Explicitly write status and flush headers immediately
+	// This ensures client receives headers before we wait for events
+	w.WriteHeader(http.StatusOK)
+	sse.flusher.Flush()
+
 	// Channel for events
 	events := make(chan event.Event, 100)
 
@@ -132,6 +137,11 @@ func (srv *Server) sessionEvents(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 		return
 	}
+
+	// Explicitly write status and flush headers immediately
+	// This ensures client receives headers before we wait for events
+	w.WriteHeader(http.StatusOK)
+	sse.flusher.Flush()
 
 	// Channel for events
 	events := make(chan event.Event, 100)

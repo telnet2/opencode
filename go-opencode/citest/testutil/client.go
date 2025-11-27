@@ -281,9 +281,13 @@ func (c *TestClient) DeleteSession(ctx context.Context, sessionID string) error 
 	return nil
 }
 
-// ListSessions lists all sessions
-func (c *TestClient) ListSessions(ctx context.Context) ([]Session, error) {
-	resp, err := c.Get(ctx, "/session")
+// ListSessions lists all sessions in a directory
+func (c *TestClient) ListSessions(ctx context.Context, directory string) ([]Session, error) {
+	opts := []RequestOption{}
+	if directory != "" {
+		opts = append(opts, WithQuery(map[string]string{"directory": directory}))
+	}
+	resp, err := c.Get(ctx, "/session", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -302,9 +306,9 @@ func (c *TestClient) ListSessions(ctx context.Context) ([]Session, error) {
 
 // MessagePart represents a message part
 type MessagePart struct {
-	Type    string          `json:"type"`
-	Content string          `json:"content,omitempty"`
-	Tool    json.RawMessage `json:"tool,omitempty"`
+	Type string          `json:"type"`
+	Text string          `json:"text,omitempty"`
+	Tool json.RawMessage `json:"tool,omitempty"`
 }
 
 // Message represents a message
@@ -312,15 +316,28 @@ type Message struct {
 	ID        string        `json:"id"`
 	SessionID string        `json:"sessionID"`
 	Role      string        `json:"role"`
-	Content   string        `json:"content"`
 	Parts     []MessagePart `json:"parts,omitempty"`
 }
 
 // MessageResponse represents the streaming message response
 type MessageResponse struct {
-	Info  *Message `json:"info,omitempty"`
-	Parts []MessagePart `json:"parts,omitempty"`
+	Info  *Message       `json:"info,omitempty"`
+	Parts []MessagePart  `json:"parts,omitempty"`
 	Error *ErrorResponse `json:"error,omitempty"`
+}
+
+// Content extracts text content from the message parts
+func (r *MessageResponse) Content() string {
+	if r == nil {
+		return ""
+	}
+	var content strings.Builder
+	for _, part := range r.Parts {
+		if part.Type == "text" && part.Text != "" {
+			content.WriteString(part.Text)
+		}
+	}
+	return content.String()
 }
 
 // ErrorResponse represents an error
@@ -386,9 +403,17 @@ func (c *TestClient) GetMessages(ctx context.Context, sessionID string) ([]Messa
 		return nil, fmt.Errorf("failed to get messages: %d - %s", resp.StatusCode, resp.String())
 	}
 
-	var messages []Message
-	if err := resp.JSON(&messages); err != nil {
+	// Server returns []MessageResponse, extract Info from each
+	var messageResponses []MessageResponse
+	if err := resp.JSON(&messageResponses); err != nil {
 		return nil, err
+	}
+
+	var messages []Message
+	for _, mr := range messageResponses {
+		if mr.Info != nil {
+			messages = append(messages, *mr.Info)
+		}
 	}
 	return messages, nil
 }
