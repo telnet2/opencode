@@ -12,7 +12,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/opencode-ai/opencode/internal/command"
 	"github.com/opencode-ai/opencode/internal/event"
+	"github.com/opencode-ai/opencode/internal/formatter"
+	"github.com/opencode-ai/opencode/internal/mcp"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -42,15 +45,18 @@ func DefaultConfig() *Config {
 
 // Server is the HTTP server.
 type Server struct {
-	config          *Config
-	router          *chi.Mux
-	httpSrv         *http.Server
-	appConfig       *types.Config
-	storage         *storage.Storage
-	sessionService  *session.Service
-	providerReg     *provider.Registry
-	toolReg         *tool.Registry
-	bus             *event.Bus
+	config           *Config
+	router           *chi.Mux
+	httpSrv          *http.Server
+	appConfig        *types.Config
+	storage          *storage.Storage
+	sessionService   *session.Service
+	providerReg      *provider.Registry
+	toolReg          *tool.Registry
+	bus              *event.Bus
+	mcpClient        *mcp.Client
+	commandExecutor  *command.Executor
+	formatterManager *formatter.Manager
 }
 
 // New creates a new Server instance.
@@ -68,21 +74,67 @@ func New(cfg *Config, appConfig *types.Config, store *storage.Storage, providerR
 		}
 	}
 
+	// Create MCP client
+	mcpClient := mcp.NewClient()
+
+	// Create command executor
+	cmdExecutor := command.NewExecutor(cfg.Directory, appConfig)
+
+	// Create formatter manager
+	fmtManager := formatter.NewManager(cfg.Directory, appConfig)
+
 	s := &Server{
-		config:         cfg,
-		router:         r,
-		appConfig:      appConfig,
-		storage:        store,
-		sessionService: session.NewServiceWithProcessor(store, providerReg, toolReg, nil, defaultProviderID, defaultModelID),
-		providerReg:    providerReg,
-		toolReg:        toolReg,
-		bus:            event.NewBus(),
+		config:           cfg,
+		router:           r,
+		appConfig:        appConfig,
+		storage:          store,
+		sessionService:   session.NewServiceWithProcessor(store, providerReg, toolReg, nil, defaultProviderID, defaultModelID),
+		providerReg:      providerReg,
+		toolReg:          toolReg,
+		bus:              event.NewBus(),
+		mcpClient:        mcpClient,
+		commandExecutor:  cmdExecutor,
+		formatterManager: fmtManager,
 	}
 
 	s.setupMiddleware()
 	s.setupRoutes()
 
 	return s
+}
+
+// InitializeMCP initializes MCP servers from configuration.
+func (s *Server) InitializeMCP(ctx context.Context) error {
+	if s.appConfig == nil || s.appConfig.MCP == nil {
+		return nil
+	}
+
+	for name, cfg := range s.appConfig.MCP {
+		enabled := cfg.Enabled == nil || *cfg.Enabled
+		mcpCfg := &mcp.Config{
+			Enabled:     enabled,
+			Type:        mcp.TransportType(cfg.Type),
+			URL:         cfg.URL,
+			Headers:     cfg.Headers,
+			Command:     cfg.Command,
+			Environment: cfg.Environment,
+			Timeout:     cfg.Timeout,
+		}
+		if err := s.mcpClient.AddServer(ctx, name, mcpCfg); err != nil {
+			// Log but don't fail on individual server errors
+			continue
+		}
+	}
+
+	return nil
+}
+
+// CloseMCP closes all MCP server connections.
+func (s *Server) CloseMCP() error {
+	if s.mcpClient != nil {
+		return s.mcpClient.Close()
+	}
+	return nil
 }
 
 // setupMiddleware configures middleware for the server.
