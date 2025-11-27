@@ -275,7 +275,7 @@ var _ = Describe("Phase 3: Formatter Endpoints", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			resp, err := client.Post(ctx, "/formatter/format", map[string]string{
-				"path": testFile,
+				"path": testFile.Path,
 			})
 			Expect(err).NotTo(HaveOccurred())
 			// Should succeed (even if no formatter matches the extension)
@@ -296,7 +296,7 @@ var _ = Describe("Phase 3: Formatter Endpoints", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			resp, err := client.Post(ctx, "/formatter/format", map[string]interface{}{
-				"paths": []string{file1, file2},
+				"paths": []string{file1.Path, file2.Path},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
