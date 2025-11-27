@@ -92,9 +92,9 @@ This document outlines a comprehensive strategy for comparing the TypeScript (`p
 | **Client Tools** | `POST /client-tools/register` | ✅ | ✅ | Register |
 | | `DELETE /client-tools/unregister` | ✅ | ✅ | Unregister |
 | | `POST /client-tools/result` | ✅ | ✅ | Submit result |
-| | `GET /client-tools/pending/:id` | ✅ | ⚠️ | Pending (partial) |
-| | `GET /client-tools/tools/:id` | ✅ | ✅ | Get tools |
-| | `GET /client-tools/tools` | ✅ | ✅ | All tools |
+| | `GET /client-tools/pending/:id` | ✅ | ❌ | Pending SSE (missing) |
+| | `GET /client-tools/tools/:id` | ✅ | ❌ | Get tools (missing) |
+| | `GET /client-tools/tools` | ✅ | ❌ | All tools (missing) |
 | **Instance** | `POST /instance/dispose` | ✅ | ✅ | Dispose |
 | | `GET /path` | ✅ | ✅ | Get paths |
 | | `POST /log` | ✅ | ✅ | Write log |
@@ -113,6 +113,211 @@ This document outlines a comprehensive strategy for comparing the TypeScript (`p
 | **Docs** | `GET /doc` | ✅ | ✅ | OpenAPI spec |
 
 **Legend:** ✅ Full parity | ⚠️ Partial implementation | ❌ Missing
+
+---
+
+## 2.2 Parity Gaps: Detailed Analysis
+
+This section documents the specific missing functionality in the Go implementation that requires attention for full feature parity.
+
+### Gap 1: Symbol Search (`GET /find/symbol`)
+
+**Status:** ⚠️ Stub - Returns 501 Not Implemented
+
+**TypeScript Implementation** (`packages/opencode/src/server/server.ts:1399`):
+- Fully functional LSP-based workspace symbol search
+- Integrates with LSP clients to query workspace symbols
+- Returns array of `LSP.Symbol` objects with location information
+- Supports symbol query filtering
+
+**Go Implementation** (`go-opencode/internal/server/handlers_file.go:247-250`):
+```go
+// searchSymbols handles GET /find/symbol
+func (s *Server) searchSymbols(w http.ResponseWriter, r *http.Request) {
+    // LSP-based symbol search (placeholder)
+    notImplemented(w)
+}
+```
+
+**Required for Parity:**
+1. Integrate with LSP client infrastructure (`go-opencode/internal/lsp/`)
+2. Implement `workspace/symbol` LSP request
+3. Parse and return symbol results matching TypeScript response schema:
+   ```typescript
+   interface Symbol {
+     name: string
+     kind: SymbolKind
+     location: Location
+     containerName?: string
+   }
+   ```
+
+**Priority:** Medium - Used for code navigation features in IDEs
+
+---
+
+### Gap 2: Client Tools Pending Endpoint (`GET /client-tools/pending/:clientID`)
+
+**Status:** ❌ Missing - No route defined
+
+**TypeScript Implementation** (`packages/opencode/src/server/client-tools.ts:169-229`):
+- SSE endpoint for streaming pending tool execution requests to clients
+- Subscribes to `ClientToolRegistry.Event.ToolRequest` events
+- Filters events by `clientID` parameter
+- Sends `tool-request` events with full request payload
+- Implements keepalive pings every 30 seconds
+- Handles client disconnection with automatic cleanup via `ClientToolRegistry.cleanup(clientID)`
+
+```typescript
+// SSE endpoint for tool execution requests
+.get("/pending/:clientID", async (c) => {
+  const clientID = c.req.param("clientID")
+
+  return streamSSE(c, async (stream) => {
+    // Subscribe to tool request events for this client
+    const unsubscribe = Bus.subscribe(ClientToolRegistry.Event.ToolRequest, async (event) => {
+      if (event.properties.clientID === clientID) {
+        await stream.writeSSE({
+          event: "tool-request",
+          data: JSON.stringify(event.properties.request),
+        })
+      }
+    })
+
+    // Keep connection alive with periodic pings
+    const keepAlive = setInterval(async () => {
+      await stream.writeSSE({ event: "ping", data: "" })
+    }, 30000)
+
+    // Wait for disconnect and cleanup
+    await new Promise<void>((resolve) => {
+      stream.onAbort(() => {
+        unsubscribe()
+        clearInterval(keepAlive)
+        ClientToolRegistry.cleanup(clientID)
+        resolve()
+      })
+    })
+  })
+})
+```
+
+**Go Implementation:**
+- Route not defined in `go-opencode/internal/server/routes.go`
+- Only basic client tool routes exist:
+  - `POST /client-tools/register`
+  - `DELETE /client-tools/unregister`
+  - `POST /client-tools/execute`
+  - `POST /client-tools/result`
+
+**Additional Missing Endpoints:**
+| Endpoint | Description | Status |
+|----------|-------------|--------|
+| `GET /client-tools/pending/:clientID` | SSE stream for tool requests | ❌ Missing |
+| `GET /client-tools/tools/:clientID` | Get tools for specific client | ❌ Missing |
+| `GET /client-tools/tools` | Get all registered client tools | ❌ Missing |
+
+**Required for Parity:**
+1. Add SSE endpoint with client ID filtering
+2. Implement event bus subscription for tool requests
+3. Add keepalive ping mechanism (30s interval)
+4. Implement proper cleanup on client disconnect
+5. Add the two missing GET endpoints for tool introspection
+
+**Priority:** High - Essential for external tool integrations (VSCode extension, etc.)
+
+---
+
+### Gap 3: Provider OAuth Endpoints
+
+**Status:** ⚠️ Stub - Returns 501 Not Implemented
+
+#### 3a. OAuth Authorize (`POST /provider/:id/oauth/authorize`)
+
+**TypeScript Implementation** (`packages/opencode/src/provider/auth.ts:54-72`):
+- Initiates OAuth flow for supported providers
+- Returns authorization URL and method type (`auto` or `code`)
+- Stores pending OAuth state for callback handling
+- Returns `Authorization` object:
+  ```typescript
+  interface Authorization {
+    url: string        // OAuth authorization URL
+    method: "auto" | "code"  // Callback method type
+    instructions: string     // User instructions
+  }
+  ```
+
+**Go Implementation** (`go-opencode/internal/server/handlers_config.go:85-88`):
+```go
+// oauthAuthorize handles POST /provider/{providerID}/oauth/authorize
+func (s *Server) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
+    notImplemented(w)
+}
+```
+
+#### 3b. OAuth Callback (`POST /provider/:id/oauth/callback`)
+
+**TypeScript Implementation** (`packages/opencode/src/provider/auth.ts:74-114`):
+- Handles OAuth callback with authorization code (for `code` method)
+- Handles automatic token exchange (for `auto` method)
+- Stores resulting tokens via `Auth.set()`:
+  - API key for simple auth: `{ type: "api", key: string }`
+  - OAuth tokens: `{ type: "oauth", access: string, refresh: string, expires: number }`
+- Throws typed errors: `OauthMissing`, `OauthCodeMissing`, `OauthCallbackFailed`
+
+**Go Implementation** (`go-opencode/internal/server/handlers_config.go:90-93`):
+```go
+// oauthCallback handles POST /provider/{providerID}/oauth/callback
+func (s *Server) oauthCallback(w http.ResponseWriter, r *http.Request) {
+    notImplemented(w)
+}
+```
+
+**Supported OAuth Providers (TypeScript):**
+- Providers with OAuth support are loaded dynamically via plugin system
+- Common providers: GitHub Copilot, Amazon Q, etc.
+- Auth methods defined per-provider with `type: "oauth"` or `type: "api"`
+
+**Required for Parity:**
+1. Implement OAuth state management (pending authorizations)
+2. Add provider-specific OAuth configuration loading
+3. Implement authorization URL generation
+4. Handle callback with code exchange
+5. Store tokens securely (consider using Go's equivalent to the TypeScript Auth module)
+6. Support both `auto` and `code` OAuth methods
+7. Implement proper error types matching TypeScript errors
+
+**Priority:** Medium - Required for OAuth-based providers (GitHub Copilot, etc.)
+
+---
+
+### Summary: Implementation Priority
+
+| Gap | Priority | Effort | Impact |
+|-----|----------|--------|--------|
+| Client Tools Pending SSE | 🔴 High | Medium | Blocks external tool integrations |
+| Client Tools GET endpoints | 🔴 High | Low | Blocks tool introspection |
+| Provider OAuth | 🟡 Medium | High | Blocks OAuth-based providers |
+| Symbol Search | 🟡 Medium | Medium | Reduces IDE integration quality |
+
+### Recommended Implementation Order
+
+1. **Phase 1: Client Tools (Week 1)**
+   - Add `GET /client-tools/pending/:clientID` SSE endpoint
+   - Add `GET /client-tools/tools/:clientID` endpoint
+   - Add `GET /client-tools/tools` endpoint
+   - Implement event bus subscription and cleanup
+
+2. **Phase 2: Symbol Search (Week 2)**
+   - Integrate with existing LSP infrastructure
+   - Implement `workspace/symbol` request handling
+   - Return properly formatted symbol results
+
+3. **Phase 3: Provider OAuth (Week 3-4)**
+   - Design OAuth state management
+   - Implement authorize flow
+   - Implement callback handling
+   - Add token storage integration
 
 ---
 
