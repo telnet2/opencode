@@ -15,6 +15,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/command"
 	"github.com/opencode-ai/opencode/internal/event"
 	"github.com/opencode-ai/opencode/internal/formatter"
+	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/mcp"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/session"
@@ -57,6 +58,7 @@ type Server struct {
 	mcpClient        *mcp.Client
 	commandExecutor  *command.Executor
 	formatterManager *formatter.Manager
+	lspClient        *lsp.Client
 }
 
 // New creates a new Server instance.
@@ -83,6 +85,10 @@ func New(cfg *Config, appConfig *types.Config, store *storage.Storage, providerR
 	// Create formatter manager
 	fmtManager := formatter.NewManager(cfg.Directory, appConfig)
 
+	// Initialize LSP client (disabled if appConfig.LSP.Disabled is true)
+	lspDisabled := appConfig != nil && appConfig.LSP != nil && appConfig.LSP.Disabled
+	lspClient := lsp.NewClient(cfg.Directory, lspDisabled)
+
 	s := &Server{
 		config:           cfg,
 		router:           r,
@@ -95,6 +101,7 @@ func New(cfg *Config, appConfig *types.Config, store *storage.Storage, providerR
 		mcpClient:        mcpClient,
 		commandExecutor:  cmdExecutor,
 		formatterManager: fmtManager,
+		lspClient:        lspClient,
 	}
 
 	s.setupMiddleware()
@@ -133,6 +140,14 @@ func (s *Server) InitializeMCP(ctx context.Context) error {
 func (s *Server) CloseMCP() error {
 	if s.mcpClient != nil {
 		return s.mcpClient.Close()
+	}
+	return nil
+}
+
+// CloseLSP closes all LSP server connections.
+func (s *Server) CloseLSP() error {
+	if s.lspClient != nil {
+		return s.lspClient.Close()
 	}
 	return nil
 }

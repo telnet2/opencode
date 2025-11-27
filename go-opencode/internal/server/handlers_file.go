@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/opencode-ai/opencode/internal/lsp"
 )
 
 // FileInfo represents file information.
@@ -243,8 +245,53 @@ func (s *Server) searchFiles(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Symbol kinds to include in results (matching TypeScript implementation).
+// See: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#symbolKind
+var symbolKindsFilter = map[lsp.SymbolKind]bool{
+	lsp.SymbolKindClass:     true, // 5
+	lsp.SymbolKindMethod:    true, // 6
+	lsp.SymbolKindEnum:      true, // 10
+	lsp.SymbolKindInterface: true, // 11
+	lsp.SymbolKindFunction:  true, // 12
+	lsp.SymbolKindVariable:  true, // 13
+	lsp.SymbolKindConstant:  true, // 14
+	lsp.SymbolKindStruct:    true, // 23
+}
+
 // searchSymbols handles GET /find/symbol
 func (s *Server) searchSymbols(w http.ResponseWriter, r *http.Request) {
-	// LSP-based symbol search (placeholder)
-	notImplemented(w)
+	query := r.URL.Query().Get("query")
+	if query == "" {
+		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "query parameter required")
+		return
+	}
+
+	// Check if LSP is available
+	if s.lspClient == nil || s.lspClient.IsDisabled() {
+		writeJSON(w, http.StatusOK, []lsp.Symbol{})
+		return
+	}
+
+	ctx := r.Context()
+	symbols, err := s.lspClient.WorkspaceSymbol(ctx, query)
+	if err != nil {
+		// Log error but return empty array (matching TS behavior)
+		writeJSON(w, http.StatusOK, []lsp.Symbol{})
+		return
+	}
+
+	// Filter by symbol kinds (matching TypeScript)
+	filtered := make([]lsp.Symbol, 0, len(symbols))
+	for _, sym := range symbols {
+		if symbolKindsFilter[sym.Kind] {
+			filtered = append(filtered, sym)
+		}
+	}
+
+	// Limit to 10 results (matching TypeScript)
+	if len(filtered) > 10 {
+		filtered = filtered[:10]
+	}
+
+	writeJSON(w, http.StatusOK, filtered)
 }
