@@ -10,6 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/server"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -81,18 +82,85 @@ func StartTestServer(opts ...TestServerOption) (*TestServer, error) {
 		workDir = tempDir
 	}
 
-	// Check if using mockllm provider
+	// Check which provider to use
 	testProvider := os.Getenv("TEST_PROVIDER")
-	var mockLLM *MockLLMServer
-	var appConfig *types.Config
+	if testProvider == "" {
+		testProvider = "openai" // Default to OpenAI
+	}
 
-	if testProvider == "mockllm" {
-		// Start MockLLM server first
-		mockLLM = NewMockLLMServer()
-		appConfig = buildMockLLMConfig(mockLLM.URL())
-	} else {
-		// Build config for real providers
-		appConfig = buildTestConfig()
+	var mockLLM *MockLLMServer
+
+	switch testProvider {
+	case "mockllm":
+		// Start MockLLM server with config from mockllm.yaml
+		configDir := getMockLLMConfigDir()
+		var err error
+		if configDir != "" {
+			mockLLM, err = NewMockLLMServerFromDir(configDir)
+			if err != nil {
+				// Fall back to default config if loading fails
+				mockLLM = NewMockLLMServer()
+			}
+		} else {
+			mockLLM = NewMockLLMServer()
+		}
+
+		// Set env vars for config interpolation
+		os.Setenv("OPENAI_BASE_URL", mockLLM.URL())
+		os.Setenv("OPENAI_API_KEY", "mock-api-key")
+		os.Setenv("OPENAI_MODEL_ID", "gpt-4o-mini")
+		if os.Getenv("OPENCODE_MODEL") == "" {
+			os.Setenv("OPENCODE_MODEL", "openai/gpt-4o-mini")
+		}
+
+	case "ark":
+		// Set OPENCODE_MODEL for ARK provider (only if not already set)
+		if os.Getenv("OPENCODE_MODEL") == "" {
+			arkModelID := os.Getenv("ARK_MODEL_ID")
+			if arkModelID != "" {
+				os.Setenv("OPENCODE_MODEL", "ark/"+arkModelID)
+			}
+		}
+
+	case "openai":
+		// Set OPENCODE_MODEL for OpenAI provider (only if not already set)
+		if os.Getenv("OPENCODE_MODEL") == "" {
+			openaiModelID := os.Getenv("OPENAI_MODEL_ID")
+			if openaiModelID == "" {
+				openaiModelID = "gpt-4o-mini"
+				os.Setenv("OPENAI_MODEL_ID", openaiModelID)
+			}
+			os.Setenv("OPENCODE_MODEL", "openai/"+openaiModelID)
+		}
+
+	case "anthropic":
+		// Set OPENCODE_MODEL for Anthropic provider (only if not already set)
+		if os.Getenv("OPENCODE_MODEL") == "" {
+			anthropicModelID := os.Getenv("ANTHROPIC_MODEL_ID")
+			if anthropicModelID == "" {
+				anthropicModelID = "claude-sonnet-4-20250514"
+				os.Setenv("ANTHROPIC_MODEL_ID", anthropicModelID)
+			}
+			os.Setenv("OPENCODE_MODEL", "anthropic/"+anthropicModelID)
+		}
+	}
+
+	// Set OPENCODE_CONFIG to point to the test config file
+	// This ensures config.Load() finds our test configuration
+	configPath := getTestConfigPath()
+	if configPath != "" {
+		os.Setenv("OPENCODE_CONFIG", configPath)
+	}
+
+	// Load config from opencode.json using config.Load()
+	// The config file uses {env:VAR} interpolation for provider settings
+	appConfig, err := config.Load(workDir)
+	if err != nil {
+		if mockLLM != nil {
+			mockLLM.Close()
+		}
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Helper for cleanup on error
@@ -198,92 +266,53 @@ func (ts *TestServer) SSEClient() *SSEClient {
 	return NewSSEClient(ts.BaseURL)
 }
 
-// buildTestConfig creates a test configuration based on TEST_PROVIDER env var.
-// Supported providers: "openai" (default), "ark", "mockllm"
-// Note: For "mockllm", this returns nil and the caller should use buildMockLLMConfig
-func buildTestConfig() *types.Config {
-	testProvider := os.Getenv("TEST_PROVIDER")
-	if testProvider == "" {
-		testProvider = "openai" // Default to OpenAI
+// getTestConfigPath returns the path to the test configuration file.
+// It searches for citest/config/opencode.json relative to the current directory.
+func getTestConfigPath() string {
+	// Try to find the config file relative to current directory
+	// This handles running tests from different directories
+	candidates := []string{
+		"citest/config/opencode.json",
+		"../citest/config/opencode.json",
+		"../../citest/config/opencode.json",
+		"../../../citest/config/opencode.json",
 	}
 
-	switch testProvider {
-	case "ark":
-		return buildArkConfig()
-	case "openai":
-		return buildOpenAIConfig()
-	case "mockllm":
-		// MockLLM config is built separately with the server URL
-		return nil
-	default:
-		// Default to OpenAI
-		return buildOpenAIConfig()
+	for _, candidate := range candidates {
+		if absPath, err := filepath.Abs(candidate); err == nil {
+			if _, err := os.Stat(absPath); err == nil {
+				return absPath
+			}
+		}
 	}
+
+	// Also check if OPENCODE_CONFIG is already set
+	if existing := os.Getenv("OPENCODE_CONFIG"); existing != "" {
+		return existing
+	}
+
+	return ""
 }
 
-// buildArkConfig creates a config for ARK provider
-func buildArkConfig() *types.Config {
-	apiKey := os.Getenv("ARK_API_KEY")
-	baseURL := os.Getenv("ARK_BASE_URL")
-	modelID := os.Getenv("ARK_MODEL_ID")
-
-	return &types.Config{
-		Model: fmt.Sprintf("ark/%s", modelID),
-		Provider: map[string]types.ProviderConfig{
-			"ark": {
-				APIKey:  apiKey,
-				BaseURL: baseURL,
-				Model:   modelID,
-			},
-		},
-		Permission: &types.PermissionConfig{
-			Edit: "allow",
-			Bash: "allow",
-		},
-	}
-}
-
-// buildOpenAIConfig creates a config for OpenAI provider
-func buildOpenAIConfig() *types.Config {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	modelID := os.Getenv("OPENAI_MODEL_ID")
-	if modelID == "" {
-		modelID = "gpt-4o-mini"
+// getMockLLMConfigDir returns the directory containing mockllm.yaml config.
+func getMockLLMConfigDir() string {
+	candidates := []string{
+		"citest/config",
+		"../citest/config",
+		"../../citest/config",
+		"../../../citest/config",
 	}
 
-	return &types.Config{
-		Model: fmt.Sprintf("openai/%s", modelID),
-		Provider: map[string]types.ProviderConfig{
-			"openai": {
-				APIKey: apiKey,
-				Model:  modelID,
-			},
-		},
-		Permission: &types.PermissionConfig{
-			Edit: "allow",
-			Bash: "allow",
-		},
+	for _, candidate := range candidates {
+		if absPath, err := filepath.Abs(candidate); err == nil {
+			mockllmPath := filepath.Join(absPath, "mockllm.yaml")
+			if _, err := os.Stat(mockllmPath); err == nil {
+				return absPath
+			}
+		}
 	}
-}
 
-// buildMockLLMConfig creates a config that points to a MockLLM server.
-// It uses the OpenAI provider format with a custom BaseURL pointing to MockLLM.
-// Note: We use gpt-4o-mini as the model ID since it's a known model in the provider.
-func buildMockLLMConfig(mockLLMURL string) *types.Config {
-	return &types.Config{
-		Model: "openai/gpt-4o-mini",
-		Provider: map[string]types.ProviderConfig{
-			"openai": {
-				APIKey:  "mock-api-key", // MockLLM doesn't validate API keys
-				BaseURL: mockLLMURL,
-				Model:   "gpt-4o-mini",
-			},
-		},
-		Permission: &types.PermissionConfig{
-			Edit: "allow",
-			Bash: "allow",
-		},
-	}
+	return ""
 }
 
 // findAvailablePort finds an available TCP port

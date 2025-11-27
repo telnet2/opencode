@@ -20,8 +20,12 @@ type AnthropicProvider struct {
 
 // AnthropicConfig holds configuration for Anthropic provider.
 type AnthropicConfig struct {
+	// ID is the provider identifier (e.g., "anthropic", "claude")
+	// If empty, defaults to "anthropic"
+	ID        string
 	APIKey    string
 	BaseURL   string
+	Model     string // Model ID (e.g., "claude-sonnet-4-20250514", "claude-3-5-haiku-20241022")
 	MaxTokens int
 
 	// Extended thinking support
@@ -44,16 +48,23 @@ func NewAnthropicProvider(ctx context.Context, config *AnthropicConfig) (*Anthro
 		return nil, fmt.Errorf("ANTHROPIC_API_KEY not set")
 	}
 
+	// Default model if not specified
+	modelID := config.Model
+	if modelID == "" {
+		modelID = "claude-sonnet-4-20250514"
+	}
+
 	var chatModel model.ToolCallingChatModel
 	var err error
 
 	if config.UseBedrock {
-		// Use AWS Bedrock
+		// Use AWS Bedrock - convert model ID to Bedrock format
+		bedrockModel := "anthropic." + modelID + "-v1:0"
 		chatModel, err = claude.NewChatModel(ctx, &claude.Config{
 			ByBedrock: true,
 			Region:    config.Region,
 			Profile:   config.Profile,
-			Model:     "anthropic.claude-sonnet-4-20250514-v1:0",
+			Model:     bedrockModel,
 			MaxTokens: config.MaxTokens,
 			Thinking:  config.Thinking,
 		})
@@ -61,7 +72,7 @@ func NewAnthropicProvider(ctx context.Context, config *AnthropicConfig) (*Anthro
 		// Use direct API
 		cfg := &claude.Config{
 			APIKey:    apiKey,
-			Model:     "claude-sonnet-4-20250514",
+			Model:     modelID,
 			MaxTokens: config.MaxTokens,
 			Thinking:  config.Thinking,
 		}
@@ -83,7 +94,12 @@ func NewAnthropicProvider(ctx context.Context, config *AnthropicConfig) (*Anthro
 }
 
 // ID returns the provider identifier.
-func (p *AnthropicProvider) ID() string { return "anthropic" }
+func (p *AnthropicProvider) ID() string {
+	if p.config.ID != "" {
+		return p.config.ID
+	}
+	return "anthropic"
+}
 
 // Name returns the human-readable provider name.
 func (p *AnthropicProvider) Name() string { return "Anthropic" }
@@ -173,6 +189,29 @@ func anthropicModels() []types.Model {
 		{
 			ID:                "claude-3-5-haiku-20241022",
 			Name:              "Claude 3.5 Haiku",
+			ProviderID:        "anthropic",
+			ContextLength:     200000,
+			MaxOutputTokens:   8192,
+			SupportsTools:     true,
+			SupportsVision:    true,
+			InputPrice:        0.8,
+			OutputPrice:       4.0,
+		},
+		{
+			ID:                "claude-haiku-4-5-20251001",
+			Name:              "Claude 4.5 Haiku",
+			ProviderID:        "anthropic",
+			ContextLength:     200000,
+			MaxOutputTokens:   8192,
+			SupportsTools:     true,
+			SupportsVision:    true,
+			InputPrice:        0.8,
+			OutputPrice:       4.0,
+		},
+		// Alias for claude-haiku-4-5-20251001
+		{
+			ID:                "claude-haiku-4-5",
+			Name:              "Claude 4.5 Haiku",
 			ProviderID:        "anthropic",
 			ContextLength:     200000,
 			MaxOutputTokens:   8192,

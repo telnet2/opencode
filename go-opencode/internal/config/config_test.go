@@ -30,6 +30,7 @@ func TestLoadTypeScriptConfig(t *testing.T) {
 		"username": "testuser",
 		"provider": {
 			"anthropic": {
+				"npm": "@ai-sdk/anthropic",
 				"options": {
 					"apiKey": "sk-ant-test123"
 				}
@@ -66,9 +67,11 @@ func TestLoadTypeScriptConfig(t *testing.T) {
 	assert.Equal(t, "anthropic/claude-3-5-haiku-20241022", cfg.SmallModel)
 	assert.Equal(t, "testuser", cfg.Username)
 
-	// Verify nested provider options are normalized
+	// Verify nested provider options
 	anthropic := cfg.Provider["anthropic"]
-	assert.Equal(t, "sk-ant-test123", anthropic.APIKey)
+	assert.Equal(t, "@ai-sdk/anthropic", anthropic.Npm)
+	require.NotNil(t, anthropic.Options)
+	assert.Equal(t, "sk-ant-test123", anthropic.Options.APIKey)
 
 	// Verify agent config with top_p
 	coder := cfg.Agent["coder"]
@@ -78,42 +81,6 @@ func TestLoadTypeScriptConfig(t *testing.T) {
 	assert.Equal(t, 0.9, *coder.TopP)
 	assert.True(t, coder.Tools["bash"])
 	assert.True(t, coder.Tools["edit"])
-}
-
-func TestLoadGoStyleConfig(t *testing.T) {
-	// Create a temporary directory
-	tmpDir, err := os.MkdirTemp("", "opencode-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Isolate HOME
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", oldHome)
-
-	// Go-style config with direct fields
-	goConfig := `{
-		"model": "openai/gpt-4o",
-		"provider": {
-			"openai": {
-				"apiKey": "sk-openai-test",
-				"baseURL": "https://api.openai.com/v1"
-			}
-		}
-	}`
-
-	// Write config
-	configPath := filepath.Join(tmpDir, ".opencode", "opencode.json")
-	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
-	require.NoError(t, os.WriteFile(configPath, []byte(goConfig), 0644))
-
-	// Load config
-	cfg, err := Load(tmpDir)
-	require.NoError(t, err)
-
-	assert.Equal(t, "openai/gpt-4o", cfg.Model)
-	assert.Equal(t, "sk-openai-test", cfg.Provider["openai"].APIKey)
-	assert.Equal(t, "https://api.openai.com/v1", cfg.Provider["openai"].BaseURL)
 }
 
 func TestJSONCComments(t *testing.T) {
@@ -135,7 +102,9 @@ func TestJSONCComments(t *testing.T) {
 		   multi-line comment */
 		"provider": {
 			"anthropic": {
-				"apiKey": "test-key" // inline comment
+				"options": {
+					"apiKey": "test-key" // inline comment
+				}
 			}
 		}
 	}`
@@ -150,7 +119,8 @@ func TestJSONCComments(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "anthropic/claude-sonnet-4-20250514", cfg.Model)
-	assert.Equal(t, "test-key", cfg.Provider["anthropic"].APIKey)
+	require.NotNil(t, cfg.Provider["anthropic"].Options)
+	assert.Equal(t, "test-key", cfg.Provider["anthropic"].Options.APIKey)
 }
 
 func TestEnvInterpolation(t *testing.T) {
@@ -168,12 +138,14 @@ func TestEnvInterpolation(t *testing.T) {
 	os.Setenv("HOME", tmpDir)
 	defer os.Setenv("HOME", oldHome)
 
-	// Config with env interpolation
+	// Config with env interpolation using TypeScript-style options
 	config := `{
 		"model": "anthropic/claude-sonnet-4",
 		"provider": {
 			"anthropic": {
-				"apiKey": "{env:TEST_API_KEY}"
+				"options": {
+					"apiKey": "{env:TEST_API_KEY}"
+				}
 			}
 		}
 	}`
@@ -186,7 +158,8 @@ func TestEnvInterpolation(t *testing.T) {
 	cfg, err := Load(tmpDir)
 	require.NoError(t, err)
 
-	assert.Equal(t, "interpolated-key", cfg.Provider["anthropic"].APIKey)
+	require.NotNil(t, cfg.Provider["anthropic"].Options)
+	assert.Equal(t, "interpolated-key", cfg.Provider["anthropic"].Options.APIKey)
 }
 
 func TestFileInterpolation(t *testing.T) {
@@ -238,12 +211,15 @@ func TestConfigMerge(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", oldHome)
 
-	// Global config
+	// Global config with TypeScript-style options
 	globalConfig := `{
 		"model": "anthropic/claude-sonnet-4",
 		"provider": {
 			"anthropic": {
-				"apiKey": "global-key"
+				"npm": "@ai-sdk/anthropic",
+				"options": {
+					"apiKey": "global-key"
+				}
 			}
 		},
 		"agent": {
@@ -279,7 +255,8 @@ func TestConfigMerge(t *testing.T) {
 	assert.Equal(t, "openai/gpt-4o", cfg.Model)
 
 	// Global provider should be preserved
-	assert.Equal(t, "global-key", cfg.Provider["anthropic"].APIKey)
+	require.NotNil(t, cfg.Provider["anthropic"].Options)
+	assert.Equal(t, "global-key", cfg.Provider["anthropic"].Options.APIKey)
 
 	// Agent tools should be merged (project overrides coder)
 	assert.True(t, cfg.Agent["coder"].Tools["edit"])
@@ -288,11 +265,7 @@ func TestConfigMerge(t *testing.T) {
 func TestEnvVarOverride(t *testing.T) {
 	// Set test environment variables
 	os.Setenv("OPENCODE_MODEL", "env-model")
-	os.Setenv("ANTHROPIC_API_KEY", "env-anthropic-key")
-	defer func() {
-		os.Unsetenv("OPENCODE_MODEL")
-		os.Unsetenv("ANTHROPIC_API_KEY")
-	}()
+	defer os.Unsetenv("OPENCODE_MODEL")
 
 	// Create a temporary directory
 	tmpDir, err := os.MkdirTemp("", "opencode-test-*")
@@ -319,9 +292,6 @@ func TestEnvVarOverride(t *testing.T) {
 
 	// Environment variable should override file config
 	assert.Equal(t, "env-model", cfg.Model)
-
-	// Provider key from env should be set
-	assert.Equal(t, "env-anthropic-key", cfg.Provider["anthropic"].APIKey)
 }
 
 func TestOPENCODE_CONFIG(t *testing.T) {
@@ -539,8 +509,11 @@ func TestConfigSerialization(t *testing.T) {
 		Username:   "testuser",
 		Provider: map[string]types.ProviderConfig{
 			"anthropic": {
-				APIKey:  "test-key",
-				BaseURL: "https://api.anthropic.com",
+				Npm: "@ai-sdk/anthropic",
+				Options: &types.ProviderOptions{
+					APIKey:  "test-key",
+					BaseURL: "https://api.anthropic.com",
+				},
 			},
 		},
 		Agent: map[string]types.AgentConfig{
@@ -565,7 +538,245 @@ func TestConfigSerialization(t *testing.T) {
 	assert.Equal(t, cfg.Model, loaded.Model)
 	assert.Equal(t, cfg.SmallModel, loaded.SmallModel)
 	assert.Equal(t, cfg.Username, loaded.Username)
-	assert.Equal(t, cfg.Provider["anthropic"].APIKey, loaded.Provider["anthropic"].APIKey)
+	assert.Equal(t, "@ai-sdk/anthropic", loaded.Provider["anthropic"].Npm)
+	require.NotNil(t, loaded.Provider["anthropic"].Options)
+	assert.Equal(t, "test-key", loaded.Provider["anthropic"].Options.APIKey)
 	assert.Equal(t, *cfg.Agent["coder"].Temperature, *loaded.Agent["coder"].Temperature)
 	assert.Equal(t, *cfg.Agent["coder"].TopP, *loaded.Agent["coder"].TopP)
+}
+
+func TestOpenAICompatibleProvider(t *testing.T) {
+	// Create a temporary directory
+	tmpDir, err := os.MkdirTemp("", "opencode-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Isolate HOME
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
+	// Config with OpenAI-compatible provider (like qwen)
+	config := `{
+		"model": "qwen/qwen-max",
+		"provider": {
+			"qwen": {
+				"npm": "@ai-sdk/openai-compatible",
+				"options": {
+					"apiKey": "qwen-api-key",
+					"baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1"
+				},
+				"models": {
+					"qwen-max": {
+						"id": "qwen-max",
+						"reasoning": true,
+						"tool_call": true
+					}
+				}
+			}
+		}
+	}`
+
+	configPath := filepath.Join(tmpDir, ".opencode", "opencode.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(config), 0644))
+
+	// Load config
+	cfg, err := Load(tmpDir)
+	require.NoError(t, err)
+
+	qwen := cfg.Provider["qwen"]
+	assert.Equal(t, "@ai-sdk/openai-compatible", qwen.Npm)
+	require.NotNil(t, qwen.Options)
+	assert.Equal(t, "qwen-api-key", qwen.Options.APIKey)
+	assert.Equal(t, "https://dashscope.aliyuncs.com/compatible-mode/v1", qwen.Options.BaseURL)
+
+	// Check custom model config
+	qwenMax := qwen.Models["qwen-max"]
+	assert.Equal(t, "qwen-max", qwenMax.ID)
+	assert.True(t, qwenMax.Reasoning)
+	assert.True(t, qwenMax.ToolCall)
+}
+
+func TestProviderWithoutOptions(t *testing.T) {
+	// Create a temporary directory
+	tmpDir, err := os.MkdirTemp("", "opencode-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Isolate HOME
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
+	// Config with provider but no options (should not panic)
+	config := `{
+		"model": "anthropic/claude-sonnet-4",
+		"provider": {
+			"anthropic": {
+				"npm": "@ai-sdk/anthropic"
+			}
+		}
+	}`
+
+	configPath := filepath.Join(tmpDir, ".opencode", "opencode.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(config), 0644))
+
+	// Load config - should not panic
+	cfg, err := Load(tmpDir)
+	require.NoError(t, err)
+
+	anthropic := cfg.Provider["anthropic"]
+	assert.Equal(t, "@ai-sdk/anthropic", anthropic.Npm)
+	assert.Nil(t, anthropic.Options)
+}
+
+func TestInterpolateFunction(t *testing.T) {
+	t.Run("interpolates env variables", func(t *testing.T) {
+		os.Setenv("TEST_VAR", "test-value")
+		defer os.Unsetenv("TEST_VAR")
+
+		input := []byte(`{"key": "{env:TEST_VAR}"}`)
+		result := interpolate(input, "")
+
+		assert.Equal(t, `{"key": "test-value"}`, string(result))
+	})
+
+	t.Run("handles missing env variables", func(t *testing.T) {
+		os.Unsetenv("NONEXISTENT")
+
+		input := []byte(`{"key": "{env:NONEXISTENT}"}`)
+		result := interpolate(input, "")
+
+		assert.Equal(t, `{"key": ""}`, string(result))
+	})
+
+	t.Run("interpolates multiple env variables", func(t *testing.T) {
+		os.Setenv("VAR_A", "value-a")
+		os.Setenv("VAR_B", "value-b")
+		defer os.Unsetenv("VAR_A")
+		defer os.Unsetenv("VAR_B")
+
+		input := []byte(`{"a": "{env:VAR_A}", "b": "{env:VAR_B}"}`)
+		result := interpolate(input, "")
+
+		assert.Equal(t, `{"a": "value-a", "b": "value-b"}`, string(result))
+	})
+
+	t.Run("interpolates file contents", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		secretFile := filepath.Join(tmpDir, "secret.txt")
+		err := os.WriteFile(secretFile, []byte("secret-content"), 0644)
+		require.NoError(t, err)
+
+		input := []byte(`{"key": "{file:secret.txt}"}`)
+		result := interpolate(input, tmpDir)
+
+		assert.Equal(t, `{"key": "secret-content"}`, string(result))
+	})
+
+	t.Run("handles missing file gracefully", func(t *testing.T) {
+		input := []byte(`{"key": "{file:nonexistent.txt}"}`)
+		result := interpolate(input, "/tmp")
+
+		// Should keep original placeholder if file not found
+		assert.Equal(t, `{"key": "{file:nonexistent.txt}"}`, string(result))
+	})
+}
+
+func TestMergeConfigFunction(t *testing.T) {
+	t.Run("merges providers", func(t *testing.T) {
+		target := &types.Config{
+			Provider: map[string]types.ProviderConfig{
+				"anthropic": {Npm: "@ai-sdk/anthropic"},
+			},
+		}
+		source := &types.Config{
+			Provider: map[string]types.ProviderConfig{
+				"openai": {Npm: "@ai-sdk/openai"},
+			},
+		}
+
+		mergeConfig(target, source)
+
+		assert.Len(t, target.Provider, 2)
+		assert.Equal(t, "@ai-sdk/anthropic", target.Provider["anthropic"].Npm)
+		assert.Equal(t, "@ai-sdk/openai", target.Provider["openai"].Npm)
+	})
+
+	t.Run("source overrides target for same key", func(t *testing.T) {
+		target := &types.Config{
+			Provider: map[string]types.ProviderConfig{
+				"openai": {
+					Npm: "@ai-sdk/openai",
+					Options: &types.ProviderOptions{
+						APIKey: "old-key",
+					},
+				},
+			},
+		}
+		source := &types.Config{
+			Provider: map[string]types.ProviderConfig{
+				"openai": {
+					Npm: "@ai-sdk/openai-compatible",
+					Options: &types.ProviderOptions{
+						APIKey:  "new-key",
+						BaseURL: "https://custom.example.com",
+					},
+				},
+			},
+		}
+
+		mergeConfig(target, source)
+
+		openai := target.Provider["openai"]
+		assert.Equal(t, "@ai-sdk/openai-compatible", openai.Npm)
+		assert.Equal(t, "new-key", openai.Options.APIKey)
+		assert.Equal(t, "https://custom.example.com", openai.Options.BaseURL)
+	})
+
+	t.Run("does not overwrite with empty model", func(t *testing.T) {
+		target := &types.Config{
+			Model: "anthropic/claude-sonnet-4",
+		}
+		source := &types.Config{
+			SmallModel: "anthropic/claude-3-5-haiku",
+		}
+
+		mergeConfig(target, source)
+
+		assert.Equal(t, "anthropic/claude-sonnet-4", target.Model)
+		assert.Equal(t, "anthropic/claude-3-5-haiku", target.SmallModel)
+	})
+}
+
+func TestApplyEnvOverridesFunction(t *testing.T) {
+	t.Run("OPENCODE_MODEL overrides config", func(t *testing.T) {
+		os.Setenv("OPENCODE_MODEL", "env-override-model")
+		defer os.Unsetenv("OPENCODE_MODEL")
+
+		config := &types.Config{
+			Model:    "config-model",
+			Provider: make(map[string]types.ProviderConfig),
+		}
+
+		applyEnvOverrides(config)
+
+		assert.Equal(t, "env-override-model", config.Model)
+	})
+
+	t.Run("OPENCODE_SMALL_MODEL overrides config", func(t *testing.T) {
+		os.Setenv("OPENCODE_SMALL_MODEL", "env-small-model")
+		defer os.Unsetenv("OPENCODE_SMALL_MODEL")
+
+		config := &types.Config{
+			SmallModel: "config-small-model",
+			Provider:   make(map[string]types.ProviderConfig),
+		}
+
+		applyEnvOverrides(config)
+
+		assert.Equal(t, "env-small-model", config.SmallModel)
+	})
 }

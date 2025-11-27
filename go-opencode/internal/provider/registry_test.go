@@ -218,3 +218,84 @@ func TestInitializeProviders_NoConfig(t *testing.T) {
 		t.Errorf("Expected 0 providers without API keys, got %d", len(providers))
 	}
 }
+
+func TestInferNpmFromProviderName(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected string
+	}{
+		{"anthropic", NpmAnthropic},
+		{"claude", NpmAnthropic},
+		{"openai", NpmOpenAI},
+		{"unknown", ""},
+		{"ark", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			npm := inferNpmFromProviderName(tt.name)
+			if npm != tt.expected {
+				t.Errorf("inferNpmFromProviderName(%q) = %q, want %q", tt.name, npm, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetProviderCredentials(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      types.ProviderConfig
+		wantAPIKey  string
+		wantBaseURL string
+	}{
+		{
+			name: "with options",
+			config: types.ProviderConfig{
+				Options: &types.ProviderOptions{
+					APIKey:  "test-key",
+					BaseURL: "https://api.example.com",
+				},
+			},
+			wantAPIKey:  "test-key",
+			wantBaseURL: "https://api.example.com",
+		},
+		{
+			name:        "nil options",
+			config:      types.ProviderConfig{},
+			wantAPIKey:  "",
+			wantBaseURL: "",
+		},
+		{
+			name: "partial options - only API key",
+			config: types.ProviderConfig{
+				Options: &types.ProviderOptions{
+					APIKey: "only-key",
+				},
+			},
+			wantAPIKey:  "only-key",
+			wantBaseURL: "",
+		},
+		{
+			name: "partial options - only base URL",
+			config: types.ProviderConfig{
+				Options: &types.ProviderOptions{
+					BaseURL: "https://custom.api.com",
+				},
+			},
+			wantAPIKey:  "",
+			wantBaseURL: "https://custom.api.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiKey, baseURL := getProviderCredentials(tt.config)
+			if apiKey != tt.wantAPIKey {
+				t.Errorf("apiKey = %q, want %q", apiKey, tt.wantAPIKey)
+			}
+			if baseURL != tt.wantBaseURL {
+				t.Errorf("baseURL = %q, want %q", baseURL, tt.wantBaseURL)
+			}
+		})
+	}
+}

@@ -1,8 +1,12 @@
 package testutil
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -38,12 +42,12 @@ func TestLoadMockLLMConfig(t *testing.T) {
 		t.Errorf("Unexpected response: %s", response)
 	}
 
-	// Test FindMatchingToolRule
+	// Test FindMatchingToolRule (case-insensitive matching)
 	toolRule := config.FindMatchingToolRule("echo hello world", []string{"bash", "read"})
 	if toolRule == nil {
 		t.Error("Expected to find matching tool rule")
 	}
-	if toolRule != nil && toolRule.Tool != "bash" {
+	if toolRule != nil && strings.ToLower(toolRule.Tool) != "bash" {
 		t.Errorf("Expected bash tool, got: %s", toolRule.Tool)
 	}
 }
@@ -136,6 +140,159 @@ func TestSaveMockLLMConfig(t *testing.T) {
 	if len(loaded.Responses) != len(config.Responses) {
 		t.Errorf("Response count mismatch: got %d, want %d", len(loaded.Responses), len(config.Responses))
 	}
+}
+
+func TestMockLLMEmptyContentHandling(t *testing.T) {
+	config := DefaultMockLLMConfig()
+	server := NewMockLLMServerWithConfig(config)
+	defer server.Close()
+
+	// Test 1: Empty user message content should return 400 error
+	t.Run("EmptyUserMessageReturns400", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"model": "test-model",
+			"messages": []interface{}{
+				map[string]interface{}{
+					"role":    "user",
+					"content": "",
+				},
+			},
+			"stream": false,
+		}
+		body, _ := json.Marshal(reqBody)
+
+		resp, err := http.Post(server.URL()+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("Request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+
+		var errResp map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		t.Logf("Error response: %v", errResp)
+	})
+
+	// Test 2: Null content should return 400 error
+	t.Run("NullContentReturns400", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"model": "test-model",
+			"messages": []interface{}{
+				map[string]interface{}{
+					"role":    "user",
+					"content": nil,
+				},
+			},
+			"stream": false,
+		}
+		body, _ := json.Marshal(reqBody)
+
+		resp, err := http.Post(server.URL()+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("Request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	// Test 3: Non-empty content should succeed
+	t.Run("NonEmptyContentSucceeds", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"model": "test-model",
+			"messages": []interface{}{
+				map[string]interface{}{
+					"role":    "user",
+					"content": "hello",
+				},
+			},
+			"stream": false,
+		}
+		body, _ := json.Marshal(reqBody)
+
+		resp, err := http.Post(server.URL()+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("Request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		if result["choices"] == nil {
+			t.Error("Expected choices in response")
+		}
+	})
+
+	// Test 4: Empty system message should also return 400 error
+	t.Run("EmptySystemMessageReturns400", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"model": "test-model",
+			"messages": []interface{}{
+				map[string]interface{}{
+					"role":    "system",
+					"content": "",
+				},
+				map[string]interface{}{
+					"role":    "user",
+					"content": "hello",
+				},
+			},
+			"stream": false,
+		}
+		body, _ := json.Marshal(reqBody)
+
+		resp, err := http.Post(server.URL()+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("Request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	// Test 5: Multiple valid messages should succeed
+	t.Run("MultipleValidMessagesSucceed", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"model": "test-model",
+			"messages": []interface{}{
+				map[string]interface{}{
+					"role":    "user",
+					"content": "Remember X=5",
+				},
+				map[string]interface{}{
+					"role":    "assistant",
+					"content": "OK",
+				},
+				map[string]interface{}{
+					"role":    "user",
+					"content": "What is X?",
+				},
+			},
+			"stream": false,
+		}
+		body, _ := json.Marshal(reqBody)
+
+		resp, err := http.Post(server.URL()+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("Request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+	})
 }
 
 func TestChunkSplitting(t *testing.T) {

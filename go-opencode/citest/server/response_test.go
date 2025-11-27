@@ -249,6 +249,11 @@ var _ = Describe("Config and Provider Endpoints", func() {
 				expectedProvider = "openai" // Default to OpenAI
 			}
 
+			// Skip this check for mockllm since it's test infrastructure, not a registered provider
+			if expectedProvider == "mockllm" {
+				Skip("mockllm is test infrastructure, not a registered provider")
+			}
+
 			found := false
 			for _, p := range providers {
 				if p.ID == expectedProvider {

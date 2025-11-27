@@ -246,10 +246,11 @@ func (c *MockLLMConfig) FindMatchingResponse(prompt string) (string, bool) {
 }
 
 // FindMatchingToolRule finds a matching tool rule for a prompt and available tools.
+// Tool matching is case-insensitive.
 func (c *MockLLMConfig) FindMatchingToolRule(prompt string, availableTools []string) *ToolRule {
 	toolSet := make(map[string]bool)
 	for _, t := range availableTools {
-		toolSet[t] = true
+		toolSet[strings.ToLower(t)] = true
 	}
 
 	var bestMatch *ToolRule
@@ -257,8 +258,8 @@ func (c *MockLLMConfig) FindMatchingToolRule(prompt string, availableTools []str
 
 	for i := range c.ToolRules {
 		rule := &c.ToolRules[i]
-		// Check if the required tool is available
-		if !toolSet[rule.Tool] {
+		// Check if the required tool is available (case-insensitive)
+		if !toolSet[strings.ToLower(rule.Tool)] {
 			continue
 		}
 		if rule.Match.Matches(prompt) {
