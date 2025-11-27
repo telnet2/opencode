@@ -35,9 +35,11 @@ func TestAgenticLoopWithRealLLM(t *testing.T) {
 		Model: "ark/" + modelID,
 		Provider: map[string]types.ProviderConfig{
 			"ark": {
-				APIKey:  apiKey,
-				BaseURL: baseURL,
-				Model:   modelID,
+				Model: modelID,
+				Options: &types.ProviderOptions{
+					APIKey:  apiKey,
+					BaseURL: baseURL,
+				},
 			},
 		},
 	}
