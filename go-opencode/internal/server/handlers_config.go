@@ -33,16 +33,39 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.appConfig)
 }
 
+// ProviderInfo represents provider information for JSON serialization
+type ProviderInfo struct {
+	ID     string        `json:"id"`
+	Name   string        `json:"name"`
+	Models []types.Model `json:"models"`
+}
+
 // listProviders handles GET /config/providers
 func (s *Server) listProviders(w http.ResponseWriter, r *http.Request) {
 	providers := s.providerReg.List()
-	writeJSON(w, http.StatusOK, providers)
+	result := make([]ProviderInfo, len(providers))
+	for i, p := range providers {
+		result[i] = ProviderInfo{
+			ID:     p.ID(),
+			Name:   p.Name(),
+			Models: p.Models(),
+		}
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // listAllProviders handles GET /provider
 func (s *Server) listAllProviders(w http.ResponseWriter, r *http.Request) {
 	providers := s.providerReg.List()
-	writeJSON(w, http.StatusOK, providers)
+	result := make([]ProviderInfo, len(providers))
+	for i, p := range providers {
+		result[i] = ProviderInfo{
+			ID:     p.ID(),
+			Name:   p.Name(),
+			Models: p.Models(),
+		}
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // getAuthMethods handles GET /provider/auth

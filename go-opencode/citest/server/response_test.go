@@ -2,7 +2,9 @@ package server_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -237,18 +239,24 @@ var _ = Describe("Config and Provider Endpoints", func() {
 			Expect(len(providers)).To(BeNumerically(">", 0))
 		})
 
-		It("should include ARK provider", func() {
+		It("should include the configured provider", func() {
 			providers, err := client.GetProviders(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
+			// Check for the expected provider based on TEST_PROVIDER env var
+			expectedProvider := os.Getenv("TEST_PROVIDER")
+			if expectedProvider == "" {
+				expectedProvider = "openai" // Default to OpenAI
+			}
+
 			found := false
 			for _, p := range providers {
-				if p.ID == "ark" {
+				if p.ID == expectedProvider {
 					found = true
 					break
 				}
 			}
-			Expect(found).To(BeTrue(), "ARK provider should be in the list")
+			Expect(found).To(BeTrue(), fmt.Sprintf("%s provider should be in the list", expectedProvider))
 		})
 	})
 })

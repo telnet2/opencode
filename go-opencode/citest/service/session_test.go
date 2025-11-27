@@ -77,7 +77,7 @@ var _ = Describe("Session Management", func() {
 		})
 
 		It("should list all sessions", func() {
-			list, err := client.ListSessions(ctx)
+			list, err := client.ListSessions(ctx, tempDir.Path)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(list)).To(BeNumerically(">=", 3))
 

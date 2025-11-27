@@ -22,6 +22,7 @@ type OpenAIProvider struct {
 type OpenAIConfig struct {
 	APIKey    string
 	BaseURL   string
+	Model     string
 	MaxTokens int
 
 	// Azure configuration
@@ -49,10 +50,18 @@ func NewOpenAIProvider(ctx context.Context, config *OpenAIConfig) (*OpenAIProvid
 		maxTokens = 4096
 	}
 
+	modelID := config.Model
+	if modelID == "" {
+		modelID = os.Getenv("OPENAI_MODEL_ID")
+	}
+	if modelID == "" {
+		modelID = "gpt-4o"
+	}
+
 	cfg := &openai.ChatModelConfig{
-		APIKey:    apiKey,
-		Model:     "gpt-4o",
-		MaxTokens: &maxTokens,
+		APIKey:              apiKey,
+		Model:               modelID,
+		MaxCompletionTokens: &maxTokens, // Use MaxCompletionTokens for GPT-5 compatibility
 	}
 
 	if config.BaseURL != "" {
@@ -108,11 +117,16 @@ func (p *OpenAIProvider) CreateCompletion(ctx context.Context, req *CompletionRe
 		}
 	}
 
+	// Build options - GPT-5 models require max_completion_tokens instead of max_tokens
+	opts := []model.Option{
+		openai.WithMaxCompletionTokens(req.MaxTokens),
+	}
+	if req.Temperature > 0 {
+		opts = append(opts, model.WithTemperature(float32(req.Temperature)))
+	}
+
 	// Create streaming request
-	stream, err := chatModel.Stream(ctx, req.Messages,
-		model.WithMaxTokens(req.MaxTokens),
-		model.WithTemperature(float32(req.Temperature)),
-	)
+	stream, err := chatModel.Stream(ctx, req.Messages, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stream: %w", err)
 	}
@@ -123,6 +137,43 @@ func (p *OpenAIProvider) CreateCompletion(ctx context.Context, req *CompletionRe
 // openAIModels returns the list of OpenAI models.
 func openAIModels() []types.Model {
 	return []types.Model{
+		// GPT-5 family (newest)
+		{
+			ID:                "gpt-5",
+			Name:              "GPT-5",
+			ProviderID:        "openai",
+			ContextLength:     272000,
+			MaxOutputTokens:   128000,
+			SupportsTools:     true,
+			SupportsVision:    true,
+			SupportsReasoning: true,
+			InputPrice:        1.25,
+			OutputPrice:       10.0,
+		},
+		{
+			ID:                "gpt-5-mini",
+			Name:              "GPT-5 Mini",
+			ProviderID:        "openai",
+			ContextLength:     272000,
+			MaxOutputTokens:   128000,
+			SupportsTools:     true,
+			SupportsVision:    true,
+			SupportsReasoning: true,
+			InputPrice:        0.25,
+			OutputPrice:       2.0,
+		},
+		{
+			ID:              "gpt-5-nano",
+			Name:            "GPT-5 Nano",
+			ProviderID:      "openai",
+			ContextLength:   272000,
+			MaxOutputTokens: 128000,
+			SupportsTools:   true,
+			SupportsVision:  true,
+			InputPrice:      0.05,
+			OutputPrice:     0.4,
+		},
+		// GPT-4o family
 		{
 			ID:              "gpt-4o",
 			Name:            "GPT-4o",
@@ -145,6 +196,7 @@ func openAIModels() []types.Model {
 			InputPrice:      0.15,
 			OutputPrice:     0.6,
 		},
+		// O1 family
 		{
 			ID:                "o1",
 			Name:              "O1",

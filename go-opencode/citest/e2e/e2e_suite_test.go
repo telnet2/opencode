@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/joho/godotenv"
 	opencode "github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode-sdk-go/option"
 
@@ -24,6 +25,9 @@ func TestE2E(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	// Load environment variables from .env file first
+	_ = godotenv.Load("../../.env")
+
 	// Skip if required env vars are missing
 	if testutil.SkipIfMissingEnv("ARK_API_KEY", "ARK_MODEL_ID") {
 		Skip("ARK environment variables not set")

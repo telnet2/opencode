@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -56,12 +57,23 @@ type Server struct {
 func New(cfg *Config, appConfig *types.Config, store *storage.Storage, providerReg *provider.Registry, toolReg *tool.Registry) *Server {
 	r := chi.NewRouter()
 
+	// Parse default provider and model from config
+	// Format: "provider/model" (e.g., "ark/ep-xxx" or "anthropic/claude-sonnet-4-20250514")
+	var defaultProviderID, defaultModelID string
+	if appConfig != nil && appConfig.Model != "" {
+		parts := strings.SplitN(appConfig.Model, "/", 2)
+		if len(parts) == 2 {
+			defaultProviderID = parts[0]
+			defaultModelID = parts[1]
+		}
+	}
+
 	s := &Server{
 		config:         cfg,
 		router:         r,
 		appConfig:      appConfig,
 		storage:        store,
-		sessionService: session.NewService(store),
+		sessionService: session.NewServiceWithProcessor(store, providerReg, toolReg, nil, defaultProviderID, defaultModelID),
 		providerReg:    providerReg,
 		toolReg:        toolReg,
 		bus:            event.NewBus(),

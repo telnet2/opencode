@@ -128,11 +128,20 @@ func (p *Processor) processMessageChunk(
 			state.parts = append(state.parts, *currentTextPart)
 			*accumulatedContent = msg.Content
 			callback(state.message, state.parts)
-		} else if len(msg.Content) > len(*accumulatedContent) {
-			// Append delta
-			delta := msg.Content[len(*accumulatedContent):]
-			(*currentTextPart).Text = msg.Content
-			*accumulatedContent = msg.Content
+		} else {
+			// Check if this is accumulated content (longer than previous) or delta content (shorter)
+			var delta string
+			if len(msg.Content) > len(*accumulatedContent) {
+				// Accumulated mode: extract delta from difference
+				delta = msg.Content[len(*accumulatedContent):]
+				(*currentTextPart).Text = msg.Content
+				*accumulatedContent = msg.Content
+			} else {
+				// Delta mode: append delta directly
+				delta = msg.Content
+				*accumulatedContent += msg.Content
+				(*currentTextPart).Text = *accumulatedContent
+			}
 
 			// Publish delta event
 			event.Publish(event.Event{

@@ -21,6 +21,10 @@ type Processor struct {
 	storage           *storage.Storage
 	permissionChecker *permission.Checker
 
+	// Default provider and model to use when not specified
+	defaultProviderID string
+	defaultModelID    string
+
 	// Active sessions being processed
 	sessions map[string]*sessionState
 }
@@ -45,12 +49,23 @@ func NewProcessor(
 	toolReg *tool.Registry,
 	store *storage.Storage,
 	permChecker *permission.Checker,
+	defaultProviderID string,
+	defaultModelID string,
 ) *Processor {
+	// Use reasonable defaults if not specified
+	if defaultProviderID == "" {
+		defaultProviderID = "anthropic"
+	}
+	if defaultModelID == "" {
+		defaultModelID = "claude-sonnet-4-20250514"
+	}
 	return &Processor{
 		providerRegistry:  providerReg,
 		toolRegistry:      toolReg,
 		storage:           store,
 		permissionChecker: permChecker,
+		defaultProviderID: defaultProviderID,
+		defaultModelID:    defaultModelID,
 		sessions:          make(map[string]*sessionState),
 	}
 }
