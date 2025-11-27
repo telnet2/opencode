@@ -16,50 +16,71 @@ import (
 // interacting with the opencode API. You should not instantiate this client
 // directly, and instead use the [NewClient] method instead.
 type Client struct {
-	Options []option.RequestOption
-	Event   *EventService
-	Path    *PathService
-	App     *AppService
-	Agent   *AgentService
-	Find    *FindService
-	File    *FileService
-	Config  *ConfigService
-	Command *CommandService
-	Project *ProjectService
-	Session *SessionService
-	Tui     *TuiService
+	Options      []option.RequestOption
+	Global       GlobalService
+	Project      ProjectService
+	Config       ConfigService
+	Experimental ExperimentalService
+	Instance     InstanceService
+	Path         PathService
+	Session      SessionService
+	Command      CommandService
+	Provider     ProviderService
+	Find         FindService
+	File         FileService
+	Log          LogService
+	Agent        AgentService
+	Mcp          McpService
+	Lsp          LspService
+	Formatter    FormatterService
+	Tui          TuiService
+	ClientTools  ClientToolService
+	Auth         AuthService
+	Event        EventService
 }
 
-// DefaultClientOptions read from the environment (OPENCODE_BASE_URL). This should
-// be used to initialize new clients.
+// DefaultClientOptions read from the environment (OPENCODE_API_KEY,
+// OPENCODE_BASE_URL). This should be used to initialize new clients.
 func DefaultClientOptions() []option.RequestOption {
 	defaults := []option.RequestOption{option.WithEnvironmentProduction()}
 	if o, ok := os.LookupEnv("OPENCODE_BASE_URL"); ok {
 		defaults = append(defaults, option.WithBaseURL(o))
 	}
+	if o, ok := os.LookupEnv("OPENCODE_API_KEY"); ok {
+		defaults = append(defaults, option.WithAPIKey(o))
+	}
 	return defaults
 }
 
 // NewClient generates a new client with the default option read from the
-// environment (OPENCODE_BASE_URL). The option passed in as arguments are applied
-// after these default arguments, and all option will be passed down to the
-// services and requests that this client makes.
-func NewClient(opts ...option.RequestOption) (r *Client) {
+// environment (OPENCODE_API_KEY, OPENCODE_BASE_URL). The option passed in as
+// arguments are applied after these default arguments, and all option will be
+// passed down to the services and requests that this client makes.
+func NewClient(opts ...option.RequestOption) (r Client) {
 	opts = append(DefaultClientOptions(), opts...)
 
-	r = &Client{Options: opts}
+	r = Client{Options: opts}
 
-	r.Event = NewEventService(opts...)
+	r.Global = NewGlobalService(opts...)
+	r.Project = NewProjectService(opts...)
+	r.Config = NewConfigService(opts...)
+	r.Experimental = NewExperimentalService(opts...)
+	r.Instance = NewInstanceService(opts...)
 	r.Path = NewPathService(opts...)
-	r.App = NewAppService(opts...)
-	r.Agent = NewAgentService(opts...)
+	r.Session = NewSessionService(opts...)
+	r.Command = NewCommandService(opts...)
+	r.Provider = NewProviderService(opts...)
 	r.Find = NewFindService(opts...)
 	r.File = NewFileService(opts...)
-	r.Config = NewConfigService(opts...)
-	r.Command = NewCommandService(opts...)
-	r.Project = NewProjectService(opts...)
-	r.Session = NewSessionService(opts...)
+	r.Log = NewLogService(opts...)
+	r.Agent = NewAgentService(opts...)
+	r.Mcp = NewMcpService(opts...)
+	r.Lsp = NewLspService(opts...)
+	r.Formatter = NewFormatterService(opts...)
 	r.Tui = NewTuiService(opts...)
+	r.ClientTools = NewClientToolService(opts...)
+	r.Auth = NewAuthService(opts...)
+	r.Event = NewEventService(opts...)
 
 	return
 }
@@ -95,40 +116,40 @@ func NewClient(opts ...option.RequestOption) (r *Client) {
 //
 // For even greater flexibility, see [option.WithResponseInto] and
 // [option.WithResponseBodyInto].
-func (r *Client) Execute(ctx context.Context, method string, path string, params interface{}, res interface{}, opts ...option.RequestOption) error {
+func (r *Client) Execute(ctx context.Context, method string, path string, params any, res any, opts ...option.RequestOption) error {
 	opts = slices.Concat(r.Options, opts)
 	return requestconfig.ExecuteNewRequest(ctx, method, path, params, res, opts...)
 }
 
 // Get makes a GET request with the given URL, params, and optionally deserializes
 // to a response. See [Execute] documentation on the params and response.
-func (r *Client) Get(ctx context.Context, path string, params interface{}, res interface{}, opts ...option.RequestOption) error {
+func (r *Client) Get(ctx context.Context, path string, params any, res any, opts ...option.RequestOption) error {
 	return r.Execute(ctx, http.MethodGet, path, params, res, opts...)
 }
 
 // Post makes a POST request with the given URL, params, and optionally
 // deserializes to a response. See [Execute] documentation on the params and
 // response.
-func (r *Client) Post(ctx context.Context, path string, params interface{}, res interface{}, opts ...option.RequestOption) error {
+func (r *Client) Post(ctx context.Context, path string, params any, res any, opts ...option.RequestOption) error {
 	return r.Execute(ctx, http.MethodPost, path, params, res, opts...)
 }
 
 // Put makes a PUT request with the given URL, params, and optionally deserializes
 // to a response. See [Execute] documentation on the params and response.
-func (r *Client) Put(ctx context.Context, path string, params interface{}, res interface{}, opts ...option.RequestOption) error {
+func (r *Client) Put(ctx context.Context, path string, params any, res any, opts ...option.RequestOption) error {
 	return r.Execute(ctx, http.MethodPut, path, params, res, opts...)
 }
 
 // Patch makes a PATCH request with the given URL, params, and optionally
 // deserializes to a response. See [Execute] documentation on the params and
 // response.
-func (r *Client) Patch(ctx context.Context, path string, params interface{}, res interface{}, opts ...option.RequestOption) error {
+func (r *Client) Patch(ctx context.Context, path string, params any, res any, opts ...option.RequestOption) error {
 	return r.Execute(ctx, http.MethodPatch, path, params, res, opts...)
 }
 
 // Delete makes a DELETE request with the given URL, params, and optionally
 // deserializes to a response. See [Execute] documentation on the params and
 // response.
-func (r *Client) Delete(ctx context.Context, path string, params interface{}, res interface{}, opts ...option.RequestOption) error {
+func (r *Client) Delete(ctx context.Context, path string, params any, res any, opts ...option.RequestOption) error {
 	return r.Execute(ctx, http.MethodDelete, path, params, res, opts...)
 }

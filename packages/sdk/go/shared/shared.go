@@ -3,192 +3,146 @@
 package shared
 
 import (
+	"encoding/json"
+
 	"github.com/sst/opencode-sdk-go/internal/apijson"
+	"github.com/sst/opencode-sdk-go/packages/param"
+	"github.com/sst/opencode-sdk-go/packages/respjson"
+	"github.com/sst/opencode-sdk-go/shared/constant"
 )
 
-type MessageAbortedError struct {
-	Data MessageAbortedErrorData `json:"data,required"`
-	Name MessageAbortedErrorName `json:"name,required"`
-	JSON messageAbortedErrorJSON `json:"-"`
+// aliased to make [param.APIUnion] private when embedding
+type paramUnion = param.APIUnion
+
+// aliased to make [param.APIObject] private when embedding
+type paramObj = param.APIObject
+
+type McpLocalConfig struct {
+	// Command and arguments to run the MCP server
+	Command []string `json:"command,required"`
+	// Type of MCP server connection
+	Type constant.Local `json:"type,required"`
+	// Enable or disable the MCP server on startup
+	Enabled bool `json:"enabled"`
+	// Environment variables to set when running the MCP server
+	Environment map[string]string `json:"environment"`
+	// Timeout in ms for fetching tools from the MCP server. Defaults to 5000 (5
+	// seconds) if not specified.
+	Timeout int64 `json:"timeout"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Command     respjson.Field
+		Type        respjson.Field
+		Enabled     respjson.Field
+		Environment respjson.Field
+		Timeout     respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
 }
 
-// messageAbortedErrorJSON contains the JSON metadata for the struct
-// [MessageAbortedError]
-type messageAbortedErrorJSON struct {
-	Data        apijson.Field
-	Name        apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
-}
-
-func (r *MessageAbortedError) UnmarshalJSON(data []byte) (err error) {
+// Returns the unmodified JSON received from the API
+func (r McpLocalConfig) RawJSON() string { return r.JSON.raw }
+func (r *McpLocalConfig) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-func (r messageAbortedErrorJSON) RawJSON() string {
-	return r.raw
+// ToParam converts this McpLocalConfig to a McpLocalConfigParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// McpLocalConfigParam.Overrides()
+func (r McpLocalConfig) ToParam() McpLocalConfigParam {
+	return param.Override[McpLocalConfigParam](json.RawMessage(r.RawJSON()))
 }
 
-func (r MessageAbortedError) ImplementsEventListResponseEventSessionErrorPropertiesError() {}
-
-func (r MessageAbortedError) ImplementsAssistantMessageError() {}
-
-type MessageAbortedErrorData struct {
-	Message string                      `json:"message,required"`
-	JSON    messageAbortedErrorDataJSON `json:"-"`
+// The properties Command, Type are required.
+type McpLocalConfigParam struct {
+	// Command and arguments to run the MCP server
+	Command []string `json:"command,omitzero,required"`
+	// Enable or disable the MCP server on startup
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Timeout in ms for fetching tools from the MCP server. Defaults to 5000 (5
+	// seconds) if not specified.
+	Timeout param.Opt[int64] `json:"timeout,omitzero"`
+	// Environment variables to set when running the MCP server
+	Environment map[string]string `json:"environment,omitzero"`
+	// Type of MCP server connection
+	//
+	// This field can be elided, and will marshal its zero value as "local".
+	Type constant.Local `json:"type,required"`
+	paramObj
 }
 
-// messageAbortedErrorDataJSON contains the JSON metadata for the struct
-// [MessageAbortedErrorData]
-type messageAbortedErrorDataJSON struct {
-	Message     apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
+func (r McpLocalConfigParam) MarshalJSON() (data []byte, err error) {
+	type shadow McpLocalConfigParam
+	return param.MarshalObject(r, (*shadow)(&r))
 }
-
-func (r *MessageAbortedErrorData) UnmarshalJSON(data []byte) (err error) {
+func (r *McpLocalConfigParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-func (r messageAbortedErrorDataJSON) RawJSON() string {
-	return r.raw
+type McpRemoteConfig struct {
+	// Type of MCP server connection
+	Type constant.Remote `json:"type,required"`
+	// URL of the remote MCP server
+	URL string `json:"url,required"`
+	// Enable or disable the MCP server on startup
+	Enabled bool `json:"enabled"`
+	// Headers to send with the request
+	Headers map[string]string `json:"headers"`
+	// Timeout in ms for fetching tools from the MCP server. Defaults to 5000 (5
+	// seconds) if not specified.
+	Timeout int64 `json:"timeout"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Type        respjson.Field
+		URL         respjson.Field
+		Enabled     respjson.Field
+		Headers     respjson.Field
+		Timeout     respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
 }
 
-type MessageAbortedErrorName string
-
-const (
-	MessageAbortedErrorNameMessageAbortedError MessageAbortedErrorName = "MessageAbortedError"
-)
-
-func (r MessageAbortedErrorName) IsKnown() bool {
-	switch r {
-	case MessageAbortedErrorNameMessageAbortedError:
-		return true
-	}
-	return false
-}
-
-type ProviderAuthError struct {
-	Data ProviderAuthErrorData `json:"data,required"`
-	Name ProviderAuthErrorName `json:"name,required"`
-	JSON providerAuthErrorJSON `json:"-"`
-}
-
-// providerAuthErrorJSON contains the JSON metadata for the struct
-// [ProviderAuthError]
-type providerAuthErrorJSON struct {
-	Data        apijson.Field
-	Name        apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
-}
-
-func (r *ProviderAuthError) UnmarshalJSON(data []byte) (err error) {
+// Returns the unmodified JSON received from the API
+func (r McpRemoteConfig) RawJSON() string { return r.JSON.raw }
+func (r *McpRemoteConfig) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-func (r providerAuthErrorJSON) RawJSON() string {
-	return r.raw
+// ToParam converts this McpRemoteConfig to a McpRemoteConfigParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// McpRemoteConfigParam.Overrides()
+func (r McpRemoteConfig) ToParam() McpRemoteConfigParam {
+	return param.Override[McpRemoteConfigParam](json.RawMessage(r.RawJSON()))
 }
 
-func (r ProviderAuthError) ImplementsEventListResponseEventSessionErrorPropertiesError() {}
-
-func (r ProviderAuthError) ImplementsAssistantMessageError() {}
-
-type ProviderAuthErrorData struct {
-	Message    string                    `json:"message,required"`
-	ProviderID string                    `json:"providerID,required"`
-	JSON       providerAuthErrorDataJSON `json:"-"`
+// The properties Type, URL are required.
+type McpRemoteConfigParam struct {
+	// URL of the remote MCP server
+	URL string `json:"url,required"`
+	// Enable or disable the MCP server on startup
+	Enabled param.Opt[bool] `json:"enabled,omitzero"`
+	// Timeout in ms for fetching tools from the MCP server. Defaults to 5000 (5
+	// seconds) if not specified.
+	Timeout param.Opt[int64] `json:"timeout,omitzero"`
+	// Headers to send with the request
+	Headers map[string]string `json:"headers,omitzero"`
+	// Type of MCP server connection
+	//
+	// This field can be elided, and will marshal its zero value as "remote".
+	Type constant.Remote `json:"type,required"`
+	paramObj
 }
 
-// providerAuthErrorDataJSON contains the JSON metadata for the struct
-// [ProviderAuthErrorData]
-type providerAuthErrorDataJSON struct {
-	Message     apijson.Field
-	ProviderID  apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
+func (r McpRemoteConfigParam) MarshalJSON() (data []byte, err error) {
+	type shadow McpRemoteConfigParam
+	return param.MarshalObject(r, (*shadow)(&r))
 }
-
-func (r *ProviderAuthErrorData) UnmarshalJSON(data []byte) (err error) {
+func (r *McpRemoteConfigParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
-}
-
-func (r providerAuthErrorDataJSON) RawJSON() string {
-	return r.raw
-}
-
-type ProviderAuthErrorName string
-
-const (
-	ProviderAuthErrorNameProviderAuthError ProviderAuthErrorName = "ProviderAuthError"
-)
-
-func (r ProviderAuthErrorName) IsKnown() bool {
-	switch r {
-	case ProviderAuthErrorNameProviderAuthError:
-		return true
-	}
-	return false
-}
-
-type UnknownError struct {
-	Data UnknownErrorData `json:"data,required"`
-	Name UnknownErrorName `json:"name,required"`
-	JSON unknownErrorJSON `json:"-"`
-}
-
-// unknownErrorJSON contains the JSON metadata for the struct [UnknownError]
-type unknownErrorJSON struct {
-	Data        apijson.Field
-	Name        apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
-}
-
-func (r *UnknownError) UnmarshalJSON(data []byte) (err error) {
-	return apijson.UnmarshalRoot(data, r)
-}
-
-func (r unknownErrorJSON) RawJSON() string {
-	return r.raw
-}
-
-func (r UnknownError) ImplementsEventListResponseEventSessionErrorPropertiesError() {}
-
-func (r UnknownError) ImplementsAssistantMessageError() {}
-
-type UnknownErrorData struct {
-	Message string               `json:"message,required"`
-	JSON    unknownErrorDataJSON `json:"-"`
-}
-
-// unknownErrorDataJSON contains the JSON metadata for the struct
-// [UnknownErrorData]
-type unknownErrorDataJSON struct {
-	Message     apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
-}
-
-func (r *UnknownErrorData) UnmarshalJSON(data []byte) (err error) {
-	return apijson.UnmarshalRoot(data, r)
-}
-
-func (r unknownErrorDataJSON) RawJSON() string {
-	return r.raw
-}
-
-type UnknownErrorName string
-
-const (
-	UnknownErrorNameUnknownError UnknownErrorName = "UnknownError"
-)
-
-func (r UnknownErrorName) IsKnown() bool {
-	switch r {
-	case UnknownErrorNameUnknownError:
-		return true
-	}
-	return false
 }

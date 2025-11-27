@@ -24,9 +24,10 @@ func TestAgentListWithOptionalParams(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
 	_, err := client.Agent.List(context.TODO(), opencode.AgentListParams{
-		Directory: opencode.F("directory"),
+		Directory: opencode.String("directory"),
 	})
 	if err != nil {
 		var apierr *opencode.Error
