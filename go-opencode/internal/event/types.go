@@ -3,28 +3,44 @@ package event
 import "github.com/opencode-ai/opencode/pkg/types"
 
 // SessionCreatedData is the data for session.created events.
+// SDK compatible: uses "info" field for session object.
 type SessionCreatedData struct {
-	Session *types.Session `json:"session"`
+	Info *types.Session `json:"info"`
 }
 
 // SessionUpdatedData is the data for session.updated events.
+// SDK compatible: uses "info" field for session object.
 type SessionUpdatedData struct {
-	Session *types.Session `json:"session"`
+	Info *types.Session `json:"info"`
 }
 
 // SessionDeletedData is the data for session.deleted events.
+// SDK compatible: uses "info" field for session object.
 type SessionDeletedData struct {
+	Info *types.Session `json:"info"`
+}
+
+// SessionIdleData is the data for session.idle events.
+type SessionIdleData struct {
 	SessionID string `json:"sessionID"`
 }
 
+// SessionErrorData is the data for session.error events.
+type SessionErrorData struct {
+	SessionID string             `json:"sessionID,omitempty"`
+	Error     *types.SessionError `json:"error,omitempty"`
+}
+
 // MessageCreatedData is the data for message.created events.
+// SDK compatible: uses "info" field for message object.
 type MessageCreatedData struct {
-	Message *types.Message `json:"message"`
+	Info *types.Message `json:"info"`
 }
 
 // MessageUpdatedData is the data for message.updated events.
+// SDK compatible: uses "info" field for message object.
 type MessageUpdatedData struct {
-	Message *types.Message `json:"message"`
+	Info *types.Message `json:"info"`
 }
 
 // MessageRemovedData is the data for message.removed events.
@@ -33,24 +49,31 @@ type MessageRemovedData struct {
 	MessageID string `json:"messageID"`
 }
 
-// PartUpdatedData is the data for part.updated events.
-type PartUpdatedData struct {
-	SessionID string     `json:"sessionID"`
-	MessageID string     `json:"messageID"`
-	Part      types.Part `json:"part"`
-	Delta     *string    `json:"delta,omitempty"` // For streaming text
+// MessagePartUpdatedData is the data for message.part.updated events.
+// SDK compatible: uses "part" and "delta" fields.
+type MessagePartUpdatedData struct {
+	Part  types.Part `json:"part"`
+	Delta string     `json:"delta,omitempty"` // For streaming text
+}
+
+// Deprecated: Use MessagePartUpdatedData instead
+type PartUpdatedData = MessagePartUpdatedData
+
+// MessagePartRemovedData is the data for message.part.removed events.
+type MessagePartRemovedData struct {
+	SessionID string `json:"sessionID"`
+	MessageID string `json:"messageID"`
+	PartID    string `json:"partID"`
 }
 
 // FileEditedData is the data for file.edited events.
 type FileEditedData struct {
-	SessionID string `json:"sessionID"`
-	File      string `json:"file"`
-	Additions int    `json:"additions"`
-	Deletions int    `json:"deletions"`
+	File string `json:"file"`
 }
 
-// PermissionRequiredData is the data for permission.required events.
-type PermissionRequiredData struct {
+// PermissionUpdatedData is the data for permission.updated events.
+// SDK compatible format for permission requests.
+type PermissionUpdatedData struct {
 	ID             string   `json:"id"`
 	SessionID      string   `json:"sessionID"`
 	PermissionType string   `json:"permissionType"` // "bash" | "edit" | "external_directory"
@@ -58,7 +81,17 @@ type PermissionRequiredData struct {
 	Title          string   `json:"title"`
 }
 
-// PermissionResolvedData is the data for permission.resolved events.
+// Deprecated: Use PermissionUpdatedData instead
+type PermissionRequiredData = PermissionUpdatedData
+
+// PermissionRepliedData is the data for permission.replied events.
+type PermissionRepliedData struct {
+	PermissionID string `json:"permissionID"`
+	SessionID    string `json:"sessionID"`
+	Response     string `json:"response"` // "once" | "always" | "reject"
+}
+
+// Deprecated: Use PermissionRepliedData instead
 type PermissionResolvedData struct {
 	ID        string `json:"id"`
 	SessionID string `json:"sessionID"`
