@@ -28,6 +28,7 @@ type TestServer struct {
 	TempDir     string
 	WorkDir     string
 	port        int
+	mockLLM     *MockLLMServer // MockLLM server if using mockllm provider
 }
 
 // TestServerOption configures TestServer
@@ -80,13 +81,32 @@ func StartTestServer(opts ...TestServerOption) (*TestServer, error) {
 		workDir = tempDir
 	}
 
-	// Build config
-	appConfig := buildTestConfig()
+	// Check if using mockllm provider
+	testProvider := os.Getenv("TEST_PROVIDER")
+	var mockLLM *MockLLMServer
+	var appConfig *types.Config
+
+	if testProvider == "mockllm" {
+		// Start MockLLM server first
+		mockLLM = NewMockLLMServer()
+		appConfig = buildMockLLMConfig(mockLLM.URL())
+	} else {
+		// Build config for real providers
+		appConfig = buildTestConfig()
+	}
+
+	// Helper for cleanup on error
+	cleanup := func() {
+		if mockLLM != nil {
+			mockLLM.Close()
+		}
+		os.RemoveAll(tempDir)
+	}
 
 	// Find available port
 	port, err := findAvailablePort()
 	if err != nil {
-		os.RemoveAll(tempDir)
+		cleanup()
 		return nil, fmt.Errorf("failed to find available port: %w", err)
 	}
 
@@ -95,7 +115,7 @@ func StartTestServer(opts ...TestServerOption) (*TestServer, error) {
 	// Initialize storage
 	storagePath := filepath.Join(tempDir, "storage")
 	if err := os.MkdirAll(storagePath, 0755); err != nil {
-		os.RemoveAll(tempDir)
+		cleanup()
 		return nil, fmt.Errorf("failed to create storage dir: %w", err)
 	}
 	store := storage.New(storagePath)
@@ -103,7 +123,7 @@ func StartTestServer(opts ...TestServerOption) (*TestServer, error) {
 	// Initialize providers
 	providerReg, err := provider.InitializeProviders(ctx, appConfig)
 	if err != nil {
-		os.RemoveAll(tempDir)
+		cleanup()
 		return nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
@@ -127,7 +147,7 @@ func StartTestServer(opts ...TestServerOption) (*TestServer, error) {
 	baseURL := fmt.Sprintf("http://localhost:%d", port)
 	if err := waitForServer(baseURL, 10*time.Second); err != nil {
 		srv.Shutdown(ctx)
-		os.RemoveAll(tempDir)
+		cleanup()
 		return nil, fmt.Errorf("server failed to start: %w", err)
 	}
 
@@ -141,6 +161,7 @@ func StartTestServer(opts ...TestServerOption) (*TestServer, error) {
 		TempDir:     tempDir,
 		WorkDir:     workDir,
 		port:        port,
+		mockLLM:     mockLLM,
 	}, nil
 }
 
@@ -153,6 +174,11 @@ func (ts *TestServer) Stop() error {
 		if err := ts.Server.Shutdown(ctx); err != nil {
 			return err
 		}
+	}
+
+	// Close MockLLM server if running
+	if ts.mockLLM != nil {
+		ts.mockLLM.Close()
 	}
 
 	if ts.TempDir != "" {
@@ -173,7 +199,8 @@ func (ts *TestServer) SSEClient() *SSEClient {
 }
 
 // buildTestConfig creates a test configuration based on TEST_PROVIDER env var.
-// Supported providers: "openai" (default), "ark"
+// Supported providers: "openai" (default), "ark", "mockllm"
+// Note: For "mockllm", this returns nil and the caller should use buildMockLLMConfig
 func buildTestConfig() *types.Config {
 	testProvider := os.Getenv("TEST_PROVIDER")
 	if testProvider == "" {
@@ -185,6 +212,9 @@ func buildTestConfig() *types.Config {
 		return buildArkConfig()
 	case "openai":
 		return buildOpenAIConfig()
+	case "mockllm":
+		// MockLLM config is built separately with the server URL
+		return nil
 	default:
 		// Default to OpenAI
 		return buildOpenAIConfig()
@@ -227,6 +257,26 @@ func buildOpenAIConfig() *types.Config {
 			"openai": {
 				APIKey: apiKey,
 				Model:  modelID,
+			},
+		},
+		Permission: &types.PermissionConfig{
+			Edit: "allow",
+			Bash: "allow",
+		},
+	}
+}
+
+// buildMockLLMConfig creates a config that points to a MockLLM server.
+// It uses the OpenAI provider format with a custom BaseURL pointing to MockLLM.
+// Note: We use gpt-4o-mini as the model ID since it's a known model in the provider.
+func buildMockLLMConfig(mockLLMURL string) *types.Config {
+	return &types.Config{
+		Model: "openai/gpt-4o-mini",
+		Provider: map[string]types.ProviderConfig{
+			"openai": {
+				APIKey:  "mock-api-key", // MockLLM doesn't validate API keys
+				BaseURL: mockLLMURL,
+				Model:   "gpt-4o-mini",
 			},
 		},
 		Permission: &types.PermissionConfig{
