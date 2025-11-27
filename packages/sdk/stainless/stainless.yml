@@ -29,14 +29,27 @@ resources:
       unknownError: UnknownError
       providerAuthError: ProviderAuthError
       messageAbortedError: MessageAbortedError
+      messageOutputLengthError: MessageOutputLengthError
+      apiError: ApiError
 
+  # Global events (cross-directory)
+  global:
+    models:
+      globalEvent: GlobalEvent
+    methods:
+      event:
+        endpoint: get /global/event
+        paginated: false
+        streaming:
+          param_discriminator: null
+
+  # Instance-scoped events
   event:
     methods:
-      list:
+      subscribe:
         endpoint: get /event
         paginated: false
         streaming:
-          # This method is always streaming.
           param_discriminator: null
 
   path:
@@ -48,11 +61,8 @@ resources:
   app:
     models:
       app: App
-      provider: Provider
-      model: Model
     methods:
       log: post /log
-      providers: get /config/providers
 
   agent:
     models:
@@ -72,6 +82,7 @@ resources:
     models:
       file: File
       fileNode: FileNode
+      fileContent: FileContent
 
     methods:
       list: get /file
@@ -84,9 +95,11 @@ resources:
       keybindsConfig: KeybindsConfig
       mcpLocalConfig: McpLocalConfig
       mcpRemoteConfig: McpRemoteConfig
-      modeConfig: ModeConfig
+      agentConfig: AgentConfig
     methods:
       get: get /config
+      update: patch /config
+      providers: get /config/providers
 
   command:
     models:
@@ -101,9 +114,74 @@ resources:
       list: get /project
       current: get /project/current
 
+  # Tool resource for experimental tool endpoints
+  tool:
+    models:
+      toolListItem: ToolListItem
+    methods:
+      ids: get /experimental/tool/ids
+      list: get /experimental/tool
+
+  # Instance management
+  instance:
+    methods:
+      dispose: post /instance/dispose
+
+  # Provider resource
+  provider:
+    models:
+      provider: Provider
+      model: Model
+      providerAuthMethod: ProviderAuthMethod
+      providerAuthAuthorization: ProviderAuthAuthorization
+    methods:
+      list: get /provider
+      auth: get /provider/auth
+    subresources:
+      oauth:
+        methods:
+          authorize: post /provider/{id}/oauth/authorize
+          callback: post /provider/{id}/oauth/callback
+
+  # MCP server management
+  mcp:
+    models:
+      mcpStatus: McpStatus
+      mcpStatusConnected: McpStatusConnected
+      mcpStatusDisabled: McpStatusDisabled
+      mcpStatusFailed: McpStatusFailed
+    methods:
+      status: get /mcp
+      add: post /mcp
+
+  # LSP server status
+  lsp:
+    models:
+      lspStatus: LspStatus
+    methods:
+      status: get /lsp
+
+  # Formatter status
+  formatter:
+    models:
+      formatterStatus: FormatterStatus
+    methods:
+      status: get /formatter
+
+  # Authentication
+  auth:
+    models:
+      authInfo: Auth
+      oauth: OAuth
+      apiAuth: ApiAuth
+      wellKnownAuth: WellKnownAuth
+    methods:
+      set: put /auth/{id}
+
   session:
     models:
       session: Session
+      sessionStatus: SessionStatus
       message: Message
       part: Part
       textPart: TextPart
@@ -127,17 +205,23 @@ resources:
       toolStateRunning: ToolStateRunning
       toolStateCompleted: ToolStateCompleted
       toolStateError: ToolStateError
+      todo: Todo
+      fileDiff: FileDiff
 
     methods:
       get: get /session/{id}
       list: get /session
+      status: get /session/status
       children: get /session/{id}/children
+      todo: get /session/{id}/todo
       create: post /session
       delete: delete /session/{id}
       init: post /session/{id}/init
+      fork: post /session/{id}/fork
       abort: post /session/{id}/abort
       share: post /session/{id}/share
       unshare: delete /session/{id}/share
+      diff: get /session/{id}/diff
       summarize: post /session/{id}/summarize
       message: get /session/{id}/message/{messageID}
       messages: get /session/{id}/message
@@ -166,6 +250,12 @@ resources:
       openModels: post /tui/open-models
       executeCommand: post /tui/execute-command
       showToast: post /tui/show-toast
+      publish: post /tui/publish
+    subresources:
+      control:
+        methods:
+          next: get /tui/control/next
+          response: post /tui/control/response
 
 settings:
   disable_mock_tests: true
