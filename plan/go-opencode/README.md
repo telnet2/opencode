@@ -15,6 +15,7 @@ This directory contains the detailed implementation plan for rewriting the OpenC
 | [05-permission-security.md](./05-permission-security.md) | Permission system and bash parsing |
 | [06-session-processing.md](./06-session-processing.md) | Agentic loop and message processing |
 | [07-advanced-features.md](./07-advanced-features.md) | LSP, MCP, agents |
+| [11-implement-missing-endpoints.md](./11-implement-missing-endpoints.md) | SDK feature parity implementation |
 | [test-plan.md](./test-plan.md) | Comprehensive test strategy |
 | [technical-specs.md](./technical-specs.md) | Technical specifications |
 
@@ -95,8 +96,14 @@ go-opencode/
 | 5. Security | Week 9 | Permission system, bash parsing (mvdan/sh) | ✅ COMPLETE |
 | 6. Processing Loop | Week 10 | Agentic loop, message handling | ✅ COMPLETE |
 | 7. Polish | Weeks 11-12 | LSP, MCP, testing, documentation | ✅ COMPLETE |
+| 8. SDK Feature Parity | - | SDK expansion with advanced features | ✅ COMPLETE |
 
-**Implementation Progress:** 247 tests passing across all Phase 1-7 components (as of 2025-11-26)
+**Implementation Progress:** 247+ tests passing across all Phase 1-8 components (as of 2025-11-27)
+
+### SDK Feature Parity Completed Components
+
+- **Phase 1-3:** Initial SDK alignment and core endpoint implementation
+- **Phase 4:** Extended SDK with client tools, MCP management, command execution, formatting
 
 ### Phase 7 Completed Components
 
