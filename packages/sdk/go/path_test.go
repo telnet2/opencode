@@ -24,9 +24,10 @@ func TestPathGetWithOptionalParams(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
 	_, err := client.Path.Get(context.TODO(), opencode.PathGetParams{
-		Directory: opencode.F("directory"),
+		Directory: opencode.String("directory"),
 	})
 	if err != nil {
 		var apierr *opencode.Error

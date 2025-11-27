@@ -24,9 +24,10 @@ func TestProjectListWithOptionalParams(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
 	_, err := client.Project.List(context.TODO(), opencode.ProjectListParams{
-		Directory: opencode.F("directory"),
+		Directory: opencode.String("directory"),
 	})
 	if err != nil {
 		var apierr *opencode.Error
@@ -37,7 +38,7 @@ func TestProjectListWithOptionalParams(t *testing.T) {
 	}
 }
 
-func TestProjectCurrentWithOptionalParams(t *testing.T) {
+func TestProjectGetCurrentWithOptionalParams(t *testing.T) {
 	t.Skip("Prism tests are disabled")
 	baseURL := "http://localhost:4010"
 	if envURL, ok := os.LookupEnv("TEST_API_BASE_URL"); ok {
@@ -48,9 +49,10 @@ func TestProjectCurrentWithOptionalParams(t *testing.T) {
 	}
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
+		option.WithAPIKey("My API Key"),
 	)
-	_, err := client.Project.Current(context.TODO(), opencode.ProjectCurrentParams{
-		Directory: opencode.F("directory"),
+	_, err := client.Project.GetCurrent(context.TODO(), opencode.ProjectGetCurrentParams{
+		Directory: opencode.String("directory"),
 	})
 	if err != nil {
 		var apierr *opencode.Error
