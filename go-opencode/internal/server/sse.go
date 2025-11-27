@@ -105,9 +105,10 @@ func (srv *Server) globalEvents(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case e := <-events:
+			// SDK compatible format: use "properties" instead of "data"
 			data := map[string]any{
-				"type": e.Type,
-				"data": e.Data,
+				"type":       e.Type,
+				"properties": e.Data,
 			}
 			if err := sse.writeEvent("message", data); err != nil {
 				return
@@ -167,9 +168,10 @@ func (srv *Server) sessionEvents(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case e := <-events:
+			// SDK compatible format: use "properties" instead of "data"
 			data := map[string]any{
-				"type": e.Type,
-				"data": e.Data,
+				"type":       e.Type,
+				"properties": e.Data,
 			}
 			if err := sse.writeEvent("message", data); err != nil {
 				return
@@ -184,16 +186,27 @@ func (srv *Server) sessionEvents(w http.ResponseWriter, r *http.Request) {
 func (srv *Server) eventBelongsToSession(e event.Event, sessionID string) bool {
 	switch data := e.Data.(type) {
 	case event.MessageUpdatedData:
-		return data.Message.SessionID == sessionID
+		return data.Info != nil && data.Info.SessionID == sessionID
 	case event.MessageCreatedData:
-		return data.Message.SessionID == sessionID
-	case event.PartUpdatedData:
-		return data.SessionID == sessionID
+		return data.Info != nil && data.Info.SessionID == sessionID
+	case event.MessagePartUpdatedData:
+		// SDK compatible: Part now has sessionID via PartSessionID() method
+		return data.Part != nil && data.Part.PartSessionID() == sessionID
 	case event.SessionUpdatedData:
-		return data.Session.ID == sessionID
-	case event.PermissionRequiredData:
+		return data.Info != nil && data.Info.ID == sessionID
+	case event.SessionCreatedData:
+		return data.Info != nil && data.Info.ID == sessionID
+	case event.SessionDeletedData:
+		return data.Info != nil && data.Info.ID == sessionID
+	case event.PermissionUpdatedData:
+		return data.SessionID == sessionID
+	case event.PermissionRepliedData:
 		return data.SessionID == sessionID
 	case event.FileEditedData:
+		return true // File events are session-agnostic in SDK format
+	case event.SessionIdleData:
+		return data.SessionID == sessionID
+	case event.SessionErrorData:
 		return data.SessionID == sessionID
 	}
 	return false

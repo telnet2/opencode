@@ -62,10 +62,10 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Publish event
+	// Publish event (SDK compatible: uses "info" field)
 	event.Publish(event.Event{
 		Type: event.SessionCreated,
-		Data: event.SessionCreatedData{Session: session},
+		Data: event.SessionCreatedData{Info: session},
 	})
 
 	writeJSON(w, http.StatusOK, session)
@@ -100,10 +100,10 @@ func (s *Server) updateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Publish event
+	// Publish event (SDK compatible: uses "info" field)
 	event.Publish(event.Event{
 		Type: event.SessionUpdated,
-		Data: event.SessionUpdatedData{Session: session},
+		Data: event.SessionUpdatedData{Info: session},
 	})
 
 	writeJSON(w, http.StatusOK, session)
@@ -113,15 +113,18 @@ func (s *Server) updateSession(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
+	// Get session before deletion for the event (SDK expects full session info)
+	session, _ := s.sessionService.Get(r.Context(), sessionID)
+
 	if err := s.sessionService.Delete(r.Context(), sessionID); err != nil {
 		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 		return
 	}
 
-	// Publish event
+	// Publish event (SDK compatible: uses "info" field with full session)
 	event.Publish(event.Event{
 		Type: event.SessionDeleted,
-		Data: event.SessionDeletedData{SessionID: sessionID},
+		Data: event.SessionDeletedData{Info: session},
 	})
 
 	writeSuccess(w)
@@ -184,10 +187,10 @@ func (s *Server) forkSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Publish event
+	// Publish event (SDK compatible: uses "info" field)
 	event.Publish(event.Event{
 		Type: event.SessionCreated,
-		Data: event.SessionCreatedData{Session: newSession},
+		Data: event.SessionCreatedData{Info: newSession},
 	})
 
 	writeJSON(w, http.StatusOK, newSession)
@@ -389,13 +392,19 @@ func (s *Server) respondPermission(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Publish event
+	// Convert granted bool to SDK response format
+	response := "reject"
+	if req.Granted {
+		response = "once"
+	}
+
+	// Publish event (SDK compatible: uses PermissionReplied)
 	event.Publish(event.Event{
-		Type: event.PermissionResolved,
-		Data: event.PermissionResolvedData{
-			ID:        permissionID,
-			SessionID: sessionID,
-			Granted:   req.Granted,
+		Type: event.PermissionReplied,
+		Data: event.PermissionRepliedData{
+			PermissionID: permissionID,
+			SessionID:    sessionID,
+			Response:     response,
 		},
 	})
 

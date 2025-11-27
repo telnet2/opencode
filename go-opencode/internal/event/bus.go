@@ -18,13 +18,23 @@ const (
 	SessionCreated     EventType = "session.created"
 	SessionUpdated     EventType = "session.updated"
 	SessionDeleted     EventType = "session.deleted"
+	SessionIdle        EventType = "session.idle"
+	SessionError       EventType = "session.error"
 	MessageCreated     EventType = "message.created"
 	MessageUpdated     EventType = "message.updated"
 	MessageRemoved     EventType = "message.removed"
-	PartUpdated        EventType = "part.updated"
+	MessagePartUpdated EventType = "message.part.updated" // SDK compatible
+	MessagePartRemoved EventType = "message.part.removed" // SDK compatible
 	FileEdited         EventType = "file.edited"
-	PermissionRequired EventType = "permission.required"
-	PermissionResolved EventType = "permission.resolved"
+	PermissionUpdated  EventType = "permission.updated" // SDK compatible (was permission.required)
+	PermissionReplied  EventType = "permission.replied" // SDK compatible (was permission.resolved)
+
+	// Deprecated: Use MessagePartUpdated instead
+	PartUpdated EventType = "message.part.updated"
+	// Deprecated: Use PermissionUpdated instead
+	PermissionRequired EventType = "permission.updated"
+	// Deprecated: Use PermissionReplied instead
+	PermissionResolved EventType = "permission.replied"
 )
 
 // Event represents an event to be published.

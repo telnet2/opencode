@@ -72,13 +72,12 @@ func (t *WriteTool) Execute(ctx context.Context, input json.RawMessage, toolCtx 
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
-	// Publish file edited event
+	// Publish file edited event (SDK compatible: just file path)
 	if toolCtx != nil && toolCtx.SessionID != "" {
 		event.Publish(event.Event{
 			Type: event.FileEdited,
 			Data: event.FileEditedData{
-				File:      params.FilePath,
-				SessionID: toolCtx.SessionID,
+				File: params.FilePath,
 			},
 		})
 	}

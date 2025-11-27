@@ -113,13 +113,12 @@ func (t *EditTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
-	// Publish event
+	// Publish event (SDK compatible: just file path)
 	if toolCtx != nil && toolCtx.SessionID != "" {
 		event.Publish(event.Event{
 			Type: event.FileEdited,
 			Data: event.FileEditedData{
-				File:      params.FilePath,
-				SessionID: toolCtx.SessionID,
+				File: params.FilePath,
 			},
 		})
 	}
@@ -146,12 +145,12 @@ func (t *EditTool) fuzzyReplace(text string, params EditInput, toolCtx *Context)
 			return nil, fmt.Errorf("failed to write file: %w", err)
 		}
 
+		// Publish event (SDK compatible: just file path)
 		if toolCtx != nil && toolCtx.SessionID != "" {
 			event.Publish(event.Event{
 				Type: event.FileEdited,
 				Data: event.FileEditedData{
-					File:      params.FilePath,
-					SessionID: toolCtx.SessionID,
+					File: params.FilePath,
 				},
 			})
 		}
@@ -170,12 +169,12 @@ func (t *EditTool) fuzzyReplace(text string, params EditInput, toolCtx *Context)
 			return nil, fmt.Errorf("failed to write file: %w", err)
 		}
 
+		// Publish event (SDK compatible: just file path)
 		if toolCtx != nil && toolCtx.SessionID != "" {
 			event.Publish(event.Event{
 				Type: event.FileEdited,
 				Data: event.FileEditedData{
-					File:      params.FilePath,
-					SessionID: toolCtx.SessionID,
+					File: params.FilePath,
 				},
 			})
 		}

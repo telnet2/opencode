@@ -60,3 +60,19 @@ type CustomPrompt struct {
 	LoadedAt  *int64            `json:"loadedAt,omitempty"`
 	Variables map[string]string `json:"variables,omitempty"`
 }
+
+// SessionError represents an error that occurred during session processing.
+// SDK compatible with the error union type.
+type SessionError struct {
+	Name string         `json:"name"` // "ProviderAuthError" | "UnknownError" | "MessageOutputLengthError" | "MessageAbortedError" | "APIError"
+	Data map[string]any `json:"data,omitempty"`
+}
+
+// Common error types for SDK compatibility
+const (
+	ErrorNameProviderAuth        = "ProviderAuthError"
+	ErrorNameUnknown             = "UnknownError"
+	ErrorNameMessageOutputLength = "MessageOutputLengthError"
+	ErrorNameMessageAborted      = "MessageAbortedError"
+	ErrorNameAPI                 = "APIError"
+)
