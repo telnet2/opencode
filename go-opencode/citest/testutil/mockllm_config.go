@@ -18,9 +18,12 @@ type MockLLMConfig struct {
 
 // MockSettings configures MockLLM server behavior.
 type MockSettings struct {
-	LagMS           int  `yaml:"lag_ms"`            // Artificial delay in milliseconds
-	EnableStreaming bool `yaml:"enable_streaming"`  // Whether to stream responses
-	ChunkDelayMS    int  `yaml:"chunk_delay_ms"`    // Delay between streaming chunks
+	LagMS           int    `yaml:"lag_ms"`            // Artificial delay in milliseconds
+	EnableStreaming bool   `yaml:"enable_streaming"`  // Whether to stream responses
+	ChunkDelayMS    int    `yaml:"chunk_delay_ms"`    // Delay between streaming chunks
+	ChunkMode       string `yaml:"chunk_mode"`        // How to split: "word" (default), "char", "fixed"
+	ChunkSize       int    `yaml:"chunk_size"`        // Characters per chunk (for "char"/"fixed" modes)
+	MaxChunks       int    `yaml:"max_chunks"`        // Max number of chunks (0 = unlimited)
 }
 
 // MockDefaults defines fallback behavior.
