@@ -1,0 +1,136 @@
+# MockLLM Configuration
+# This file defines the mock LLM server behavior for CI testing.
+# It allows customizing responses based on prompt patterns.
+
+settings:
+  # Artificial delay in milliseconds before responding
+  lag_ms: 0
+  # Whether to support streaming responses
+  enable_streaming: true
+  # Delay between streaming chunks in milliseconds
+  chunk_delay_ms: 5
+
+defaults:
+  # Response when no rules match the prompt
+  fallback: "I understand your request. Let me help you with that."
+
+# Response rules define text responses based on prompt matching
+# Rules are checked in priority order (higher priority first)
+responses:
+  # Basic greetings and common patterns
+  - name: hello-world
+    match:
+      contains: "hello, world"
+    response: "Hello, World!"
+    priority: 10
+
+  - name: math-2plus2
+    match:
+      contains_any:
+        - "2+2"
+        - "2 + 2"
+    response: "4"
+    priority: 10
+
+  - name: remember-42
+    match:
+      contains_all:
+        - "remember"
+        - "42"
+    response: "OK"
+    priority: 10
+
+  - name: recall-number
+    match:
+      contains_all:
+        - "what number"
+        - "remember"
+    response: "42"
+    priority: 10
+
+  - name: greet-alice
+    match:
+      contains_all:
+        - "alice"
+        - "name"
+    response: "Nice to meet you, Alice"
+    priority: 5
+
+  - name: ask-name
+    match:
+      contains_all:
+        - "what"
+        - "name"
+    response: "Alice"
+    priority: 4
+
+  - name: simple-hello
+    match:
+      contains: "hello"
+    response: "Hello! How can I help you today?"
+    priority: 1
+
+  # Code-related responses
+  - name: explain-code
+    match:
+      contains_all:
+        - "explain"
+        - "code"
+    response: "This code defines a function that processes input data and returns a transformed result."
+    priority: 5
+
+  - name: write-test
+    match:
+      contains_all:
+        - "write"
+        - "test"
+    response: "I'll help you write a test for this functionality."
+    priority: 5
+
+# Tool rules define when to generate tool calls
+# The tool must be available in the request for the rule to match
+tool_rules:
+  - name: echo-hello-world
+    match:
+      contains: "echo hello world"
+    tool: bash
+    tool_call:
+      id: "call_bash_001"
+      arguments:
+        command: "echo hello world"
+    response: "I'll run that bash command for you."
+    priority: 10
+
+  - name: list-directory
+    match:
+      contains_all:
+        - "list"
+        - "directory"
+    tool: bash
+    tool_call:
+      arguments:
+        command: "ls -la"
+    response: "I'll list the directory contents for you."
+    priority: 8
+
+  - name: read-readme
+    match:
+      contains_all:
+        - "read"
+        - "readme"
+    tool: read
+    tool_call:
+      arguments:
+        file_path: "README.md"
+    response: "I'll read the README file for you."
+    priority: 8
+
+  - name: git-status
+    match:
+      contains: "git status"
+    tool: bash
+    tool_call:
+      arguments:
+        command: "git status"
+    response: "I'll check the git status for you."
+    priority: 10
