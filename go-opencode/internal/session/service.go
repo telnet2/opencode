@@ -423,6 +423,96 @@ func (s *Service) GetParts(ctx context.Context, messageID string) ([]types.Part,
 	return parts, err
 }
 
+// GetMessage returns a single message by ID.
+func (s *Service) GetMessage(ctx context.Context, sessionID, messageID string) (*types.Message, error) {
+	var msg types.Message
+	if err := s.storage.Get(ctx, []string{"message", sessionID, messageID}, &msg); err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
+// ListProjects returns all known projects.
+func (s *Service) ListProjects(ctx context.Context, directory string) ([]*types.Project, error) {
+	// Get all project IDs from storage
+	projectIDs, err := s.storage.List(ctx, []string{"session"})
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a map of unique projects
+	projectMap := make(map[string]*types.Project)
+
+	for _, projectID := range projectIDs {
+		// Scan sessions in this project to find directory
+		err := s.storage.Scan(ctx, []string{"session", projectID}, func(key string, data json.RawMessage) error {
+			var session types.Session
+			if err := json.Unmarshal(data, &session); err != nil {
+				return err
+			}
+
+			// Filter by directory if specified
+			if directory != "" && session.Directory != directory {
+				return nil
+			}
+
+			// Add to projects map if not already present
+			if _, exists := projectMap[session.ProjectID]; !exists {
+				// Check if directory is a git repository
+				var vcs *string
+				gitVCS := "git"
+				// Just check if .git exists
+				vcs = &gitVCS // Assume git for now
+
+				projectMap[session.ProjectID] = &types.Project{
+					ID:       session.ProjectID,
+					Worktree: session.Directory,
+					VCS:      vcs,
+					Time: types.ProjectTime{
+						Created: session.Time.Created,
+					},
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Convert map to slice
+	projects := make([]*types.Project, 0, len(projectMap))
+	for _, p := range projectMap {
+		projects = append(projects, p)
+	}
+
+	return projects, nil
+}
+
+// GetCurrentProject returns the project for the given directory.
+func (s *Service) GetCurrentProject(ctx context.Context, directory string) (*types.Project, error) {
+	if directory == "" {
+		return nil, fmt.Errorf("directory is required")
+	}
+
+	projectID := hashDirectory(directory)
+	now := time.Now().UnixMilli()
+
+	// Check if directory is a git repository
+	var vcs *string
+	gitVCS := "git"
+	vcs = &gitVCS // Assume git for now
+
+	return &types.Project{
+		ID:       projectID,
+		Worktree: directory,
+		VCS:      vcs,
+		Time: types.ProjectTime{
+			Created: now,
+		},
+	}, nil
+}
+
 // ProcessMessage processes a user message and generates an assistant response.
 // This is the main agentic loop.
 func (s *Service) ProcessMessage(
