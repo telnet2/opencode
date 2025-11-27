@@ -155,8 +155,18 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 		sessionID = fmt.Sprintf("sess_%d", os.Getpid())
 	}
 
+	// Parse default provider and model from config
+	var defaultProviderID, defaultModelID string
+	if appConfig.Model != "" {
+		parts := strings.SplitN(appConfig.Model, "/", 2)
+		if len(parts) == 2 {
+			defaultProviderID = parts[0]
+			defaultModelID = parts[1]
+		}
+	}
+
 	// Create processor
-	processor := session.NewProcessor(providerReg, toolReg, store, permChecker)
+	processor := session.NewProcessor(providerReg, toolReg, store, permChecker, defaultProviderID, defaultModelID)
 
 	// Create agent configuration
 	agentName := runAgent
