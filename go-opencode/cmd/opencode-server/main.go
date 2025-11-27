@@ -114,6 +114,11 @@ func main() {
 	// Create server
 	srv := server.New(serverConfig, appConfig, store, providerReg, toolReg)
 
+	// Initialize MCP servers from config
+	if err := srv.InitializeMCP(ctx); err != nil {
+		logging.Warn().Err(err).Msg("Failed to initialize some MCP servers")
+	}
+
 	// Start server in goroutine
 	go func() {
 		logging.Info().
@@ -131,6 +136,11 @@ func main() {
 	<-quit
 
 	logging.Info().Msg("Shutting down server...")
+
+	// Close MCP servers
+	if err := srv.CloseMCP(); err != nil {
+		logging.Warn().Err(err).Msg("Error closing MCP servers")
+	}
 
 	// Graceful shutdown with timeout
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
