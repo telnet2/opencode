@@ -2,17 +2,21 @@ package testutil
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"time"
 )
 
 // MockLLMServer provides an HTTP server that mimics OpenAI/Anthropic APIs for testing.
 type MockLLMServer struct {
 	server   *httptest.Server
+	config   *MockLLMConfig
 	requests []MockRequest
+	mu       sync.Mutex
 }
 
 // MockRequest records incoming requests for verification.
@@ -23,9 +27,15 @@ type MockRequest struct {
 	Body      map[string]interface{}
 }
 
-// NewMockLLMServer creates a new mock LLM server with predefined responses.
+// NewMockLLMServer creates a new mock LLM server with default configuration.
 func NewMockLLMServer() *MockLLMServer {
+	return NewMockLLMServerWithConfig(DefaultMockLLMConfig())
+}
+
+// NewMockLLMServerWithConfig creates a new mock LLM server with custom configuration.
+func NewMockLLMServerWithConfig(config *MockLLMConfig) *MockLLMServer {
 	m := &MockLLMServer{
+		config:   config,
 		requests: make([]MockRequest, 0),
 	}
 
@@ -45,6 +55,15 @@ func NewMockLLMServer() *MockLLMServer {
 	return m
 }
 
+// NewMockLLMServerFromFile creates a mock LLM server from a YAML config file.
+func NewMockLLMServerFromFile(configPath string) (*MockLLMServer, error) {
+	config, err := LoadMockLLMConfig(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+	return NewMockLLMServerWithConfig(config), nil
+}
+
 // URL returns the mock server's URL.
 func (m *MockLLMServer) URL() string {
 	return m.server.URL
@@ -57,7 +76,36 @@ func (m *MockLLMServer) Close() {
 
 // GetRequests returns all recorded requests.
 func (m *MockLLMServer) GetRequests() []MockRequest {
-	return m.requests
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]MockRequest{}, m.requests...)
+}
+
+// ClearRequests clears all recorded requests.
+func (m *MockLLMServer) ClearRequests() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.requests = make([]MockRequest, 0)
+}
+
+// GetConfig returns the current configuration.
+func (m *MockLLMServer) GetConfig() *MockLLMConfig {
+	return m.config
+}
+
+// SetConfig updates the configuration at runtime.
+func (m *MockLLMServer) SetConfig(config *MockLLMConfig) {
+	m.config = config
+}
+
+// AddResponse adds a response rule at runtime.
+func (m *MockLLMServer) AddResponse(rule ResponseRule) {
+	m.config.Responses = append(m.config.Responses, rule)
+}
+
+// AddToolRule adds a tool rule at runtime.
+func (m *MockLLMServer) AddToolRule(rule ToolRule) {
+	m.config.ToolRules = append(m.config.ToolRules, rule)
 }
 
 // handleChatCompletions handles OpenAI-compatible chat completions.
@@ -81,12 +129,19 @@ func (m *MockLLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 	}
 
 	// Record request
+	m.mu.Lock()
 	m.requests = append(m.requests, MockRequest{
 		Timestamp: time.Now(),
 		Method:    r.Method,
 		Path:      r.URL.Path,
 		Body:      req,
 	})
+	m.mu.Unlock()
+
+	// Apply artificial lag if configured
+	if m.config.Settings.LagMS > 0 {
+		time.Sleep(time.Duration(m.config.Settings.LagMS) * time.Millisecond)
+	}
 
 	// Extract last message content for matching
 	lastPrompt := m.extractLastPrompt(req)
@@ -98,7 +153,7 @@ func (m *MockLLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 	// Generate appropriate response based on prompt and available tools
 	response := m.generateResponse(lastPrompt, tools)
 
-	if stream {
+	if stream && m.config.Settings.EnableStreaming {
 		m.writeStreamingResponse(w, response)
 	} else {
 		m.writeResponse(w, response)
@@ -163,29 +218,53 @@ type toolCall struct {
 	arguments string
 }
 
-// generateResponse generates a response based on the prompt and available tools.
+// generateResponse generates a response based on the config rules.
 func (m *MockLLMServer) generateResponse(prompt string, tools []string) *mockResponse {
+	// First, check for tool rules
+	if len(tools) > 0 {
+		if toolRule := m.config.FindMatchingToolRule(prompt, tools); toolRule != nil {
+			// Build tool call arguments as JSON
+			argsJSON, _ := json.Marshal(toolRule.ToolCall.Arguments)
+
+			// Generate tool call ID if not specified
+			callID := toolRule.ToolCall.ID
+			if callID == "" {
+				callID = fmt.Sprintf("call_%s_%s", toolRule.Tool, generateMockID())
+			}
+
+			return &mockResponse{
+				content: toolRule.Response,
+				toolCalls: []toolCall{
+					{
+						id:        callID,
+						name:      toolRule.Tool,
+						arguments: string(argsJSON),
+					},
+				},
+			}
+		}
+
+		// Fallback to legacy tool handling for prompts not in config
+		if resp := m.legacyToolHandling(prompt, tools); resp != nil {
+			return resp
+		}
+	}
+
+	// Check for matching response rule
+	response, _ := m.config.FindMatchingResponse(prompt)
+	return &mockResponse{content: response}
+}
+
+// legacyToolHandling provides backward-compatible tool handling for prompts
+// not covered by the config. This ensures existing tests continue to work.
+func (m *MockLLMServer) legacyToolHandling(prompt string, tools []string) *mockResponse {
 	promptLower := strings.ToLower(prompt)
 
-	// Check for tool-related prompts
 	hasBashTool := containsTool(tools, "bash")
 	hasReadTool := containsTool(tools, "read")
 
 	// Handle bash commands
 	if hasBashTool && (strings.Contains(promptLower, "run") || strings.Contains(promptLower, "bash") || strings.Contains(promptLower, "execute")) {
-		// Extract command to run
-		if strings.Contains(promptLower, "echo hello world") {
-			return &mockResponse{
-				content: "I'll run that bash command for you.",
-				toolCalls: []toolCall{
-					{
-						id:        "call_bash_001",
-						name:      "bash",
-						arguments: `{"command": "echo hello world"}`,
-					},
-				},
-			}
-		}
 		if strings.Contains(promptLower, "ls ") {
 			// Extract the path from the prompt
 			parts := strings.Split(prompt, "'")
@@ -207,7 +286,6 @@ func (m *MockLLMServer) generateResponse(prompt string, tools []string) *mockRes
 
 	// Handle file reading
 	if hasReadTool && (strings.Contains(promptLower, "read") || strings.Contains(promptLower, "file")) {
-		// Extract file path - look for paths in the prompt
 		words := strings.Fields(prompt)
 		for _, word := range words {
 			if strings.HasPrefix(word, "/") || strings.Contains(word, ".txt") || strings.Contains(word, ".go") {
@@ -226,32 +304,7 @@ func (m *MockLLMServer) generateResponse(prompt string, tools []string) *mockRes
 		}
 	}
 
-	// Handle simple prompts (no tools needed)
-	switch {
-	case strings.Contains(promptLower, "hello, world"):
-		return &mockResponse{content: "Hello, World!"}
-
-	case strings.Contains(promptLower, "2+2") || strings.Contains(promptLower, "2 + 2"):
-		return &mockResponse{content: "4"}
-
-	case strings.Contains(promptLower, "remember") && strings.Contains(promptLower, "42"):
-		return &mockResponse{content: "OK"}
-
-	case strings.Contains(promptLower, "what number") && strings.Contains(promptLower, "remember"):
-		return &mockResponse{content: "42"}
-
-	case strings.Contains(promptLower, "alice") && strings.Contains(promptLower, "name"):
-		return &mockResponse{content: "Nice to meet you, Alice"}
-
-	case strings.Contains(promptLower, "what") && strings.Contains(promptLower, "name"):
-		return &mockResponse{content: "Alice"}
-
-	case strings.Contains(promptLower, "hello"):
-		return &mockResponse{content: "Hello! How can I help you today?"}
-
-	default:
-		return &mockResponse{content: "I understand your request. Let me help you with that."}
-	}
+	return nil
 }
 
 // containsTool checks if a tool name is in the list
@@ -270,7 +323,7 @@ func (m *MockLLMServer) writeResponse(w http.ResponseWriter, resp *mockResponse)
 		"id":      "chatcmpl-mockllm-" + generateMockID(),
 		"object":  "chat.completion",
 		"created": time.Now().Unix(),
-		"model":   "mock-gpt-4",
+		"model":   "gpt-4o-mini",
 		"choices": []map[string]interface{}{
 			{
 				"index": 0,
@@ -326,7 +379,7 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 		"id":      "chatcmpl-mockllm-" + generateMockID(),
 		"object":  "chat.completion.chunk",
 		"created": time.Now().Unix(),
-		"model":   "mock-gpt-4",
+		"model":   "gpt-4o-mini",
 		"choices": []map[string]interface{}{
 			{
 				"index": 0,
@@ -340,6 +393,12 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 	w.Write([]byte("data: " + string(data) + "\n\n"))
 	flusher.Flush()
 
+	// Get chunk delay from config
+	chunkDelay := time.Duration(m.config.Settings.ChunkDelayMS) * time.Millisecond
+	if chunkDelay <= 0 {
+		chunkDelay = 5 * time.Millisecond
+	}
+
 	// Handle tool calls
 	if len(resp.toolCalls) > 0 {
 		for _, tc := range resp.toolCalls {
@@ -348,7 +407,7 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 				"id":      "chatcmpl-mockllm-" + generateMockID(),
 				"object":  "chat.completion.chunk",
 				"created": time.Now().Unix(),
-				"model":   "mock-gpt-4",
+				"model":   "gpt-4o-mini",
 				"choices": []map[string]interface{}{
 					{
 						"index": 0,
@@ -385,7 +444,7 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 				"id":      "chatcmpl-mockllm-" + generateMockID(),
 				"object":  "chat.completion.chunk",
 				"created": time.Now().Unix(),
-				"model":   "mock-gpt-4",
+				"model":   "gpt-4o-mini",
 				"choices": []map[string]interface{}{
 					{
 						"index": 0,
@@ -400,8 +459,7 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 			w.Write([]byte("data: " + string(data) + "\n\n"))
 			flusher.Flush()
 
-			// Small delay between chunks
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(chunkDelay)
 		}
 	}
 
@@ -415,7 +473,7 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 		"id":      "chatcmpl-mockllm-" + generateMockID(),
 		"object":  "chat.completion.chunk",
 		"created": time.Now().Unix(),
-		"model":   "mock-gpt-4",
+		"model":   "gpt-4o-mini",
 		"choices": []map[string]interface{}{
 			{
 				"index":         0,
@@ -432,5 +490,5 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 
 // generateMockID generates a simple mock ID.
 func generateMockID() string {
-	return "mock123456"
+	return fmt.Sprintf("mock%d", time.Now().UnixNano()%1000000)
 }

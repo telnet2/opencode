@@ -184,9 +184,172 @@ Current test pass rates using `TEST_PROVIDER=mockllm`:
 
 Note: Some failures in `server` and `service` suites are related to MCP and client-tools infrastructure, not MockLLM functionality.
 
+## YAML Configuration
+
+MockLLM supports YAML-based configuration for defining response scenarios. This makes it easy to customize behavior without modifying Go code.
+
+### Configuration File Location
+
+- Default config: `citest/config/mockllm.yaml`
+- Custom config can be loaded programmatically
+
+### Configuration Schema
+
+```yaml
+settings:
+  lag_ms: 0              # Artificial delay before responding
+  enable_streaming: true # Support SSE streaming
+  chunk_delay_ms: 5      # Delay between stream chunks
+
+defaults:
+  fallback: "Default response when no rules match"
+
+responses:
+  - name: rule-name        # Optional identifier
+    match:                 # Match criteria (pick one)
+      contains: "text"     # Case-insensitive substring
+      contains_all: [...]  # All must be present
+      contains_any: [...]  # Any one must be present
+      exact: "text"        # Exact match
+      regex: "pattern"     # Regex pattern (future)
+    response: "Text to return"
+    priority: 10           # Higher priority wins
+
+tool_rules:
+  - name: tool-rule-name
+    match:
+      contains: "trigger phrase"
+    tool: bash             # Tool name (must be in request)
+    tool_call:
+      id: "call_id"        # Optional, auto-generated if empty
+      arguments:
+        command: "echo hi" # Tool-specific arguments
+    response: "Optional text alongside tool call"
+    priority: 10
+```
+
+### Loading Custom Configuration
+
+```go
+// From file
+mockLLM, err := testutil.NewMockLLMServerFromFile("path/to/config.yaml")
+
+// From directory (looks for mockllm.yaml or mockllm.yml)
+config, err := testutil.LoadMockLLMConfigFromDir("path/to/dir")
+mockLLM := testutil.NewMockLLMServerWithConfig(config)
+
+// Runtime configuration
+mockLLM := testutil.NewMockLLMServer()
+mockLLM.AddResponse(testutil.ResponseRule{
+    Name:     "custom-rule",
+    Match:    testutil.MatchConfig{Contains: "custom prompt"},
+    Response: "Custom response",
+    Priority: 100,
+})
+mockLLM.AddToolRule(testutil.ToolRule{
+    Name:  "custom-tool-rule",
+    Match: testutil.MatchConfig{Contains: "run custom"},
+    Tool:  "bash",
+    ToolCall: testutil.ToolCallConfig{
+        Arguments: map[string]string{"command": "echo custom"},
+    },
+    Priority: 100,
+})
+```
+
+### Example YAML Configuration
+
+```yaml
+settings:
+  lag_ms: 0
+  enable_streaming: true
+  chunk_delay_ms: 5
+
+defaults:
+  fallback: "I understand your request."
+
+responses:
+  - name: greeting
+    match:
+      contains: "hello"
+    response: "Hello! How can I help?"
+    priority: 1
+
+  - name: math
+    match:
+      contains_any:
+        - "2+2"
+        - "two plus two"
+    response: "4"
+    priority: 10
+
+  - name: context-aware
+    match:
+      contains_all:
+        - "remember"
+        - "number"
+    response: "42"
+    priority: 5
+
+tool_rules:
+  - name: list-files
+    match:
+      contains: "list files"
+    tool: bash
+    tool_call:
+      arguments:
+        command: "ls -la"
+    response: "Listing files..."
+    priority: 10
+```
+
 ## Adding New Mock Responses
 
-To add new response patterns, edit `citest/testutil/mockllm.go`:
+### Option 1: YAML Configuration (Recommended)
+
+Edit `citest/config/mockllm.yaml` to add new response patterns:
+
+```yaml
+responses:
+  - name: your-new-rule
+    match:
+      contains: "your-pattern"
+    response: "Your response"
+    priority: 10
+```
+
+For tool calls:
+
+```yaml
+tool_rules:
+  - name: your-tool-rule
+    match:
+      contains: "trigger-phrase"
+    tool: your_tool
+    tool_call:
+      arguments:
+        param: "value"
+    response: "I'll execute that for you."
+    priority: 10
+```
+
+### Option 2: Runtime Configuration
+
+Add rules programmatically in your test:
+
+```go
+mockLLM := testutil.NewMockLLMServer()
+mockLLM.AddResponse(testutil.ResponseRule{
+    Name:     "dynamic-rule",
+    Match:    testutil.MatchConfig{Contains: "dynamic"},
+    Response: "Dynamic response",
+    Priority: 100,
+})
+```
+
+### Option 3: Code Modification (Legacy)
+
+For backward compatibility, you can still edit `citest/testutil/mockllm.go`:
 
 ```go
 func (m *MockLLMServer) generateResponse(prompt string, tools []string) *mockResponse {
@@ -198,23 +361,6 @@ func (m *MockLLMServer) generateResponse(prompt string, tools []string) *mockRes
         return &mockResponse{content: "Your response"}
 
     // ... existing patterns
-    }
-}
-```
-
-For tool calls:
-
-```go
-if hasYourTool && strings.Contains(promptLower, "trigger-phrase") {
-    return &mockResponse{
-        content: "I'll execute that for you.",
-        toolCalls: []toolCall{
-            {
-                id:        "call_your_tool_001",
-                name:      "your_tool",
-                arguments: `{"param": "value"}`,
-            },
-        },
     }
 }
 ```
