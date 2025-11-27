@@ -423,6 +423,25 @@ func (s *Service) GetParts(ctx context.Context, messageID string) ([]types.Part,
 	return parts, err
 }
 
+// SavePart saves a part to storage for a given message.
+func (s *Service) SavePart(ctx context.Context, messageID string, part types.Part) error {
+	partID := ""
+	switch p := part.(type) {
+	case *types.TextPart:
+		partID = p.ID
+	case *types.FilePart:
+		partID = p.ID
+	case *types.ReasoningPart:
+		partID = p.ID
+	case *types.ToolPart:
+		partID = p.ID
+	}
+	if partID == "" {
+		return fmt.Errorf("part has no ID")
+	}
+	return s.storage.Put(ctx, []string{"part", messageID, partID}, part)
+}
+
 // GetMessage returns a single message by ID.
 func (s *Service) GetMessage(ctx context.Context, sessionID, messageID string) (*types.Message, error) {
 	var msg types.Message
@@ -515,6 +534,8 @@ func (s *Service) GetCurrentProject(ctx context.Context, directory string) (*typ
 
 // ProcessMessage processes a user message and generates an assistant response.
 // This is the main agentic loop.
+// Note: The caller (HTTP handler) is responsible for creating and storing the user message
+// and its parts before calling this function.
 func (s *Service) ProcessMessage(
 	ctx context.Context,
 	session *types.Session,
@@ -522,33 +543,6 @@ func (s *Service) ProcessMessage(
 	model *types.ModelRef,
 	onUpdate func(msg *types.Message, parts []types.Part),
 ) (*types.Message, []types.Part, error) {
-	// First, save the user message
-	userMsg := &types.Message{
-		ID:        generateID(),
-		SessionID: session.ID,
-		Role:      "user",
-		Time: types.MessageTime{
-			Created: time.Now().UnixMilli(),
-		},
-	}
-	if model != nil {
-		userMsg.Model = model
-	}
-
-	if err := s.AddMessage(ctx, session.ID, userMsg); err != nil {
-		return nil, nil, err
-	}
-
-	// Save user's text content as a part
-	userPart := &types.TextPart{
-		ID:   generateID(),
-		Type: "text",
-		Text: content,
-	}
-	if err := s.storage.Put(ctx, []string{"part", userMsg.ID, userPart.ID}, userPart); err != nil {
-		return nil, nil, err
-	}
-
 	// Use processor if available
 	if s.processor != nil {
 		var finalMsg *types.Message

@@ -102,7 +102,7 @@ tool_rules:
   - name: echo-hello-world
     match:
       contains: "echo hello world"
-    tool: bash
+    tool: Bash
     tool_call:
       id: "call_bash_001"
       arguments:
@@ -110,12 +110,23 @@ tool_rules:
     response: "I'll run that bash command for you."
     priority: 10
 
+  - name: echo-hello
+    match:
+      contains: "echo hello"
+    tool: Bash
+    tool_call:
+      id: "call_bash_echo_hello"
+      arguments:
+        command: "echo hello"
+    response: "I'll run the echo command for you."
+    priority: 9
+
   - name: list-directory
     match:
       contains_all:
         - "list"
         - "directory"
-    tool: bash
+    tool: Bash
     tool_call:
       arguments:
         command: "ls -la"
@@ -127,7 +138,7 @@ tool_rules:
       contains_all:
         - "read"
         - "readme"
-    tool: read
+    tool: Read
     tool_call:
       arguments:
         file_path: "README.md"
@@ -137,7 +148,7 @@ tool_rules:
   - name: git-status
     match:
       contains: "git status"
-    tool: bash
+    tool: Bash
     tool_call:
       arguments:
         command: "git status"

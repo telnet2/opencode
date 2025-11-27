@@ -120,10 +120,12 @@ func (p *Processor) processMessageChunk(
 			// Start new text part
 			now := time.Now().UnixMilli()
 			*currentTextPart = &types.TextPart{
-				ID:   generatePartID(),
-				Type: "text",
-				Text: msg.Content,
-				Time: types.PartTime{Start: &now},
+				ID:        generatePartID(),
+				SessionID: state.message.SessionID,
+				MessageID: state.message.ID,
+				Type:      "text",
+				Text:      msg.Content,
+				Time:      types.PartTime{Start: &now},
 			}
 			state.parts = append(state.parts, *currentTextPart)
 			*accumulatedContent = msg.Content
@@ -161,10 +163,12 @@ func (p *Processor) processMessageChunk(
 		if *currentReasoningPart == nil {
 			now := time.Now().UnixMilli()
 			*currentReasoningPart = &types.ReasoningPart{
-				ID:   generatePartID(),
-				Type: "reasoning",
-				Text: msg.ReasoningContent,
-				Time: types.PartTime{Start: &now},
+				ID:        generatePartID(),
+				SessionID: state.message.SessionID,
+				MessageID: state.message.ID,
+				Type:      "reasoning",
+				Text:      msg.ReasoningContent,
+				Time:      types.PartTime{Start: &now},
 			}
 			state.parts = append(state.parts, *currentReasoningPart)
 			callback(state.message, state.parts)
@@ -182,6 +186,8 @@ func (p *Processor) processMessageChunk(
 			now := time.Now().UnixMilli()
 			toolPart = &types.ToolPart{
 				ID:         generatePartID(),
+				SessionID:  state.message.SessionID,
+				MessageID:  state.message.ID,
 				Type:       "tool",
 				ToolCallID: tc.ID,
 				ToolName:   tc.Function.Name,

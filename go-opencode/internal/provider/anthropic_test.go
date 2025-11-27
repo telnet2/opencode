@@ -9,38 +9,37 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func TestOpenAIProvider_Integration(t *testing.T) {
+func TestAnthropicProvider_Integration(t *testing.T) {
 	// Load .env file from project root
 	_ = godotenv.Load("../../.env")
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
-		t.Skip("OPENAI_API_KEY not set, skipping integration test")
+		t.Skip("ANTHROPIC_API_KEY not set, skipping integration test")
 	}
 
-	modelID := os.Getenv("OPENAI_MODEL_ID")
+	modelID := os.Getenv("ANTHROPIC_MODEL_ID")
 	if modelID == "" {
-		modelID = "gpt-4o-mini" // Default to gpt-4o-mini for cheaper testing
+		modelID = "claude-3-5-haiku-20241022" // Default to Haiku for cheaper testing
 	}
 
 	ctx := context.Background()
 
 	// Create provider
-	provider, err := NewOpenAIProvider(ctx, &OpenAIConfig{
+	provider, err := NewAnthropicProvider(ctx, &AnthropicConfig{
 		APIKey:    apiKey,
-		Model:     modelID,
 		MaxTokens: 1024,
 	})
 	if err != nil {
-		t.Fatalf("Failed to create OpenAI provider: %v", err)
+		t.Fatalf("Failed to create Anthropic provider: %v", err)
 	}
 
 	// Verify provider properties
-	if provider.ID() != "openai" {
-		t.Errorf("Expected ID 'openai', got '%s'", provider.ID())
+	if provider.ID() != "anthropic" {
+		t.Errorf("Expected ID 'anthropic', got '%s'", provider.ID())
 	}
-	if provider.Name() != "OpenAI" {
-		t.Errorf("Expected Name 'OpenAI', got '%s'", provider.Name())
+	if provider.Name() != "Anthropic" {
+		t.Errorf("Expected Name 'Anthropic', got '%s'", provider.Name())
 	}
 
 	models := provider.Models()
@@ -58,8 +57,8 @@ func TestOpenAIProvider_Integration(t *testing.T) {
 					Content: "Say 'Hello, World!' and nothing else.",
 				},
 			},
-			MaxTokens: 100,
-			// Note: GPT-5 models don't accept custom temperature (fixed at 1)
+			MaxTokens:   100,
+			Temperature: 0.0,
 		}
 
 		stream, err := provider.CreateCompletion(ctx, req)
@@ -83,7 +82,7 @@ func TestOpenAIProvider_Integration(t *testing.T) {
 			t.Error("Expected non-empty response")
 		}
 
-		t.Logf("OpenAI Response: %s", fullResponse)
+		t.Logf("Anthropic Response: %s", fullResponse)
 	})
 
 	// Test streaming chunks
@@ -96,7 +95,8 @@ func TestOpenAIProvider_Integration(t *testing.T) {
 					Content: "Count from 1 to 5, one number per line.",
 				},
 			},
-			MaxTokens: 100,
+			MaxTokens:   100,
+			Temperature: 0.0,
 		}
 
 		stream, err := provider.CreateCompletion(ctx, req)
@@ -131,7 +131,8 @@ func TestOpenAIProvider_Integration(t *testing.T) {
 				{Role: schema.Assistant, Content: "I'll remember the number 42."},
 				{Role: schema.User, Content: "What number did I ask you to remember? Reply with just the number."},
 			},
-			MaxTokens: 50,
+			MaxTokens:   50,
+			Temperature: 0.0,
 		}
 
 		stream, err := provider.CreateCompletion(ctx, req)
@@ -154,7 +155,7 @@ func TestOpenAIProvider_Integration(t *testing.T) {
 		if fullResponse == "" {
 			t.Error("Expected non-empty response")
 		}
-		t.Logf("OpenAI Response: %s", fullResponse)
+		t.Logf("Anthropic Response: %s", fullResponse)
 	})
 
 	// Test tool binding
@@ -183,78 +184,147 @@ func TestOpenAIProvider_Integration(t *testing.T) {
 	})
 }
 
-func TestOpenAIProvider_EmptyContentHandling(t *testing.T) {
+func TestAnthropicProvider_CustomID(t *testing.T) {
 	// Load .env file from project root
 	_ = godotenv.Load("../../.env")
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
-		t.Skip("OPENAI_API_KEY not set, skipping integration test")
-	}
-
-	modelID := os.Getenv("OPENAI_MODEL_ID")
-	if modelID == "" {
-		modelID = "gpt-4o-mini" // Default to gpt-4o-mini for cheaper testing
+		t.Skip("ANTHROPIC_API_KEY not set, skipping test")
 	}
 
 	ctx := context.Background()
 
-	provider, err := NewOpenAIProvider(ctx, &OpenAIConfig{
+	// Create provider with custom ID
+	provider, err := NewAnthropicProvider(ctx, &AnthropicConfig{
+		ID:        "claude",
 		APIKey:    apiKey,
-		Model:     modelID,
 		MaxTokens: 1024,
 	})
 	if err != nil {
-		t.Fatalf("Failed to create OpenAI provider: %v", err)
+		t.Fatalf("Failed to create Anthropic provider: %v", err)
 	}
 
-	// Test 1: Empty first message content - OpenAI behavior
-	// Note: OpenAI may handle empty content differently than Anthropic
-	t.Run("EmptyFirstMessageContent", func(t *testing.T) {
+	// Verify custom ID
+	if provider.ID() != "claude" {
+		t.Errorf("Expected ID 'claude', got '%s'", provider.ID())
+	}
+}
+
+func TestAnthropicProvider_NoAPIKey(t *testing.T) {
+	ctx := context.Background()
+
+	// Clear env var temporarily
+	originalKey := os.Getenv("ANTHROPIC_API_KEY")
+	os.Unsetenv("ANTHROPIC_API_KEY")
+	defer os.Setenv("ANTHROPIC_API_KEY", originalKey)
+
+	// Create provider without API key should fail
+	_, err := NewAnthropicProvider(ctx, &AnthropicConfig{
+		MaxTokens: 1024,
+	})
+	if err == nil {
+		t.Error("Expected error when API key is not set")
+	}
+}
+
+func TestAnthropicProvider_EmptyContentHandling(t *testing.T) {
+	// Load .env file from project root
+	_ = godotenv.Load("../../.env")
+
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		t.Skip("ANTHROPIC_API_KEY not set, skipping integration test")
+	}
+
+	modelID := os.Getenv("ANTHROPIC_MODEL_ID")
+	if modelID == "" {
+		modelID = "claude-3-5-haiku-20241022" // Default to Haiku for cheaper testing
+	}
+
+	ctx := context.Background()
+
+	provider, err := NewAnthropicProvider(ctx, &AnthropicConfig{
+		APIKey:    apiKey,
+		MaxTokens: 1024,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Anthropic provider: %v", err)
+	}
+
+	// Test 1: Empty first message content should return an error
+	// This reproduces the bug where a user message without content causes:
+	// "messages.0.content: Field required"
+	t.Run("EmptyFirstMessageContentReturnsError", func(t *testing.T) {
 		req := &CompletionRequest{
 			Model: modelID,
 			Messages: []*schema.Message{
 				{
 					Role:    schema.User,
-					Content: "", // Empty content
+					Content: "", // Empty content - should cause error
 				},
 			},
-			MaxTokens: 100,
+			MaxTokens:   100,
+			Temperature: 0.0,
 		}
 
 		stream, err := provider.CreateCompletion(ctx, req)
-		if err != nil {
-			// OpenAI may reject empty content with an error
-			t.Logf("Got error for empty content (this may be expected): %v", err)
-			return
-		}
-		defer stream.Close()
-
-		// If stream was created, try to receive
-		var fullResponse string
-		var recvErr error
-		for {
-			msg, err := stream.Recv()
-			if err != nil {
-				recvErr = err
-				break
+		if err == nil {
+			// If we got a stream, try to read from it - it should fail
+			if stream != nil {
+				defer stream.Close()
+				_, recvErr := stream.Recv()
+				if recvErr == nil {
+					t.Error("Expected error for empty first message content, but received successful response")
+				} else {
+					t.Logf("Got expected error on Recv: %v", recvErr)
+				}
 			}
-			if msg != nil {
-				fullResponse += msg.Content
-			}
-		}
-
-		// Log the behavior for documentation
-		if recvErr != nil {
-			t.Logf("OpenAI response to empty content - Error: %v", recvErr)
-		} else if fullResponse == "" {
-			t.Logf("OpenAI response to empty content - Empty response")
 		} else {
-			t.Logf("OpenAI response to empty content - Got response: %s", fullResponse)
+			// Error during CreateCompletion is expected
+			t.Logf("Got expected error: %v", err)
+			if err.Error() == "" {
+				t.Error("Expected non-empty error message")
+			}
 		}
 	})
 
-	// Test 2: Non-empty first message should work correctly
+	// Test 2: Empty first message followed by non-empty message should also fail
+	// because Anthropic API requires content in every user message
+	t.Run("EmptyFirstMessageWithFollowupReturnsError", func(t *testing.T) {
+		req := &CompletionRequest{
+			Model: modelID,
+			Messages: []*schema.Message{
+				{
+					Role:    schema.User,
+					Content: "", // Empty content - should cause error
+				},
+				{
+					Role:    schema.User,
+					Content: "Say hello",
+				},
+			},
+			MaxTokens:   100,
+			Temperature: 0.0,
+		}
+
+		stream, err := provider.CreateCompletion(ctx, req)
+		if err == nil {
+			if stream != nil {
+				defer stream.Close()
+				_, recvErr := stream.Recv()
+				if recvErr == nil {
+					t.Error("Expected error for empty first message content, but received successful response")
+				} else {
+					t.Logf("Got expected error on Recv: %v", recvErr)
+				}
+			}
+		} else {
+			t.Logf("Got expected error: %v", err)
+		}
+	})
+
+	// Test 3: Non-empty first message should work correctly
 	t.Run("NonEmptyFirstMessageWorks", func(t *testing.T) {
 		req := &CompletionRequest{
 			Model: modelID,
@@ -264,7 +334,8 @@ func TestOpenAIProvider_EmptyContentHandling(t *testing.T) {
 					Content: "Say 'test' and nothing else.",
 				},
 			},
-			MaxTokens: 50,
+			MaxTokens:   50,
+			Temperature: 0.0,
 		}
 
 		stream, err := provider.CreateCompletion(ctx, req)
@@ -290,7 +361,7 @@ func TestOpenAIProvider_EmptyContentHandling(t *testing.T) {
 		t.Logf("Response: %s", fullResponse)
 	})
 
-	// Test 3: Multiple messages with non-empty content should work
+	// Test 4: Multiple messages with non-empty content should work
 	t.Run("MultipleNonEmptyMessagesWork", func(t *testing.T) {
 		req := &CompletionRequest{
 			Model: modelID,
@@ -308,7 +379,8 @@ func TestOpenAIProvider_EmptyContentHandling(t *testing.T) {
 					Content: "What is X? Reply with just the number.",
 				},
 			},
-			MaxTokens: 50,
+			MaxTokens:   50,
+			Temperature: 0.0,
 		}
 
 		stream, err := provider.CreateCompletion(ctx, req)

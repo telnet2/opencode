@@ -47,11 +47,12 @@ var _ = Describe("Phase 3: MCP Endpoints", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
 
-			var tools []interface{}
+			// Initialize slice to distinguish between null and empty array
+			tools := make([]interface{}, 0)
 			err = resp.JSON(&tools)
 			Expect(err).NotTo(HaveOccurred())
 			// Tools list may be empty if no MCP servers configured
-			Expect(tools).NotTo(BeNil())
+			// An empty array [] is valid (length 0)
 		})
 	})
 
@@ -61,11 +62,12 @@ var _ = Describe("Phase 3: MCP Endpoints", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
 
-			var resources []interface{}
+			// Initialize slice to distinguish between null and empty array
+			resources := make([]interface{}, 0)
 			err = resp.JSON(&resources)
 			Expect(err).NotTo(HaveOccurred())
 			// Resources list may be empty if no MCP servers configured
-			Expect(resources).NotTo(BeNil())
+			// An empty array [] is valid (length 0)
 		})
 	})
 

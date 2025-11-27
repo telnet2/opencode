@@ -59,9 +59,9 @@ type Config struct {
 // ProviderConfig holds configuration for a specific provider.
 // Compatible with TypeScript opencode provider configuration.
 type ProviderConfig struct {
-	// Direct API key (Go style)
-	APIKey  string `json:"apiKey,omitempty"`
-	BaseURL string `json:"baseURL,omitempty"` // Changed to match TS (was baseUrl)
+	// Npm package for the provider (TypeScript style)
+	// Supported: @ai-sdk/openai, @ai-sdk/openai-compatible, @ai-sdk/anthropic
+	Npm string `json:"npm,omitempty"`
 
 	// Model/Endpoint ID (for providers like ARK that require endpoint specification)
 	Model string `json:"model,omitempty"`
@@ -69,12 +69,22 @@ type ProviderConfig struct {
 	// Nested options (TypeScript style)
 	Options *ProviderOptions `json:"options,omitempty"`
 
+	// Custom model definitions
+	Models map[string]ModelConfig `json:"models,omitempty"`
+
 	// Model filtering
 	Whitelist []string `json:"whitelist,omitempty"`
 	Blacklist []string `json:"blacklist,omitempty"`
 
 	// Disable provider
 	Disable bool `json:"disable,omitempty"`
+}
+
+// ModelConfig holds custom model configuration (TypeScript style).
+type ModelConfig struct {
+	ID        string `json:"id,omitempty"`
+	Reasoning bool   `json:"reasoning,omitempty"`
+	ToolCall  bool   `json:"tool_call,omitempty"`
 }
 
 // ProviderOptions holds nested provider options (TypeScript style).

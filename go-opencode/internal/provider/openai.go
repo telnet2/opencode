@@ -20,6 +20,9 @@ type OpenAIProvider struct {
 
 // OpenAIConfig holds configuration for OpenAI provider.
 type OpenAIConfig struct {
+	// ID is the provider identifier (e.g., "openai", "qwen", "ollama")
+	// If empty, defaults to "openai"
+	ID        string
 	APIKey    string
 	BaseURL   string
 	Model     string
@@ -90,7 +93,12 @@ func NewOpenAIProvider(ctx context.Context, config *OpenAIConfig) (*OpenAIProvid
 }
 
 // ID returns the provider identifier.
-func (p *OpenAIProvider) ID() string { return "openai" }
+func (p *OpenAIProvider) ID() string {
+	if p.config.ID != "" {
+		return p.config.ID
+	}
+	return "openai"
+}
 
 // Name returns the human-readable provider name.
 func (p *OpenAIProvider) Name() string { return "OpenAI" }

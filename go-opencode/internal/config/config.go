@@ -107,7 +107,7 @@ func logConfigSummary(config *types.Config) {
 	// Count configured providers (without exposing API keys)
 	var providers []string
 	for name, p := range config.Provider {
-		if p.APIKey != "" {
+		if p.Options != nil && p.Options.APIKey != "" {
 			providers = append(providers, name+" (configured)")
 		} else {
 			providers = append(providers, name+" (no key)")
@@ -200,20 +200,11 @@ func interpolate(data []byte, baseDir string) []byte {
 	return []byte(str)
 }
 
-// normalizeProviderConfig merges Options fields into direct fields for compatibility.
+// normalizeProviderConfig is a no-op since we now use TypeScript-style Options only.
+// Kept for backward compatibility with any code that might call it.
 func normalizeProviderConfig(config *types.Config) {
-	for name, provider := range config.Provider {
-		if provider.Options != nil {
-			// Options take precedence over direct fields
-			if provider.Options.APIKey != "" {
-				provider.APIKey = provider.Options.APIKey
-			}
-			if provider.Options.BaseURL != "" {
-				provider.BaseURL = provider.Options.BaseURL
-			}
-		}
-		config.Provider[name] = provider
-	}
+	// TypeScript-style: credentials are always in Options
+	// No normalization needed
 }
 
 // mergeConfig merges source config into target.
@@ -335,27 +326,6 @@ func mergeConfig(target, source *types.Config) {
 
 // applyEnvOverrides applies environment variable overrides.
 func applyEnvOverrides(config *types.Config) {
-	// Provider API keys
-	providerEnvMap := map[string]string{
-		"anthropic": "ANTHROPIC_API_KEY",
-		"openai":    "OPENAI_API_KEY",
-		"google":    "GOOGLE_API_KEY",
-		"bedrock":   "AWS_ACCESS_KEY_ID",
-	}
-
-	for provider, envVar := range providerEnvMap {
-		if apiKey := os.Getenv(envVar); apiKey != "" {
-			if config.Provider == nil {
-				config.Provider = make(map[string]types.ProviderConfig)
-			}
-			p := config.Provider[provider]
-			if p.APIKey == "" {
-				p.APIKey = apiKey
-				config.Provider[provider] = p
-			}
-		}
-	}
-
 	// Model override
 	if model := os.Getenv("OPENCODE_MODEL"); model != "" {
 		config.Model = model
@@ -373,6 +343,16 @@ func applyEnvOverrides(config *types.Config) {
 			config.Permission = &perm
 		}
 	}
+
+	// Note: Provider API keys should be configured in the config file using
+	// TypeScript-style Options with {env:VAR_NAME} interpolation, e.g.:
+	// "provider": {
+	//   "anthropic": {
+	//     "options": {
+	//       "apiKey": "{env:ANTHROPIC_API_KEY}"
+	//     }
+	//   }
+	// }
 }
 
 // Save saves the configuration to a file.

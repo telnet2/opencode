@@ -29,8 +29,19 @@ var _ = BeforeSuite(func() {
 
 	// Skip env var check for mockllm provider
 	testProvider := os.Getenv("TEST_PROVIDER")
-	if testProvider != "mockllm" {
-		// Skip if required env vars are missing (only for real providers)
+	switch testProvider {
+	case "mockllm":
+		// No env var check needed for mockllm
+	case "anthropic":
+		if testutil.SkipIfMissingEnv("ANTHROPIC_API_KEY") {
+			Skip("ANTHROPIC_API_KEY not set")
+		}
+	case "openai":
+		if testutil.SkipIfMissingEnv("OPENAI_API_KEY") {
+			Skip("OPENAI_API_KEY not set")
+		}
+	case "ark", "":
+		// Default to ARK provider check for backwards compatibility
 		if testutil.SkipIfMissingEnv("ARK_API_KEY", "ARK_MODEL_ID") {
 			Skip("ARK environment variables not set")
 		}

@@ -102,12 +102,17 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create user message parts
-	userParts := []types.Part{
-		&types.TextPart{
-			ID:   generateID(),
-			Type: "text",
-			Text: content,
-		},
+	textPart := &types.TextPart{
+		ID:   generateID(),
+		Type: "text",
+		Text: content,
+	}
+	userParts := []types.Part{textPart}
+
+	// Save text part to storage
+	if err := s.sessionService.SavePart(r.Context(), userMsg.ID, textPart); err != nil {
+		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
+		return
 	}
 
 	// Add file parts if provided
@@ -115,6 +120,11 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		file.ID = generateID()
 		file.Type = "file"
 		userParts = append(userParts, &file)
+		// Save file part to storage
+		if err := s.sessionService.SavePart(r.Context(), userMsg.ID, &file); err != nil {
+			writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
+			return
+		}
 	}
 
 	// Stream user message
