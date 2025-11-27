@@ -29,7 +29,7 @@ type ReadTool struct {
 
 // ReadInput represents the input for the read tool.
 type ReadInput struct {
-	FilePath string `json:"file_path"`
+	FilePath string `json:"filePath"`
 	Offset   int    `json:"offset,omitempty"`
 	Limit    int    `json:"limit,omitempty"`
 }
@@ -39,14 +39,14 @@ func NewReadTool(workDir string) *ReadTool {
 	return &ReadTool{workDir: workDir}
 }
 
-func (t *ReadTool) ID() string          { return "Read" }
+func (t *ReadTool) ID() string          { return "read" }
 func (t *ReadTool) Description() string { return readDescription }
 
 func (t *ReadTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"file_path": {
+			"filePath": {
 				"type": "string",
 				"description": "The absolute path to the file to read"
 			},
@@ -59,7 +59,7 @@ func (t *ReadTool) Parameters() json.RawMessage {
 				"description": "Number of lines to read (default: 2000)"
 			}
 		},
-		"required": ["file_path"]
+		"required": ["filePath"]
 	}`)
 }
 
@@ -74,9 +74,9 @@ func (t *ReadTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 		params.Limit = 2000
 	}
 
-	// Block .env files
-	if strings.HasSuffix(params.FilePath, ".env") {
-		return nil, fmt.Errorf(".env files cannot be read for security reasons")
+	// Block .env files (except allowed patterns like .env.sample, .example)
+	if shouldBlockEnvFile(params.FilePath) {
+		return nil, fmt.Errorf("The user has blocked you from reading %s, DO NOT make further attempts to read it", params.FilePath)
 	}
 
 	// Check if file exists
@@ -127,13 +127,24 @@ func (t *ReadTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 		if len(line) > 2000 {
 			line = line[:2000] + "..."
 		}
-		lines = append(lines, fmt.Sprintf("%5d\t%s", lineNum, line))
+		lines = append(lines, fmt.Sprintf("%05d| %s", lineNum, line))
 	}
 
-	output := strings.Join(lines, "\n")
-	if lineNum > params.Offset+params.Limit {
-		output += fmt.Sprintf("\n\n(File has more lines. Use offset to read more.)")
+	// Format output with <file> tags like TypeScript
+	var sb strings.Builder
+	sb.WriteString("<file>\n")
+	sb.WriteString(strings.Join(lines, "\n"))
+
+	lastReadLine := params.Offset + len(lines)
+	hasMoreLines := lineNum > lastReadLine
+
+	if hasMoreLines {
+		sb.WriteString(fmt.Sprintf("\n\n(File has more lines. Use 'offset' parameter to read beyond line %d)", lastReadLine))
+	} else {
+		sb.WriteString(fmt.Sprintf("\n\n(End of file - total %d lines)", lineNum))
 	}
+	sb.WriteString("\n</file>")
+	output := sb.String()
 
 	return &Result{
 		Title:  fmt.Sprintf("Read %s", filepath.Base(params.FilePath)),
@@ -224,5 +235,24 @@ func detectMediaType(path string) string {
 	default:
 		return "application/octet-stream"
 	}
+}
+
+// shouldBlockEnvFile checks if a file should be blocked based on .env patterns.
+// Whitelist: .env.sample, .example suffixes are allowed.
+func shouldBlockEnvFile(filePath string) bool {
+	// Whitelist patterns that are allowed
+	whitelist := []string{".env.sample", ".example"}
+	for _, w := range whitelist {
+		if strings.HasSuffix(filePath, w) {
+			return false
+		}
+	}
+
+	// Block files containing .env in the path
+	if strings.Contains(filePath, ".env") {
+		return true
+	}
+
+	return false
 }
 

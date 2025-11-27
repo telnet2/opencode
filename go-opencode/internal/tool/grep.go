@@ -27,7 +27,7 @@ type GrepTool struct {
 type GrepInput struct {
 	Pattern string `json:"pattern"`
 	Path    string `json:"path,omitempty"`
-	Glob    string `json:"glob,omitempty"` // glob filter for files
+	Include string `json:"include,omitempty"` // file pattern to include (e.g., "*.js")
 }
 
 // NewGrepTool creates a new grep tool.
@@ -35,7 +35,7 @@ func NewGrepTool(workDir string) *GrepTool {
 	return &GrepTool{workDir: workDir}
 }
 
-func (t *GrepTool) ID() string          { return "Grep" }
+func (t *GrepTool) ID() string          { return "grep" }
 func (t *GrepTool) Description() string { return grepDescription }
 
 func (t *GrepTool) Parameters() json.RawMessage {
@@ -44,15 +44,15 @@ func (t *GrepTool) Parameters() json.RawMessage {
 		"properties": {
 			"pattern": {
 				"type": "string",
-				"description": "The regex pattern to search for"
+				"description": "The regex pattern to search for in file contents"
 			},
 			"path": {
 				"type": "string",
-				"description": "File or directory to search"
+				"description": "The directory to search in. Defaults to the current working directory."
 			},
-			"glob": {
+			"include": {
 				"type": "string",
-				"description": "Glob pattern to filter files (e.g., \"*.js\")"
+				"description": "File pattern to include in the search (e.g. \"*.js\", \"*.{ts,tsx}\")"
 			}
 		},
 		"required": ["pattern"]
@@ -78,8 +78,8 @@ func (t *GrepTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 		"--color=never",
 	}
 
-	if params.Glob != "" {
-		args = append(args, "--glob", params.Glob)
+	if params.Include != "" {
+		args = append(args, "--glob", params.Include)
 	}
 
 	args = append(args, params.Pattern)

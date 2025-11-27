@@ -138,8 +138,8 @@ func TestRegistry_ToolInfos(t *testing.T) {
 func TestDefaultRegistry(t *testing.T) {
 	registry := DefaultRegistry("/tmp")
 
-	// Check that core tools are registered
-	expectedTools := []string{"Read", "Write", "Edit", "Bash", "Glob", "Grep", "List"}
+	// Check that core tools are registered (using lowercase IDs matching TypeScript)
+	expectedTools := []string{"read", "write", "edit", "bash", "glob", "grep", "list"}
 
 	for _, name := range expectedTools {
 		_, ok := registry.Get(name)

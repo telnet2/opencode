@@ -114,7 +114,7 @@ func detectShell() string {
 	return "/bin/sh"
 }
 
-func (t *BashTool) ID() string          { return "Bash" }
+func (t *BashTool) ID() string          { return "bash" }
 func (t *BashTool) Description() string { return bashDescription }
 
 func (t *BashTool) Parameters() json.RawMessage {

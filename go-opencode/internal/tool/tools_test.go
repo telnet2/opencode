@@ -37,7 +37,7 @@ func TestReadTool_Execute(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -57,7 +57,7 @@ func TestReadTool_FileNotFound(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "/nonexistent/file.txt"}`)
+	input := json.RawMessage(`{"filePath": "/nonexistent/file.txt"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
 		t.Error("Expected error for nonexistent file")
@@ -80,7 +80,7 @@ func TestReadTool_WithOffsetAndLimit(t *testing.T) {
 	toolCtx := testContext()
 
 	// Read lines 3-5 (offset=2, limit=3)
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "offset": 3, "limit": 3}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "offset": 3, "limit": 3}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -94,8 +94,8 @@ func TestReadTool_WithOffsetAndLimit(t *testing.T) {
 func TestReadTool_Properties(t *testing.T) {
 	tool := NewReadTool("/tmp")
 
-	if tool.ID() != "Read" {
-		t.Errorf("Expected ID 'Read', got %q", tool.ID())
+	if tool.ID() != "read" {
+		t.Errorf("Expected ID 'read', got %q", tool.ID())
 	}
 
 	desc := tool.Description()
@@ -121,7 +121,7 @@ func TestWriteTool_Execute(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Hello, World!"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": "Hello, World!"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -149,7 +149,7 @@ func TestWriteTool_CreateDirectory(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Nested content"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": "Nested content"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -174,7 +174,7 @@ func TestWriteTool_Overwrite(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Updated"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": "Updated"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -202,9 +202,9 @@ func TestEditTool_Execute(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "World",
-		"new_string": "Go"
+		"filePath": "` + testFile + `",
+		"oldString": "World",
+		"newString": "Go"
 	}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
@@ -233,9 +233,9 @@ func TestEditTool_StringNotFound(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "NotFound",
-		"new_string": "Replacement"
+		"filePath": "` + testFile + `",
+		"oldString": "NotFound",
+		"newString": "Replacement"
 	}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
@@ -255,10 +255,10 @@ func TestEditTool_ReplaceAll(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "foo",
-		"new_string": "qux",
-		"replace_all": true
+		"filePath": "` + testFile + `",
+		"oldString": "foo",
+		"newString": "qux",
+		"replaceAll": true
 	}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
@@ -444,8 +444,8 @@ func TestEinoToolWrapper_Info(t *testing.T) {
 		t.Fatalf("Info failed: %v", err)
 	}
 
-	if info.Name != "Read" {
-		t.Errorf("Expected name 'Read', got %q", info.Name)
+	if info.Name != "read" {
+		t.Errorf("Expected name 'read', got %q", info.Name)
 	}
 	if info.Desc == "" {
 		t.Error("Description should not be empty")
@@ -460,7 +460,7 @@ func TestEinoToolWrapper_InvokableRun(t *testing.T) {
 	tool := NewReadTool(tmpDir)
 	einoTool := tool.EinoTool()
 
-	argsJSON := `{"file_path": "` + testFile + `"}`
+	argsJSON := `{"filePath": "` + testFile + `"}`
 	result, err := einoTool.InvokableRun(context.Background(), argsJSON)
 	if err != nil {
 		t.Fatalf("InvokableRun failed: %v", err)
@@ -552,5 +552,156 @@ func TestBaseTool(t *testing.T) {
 	}
 	if result.Output != "custom result" {
 		t.Errorf("Output = %q, want 'custom result'", result.Output)
+	}
+}
+
+// ============================================
+// Additional Compatibility Tests
+// ============================================
+
+// TestReadTool_EnvFileBlocking tests .env file blocking with whitelist
+func TestReadTool_EnvFileBlocking(t *testing.T) {
+	tmpDir := t.TempDir()
+	tool := NewReadTool(tmpDir)
+	ctx := context.Background()
+	toolCtx := testContext()
+
+	// Create test .env file
+	envFile := filepath.Join(tmpDir, ".env")
+	os.WriteFile(envFile, []byte("SECRET=value"), 0644)
+
+	// Should block .env file
+	input := json.RawMessage(`{"filePath": "` + envFile + `"}`)
+	_, err := tool.Execute(ctx, input, toolCtx)
+	if err == nil {
+		t.Error("Expected error when reading .env file")
+	}
+	if err != nil && !strings.Contains(err.Error(), "blocked") {
+		t.Errorf("Error should mention 'blocked', got: %v", err)
+	}
+}
+
+func TestReadTool_EnvSampleAllowed(t *testing.T) {
+	tmpDir := t.TempDir()
+	tool := NewReadTool(tmpDir)
+	ctx := context.Background()
+	toolCtx := testContext()
+
+	// Create test .env.sample file
+	sampleFile := filepath.Join(tmpDir, ".env.sample")
+	os.WriteFile(sampleFile, []byte("EXAMPLE=value"), 0644)
+
+	// Should allow .env.sample file
+	input := json.RawMessage(`{"filePath": "` + sampleFile + `"}`)
+	result, err := tool.Execute(ctx, input, toolCtx)
+	if err != nil {
+		t.Fatalf("Should allow .env.sample, got error: %v", err)
+	}
+	if !strings.Contains(result.Output, "EXAMPLE=value") {
+		t.Error("Output should contain .env.sample content")
+	}
+}
+
+func TestReadTool_ExampleEnvAllowed(t *testing.T) {
+	tmpDir := t.TempDir()
+	tool := NewReadTool(tmpDir)
+	ctx := context.Background()
+	toolCtx := testContext()
+
+	// Create test .example file
+	exampleFile := filepath.Join(tmpDir, "config.example")
+	os.WriteFile(exampleFile, []byte("CONFIG=value"), 0644)
+
+	// Should allow .example file
+	input := json.RawMessage(`{"filePath": "` + exampleFile + `"}`)
+	result, err := tool.Execute(ctx, input, toolCtx)
+	if err != nil {
+		t.Fatalf("Should allow .example, got error: %v", err)
+	}
+	if !strings.Contains(result.Output, "CONFIG=value") {
+		t.Error("Output should contain .example content")
+	}
+}
+
+// TestReadTool_OutputFormat tests the output format matches TypeScript
+func TestReadTool_OutputFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "format.txt")
+	os.WriteFile(testFile, []byte("Line 1\nLine 2\nLine 3"), 0644)
+
+	tool := NewReadTool(tmpDir)
+	ctx := context.Background()
+	toolCtx := testContext()
+
+	input := json.RawMessage(`{"filePath": "` + testFile + `"}`)
+	result, err := tool.Execute(ctx, input, toolCtx)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// Check for <file> tags
+	if !strings.HasPrefix(result.Output, "<file>") {
+		t.Error("Output should start with <file> tag")
+	}
+	if !strings.HasSuffix(result.Output, "</file>") {
+		t.Error("Output should end with </file> tag")
+	}
+
+	// Check for line number format (00001| format)
+	if !strings.Contains(result.Output, "00001| Line 1") {
+		t.Error("Output should have zero-padded line numbers with pipe separator")
+	}
+}
+
+// TestListTool_IgnorePatterns tests the ignore parameter
+func TestListTool_IgnorePatterns(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create files and directories including ones that should be ignored
+	os.WriteFile(filepath.Join(tmpDir, "keep.txt"), []byte(""), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "ignore.log"), []byte(""), 0644)
+	os.Mkdir(filepath.Join(tmpDir, "node_modules"), 0755)
+	os.WriteFile(filepath.Join(tmpDir, "node_modules", "package.json"), []byte(""), 0644)
+
+	tool := NewListTool(tmpDir)
+	ctx := context.Background()
+	toolCtx := testContext()
+
+	input := json.RawMessage(`{"path": "` + tmpDir + `"}`)
+	result, err := tool.Execute(ctx, input, toolCtx)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// Should include keep.txt
+	if !strings.Contains(result.Output, "keep.txt") {
+		t.Error("Output should contain 'keep.txt'")
+	}
+
+	// Should not include node_modules (default ignore pattern)
+	if strings.Contains(result.Output, "node_modules") {
+		t.Error("Output should NOT contain 'node_modules' (default ignore)")
+	}
+}
+
+// TestToolIDs verifies all tool IDs are lowercase
+func TestToolIDs(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	tools := []Tool{
+		NewReadTool(tmpDir),
+		NewWriteTool(tmpDir),
+		NewEditTool(tmpDir),
+		NewListTool(tmpDir),
+		NewGlobTool(tmpDir),
+		NewGrepTool(tmpDir),
+		NewBashTool(tmpDir),
+	}
+
+	for _, tool := range tools {
+		id := tool.ID()
+		if id != strings.ToLower(id) {
+			t.Errorf("Tool ID %q should be lowercase", id)
+		}
 	}
 }

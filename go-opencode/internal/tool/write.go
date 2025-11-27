@@ -26,7 +26,7 @@ type WriteTool struct {
 
 // WriteInput represents the input for the write tool.
 type WriteInput struct {
-	FilePath string `json:"file_path"`
+	FilePath string `json:"filePath"`
 	Content  string `json:"content"`
 }
 
@@ -35,14 +35,14 @@ func NewWriteTool(workDir string) *WriteTool {
 	return &WriteTool{workDir: workDir}
 }
 
-func (t *WriteTool) ID() string          { return "Write" }
+func (t *WriteTool) ID() string          { return "write" }
 func (t *WriteTool) Description() string { return writeDescription }
 
 func (t *WriteTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"file_path": {
+			"filePath": {
 				"type": "string",
 				"description": "The absolute path to the file to write"
 			},
@@ -51,7 +51,7 @@ func (t *WriteTool) Parameters() json.RawMessage {
 				"description": "The content to write to the file"
 			}
 		},
-		"required": ["file_path", "content"]
+		"required": ["filePath", "content"]
 	}`)
 }
 

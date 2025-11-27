@@ -24,7 +24,35 @@ type ListTool struct {
 
 // ListInput represents the input for the list tool.
 type ListInput struct {
-	Path string `json:"path"`
+	Path   string   `json:"path,omitempty"`
+	Ignore []string `json:"ignore,omitempty"`
+}
+
+// Default ignore patterns matching TypeScript implementation.
+var defaultIgnorePatterns = []string{
+	"node_modules/",
+	"__pycache__/",
+	".git/",
+	"dist/",
+	"build/",
+	"target/",
+	"vendor/",
+	"bin/",
+	"obj/",
+	".idea/",
+	".vscode/",
+	".zig-cache/",
+	"zig-out",
+	".coverage",
+	"coverage/",
+	"tmp/",
+	"temp/",
+	".cache/",
+	"cache/",
+	"logs/",
+	".venv/",
+	"venv/",
+	"env/",
 }
 
 // NewListTool creates a new list tool.
@@ -32,7 +60,7 @@ func NewListTool(workDir string) *ListTool {
 	return &ListTool{workDir: workDir}
 }
 
-func (t *ListTool) ID() string          { return "List" }
+func (t *ListTool) ID() string          { return "list" }
 func (t *ListTool) Description() string { return listDescription }
 
 func (t *ListTool) Parameters() json.RawMessage {
@@ -41,7 +69,12 @@ func (t *ListTool) Parameters() json.RawMessage {
 		"properties": {
 			"path": {
 				"type": "string",
-				"description": "The path to list (defaults to current directory)"
+				"description": "The absolute path to the directory to list (must be absolute, not relative)"
+			},
+			"ignore": {
+				"type": "array",
+				"items": {"type": "string"},
+				"description": "List of glob patterns to ignore"
 			}
 		}
 	}`)
@@ -72,6 +105,10 @@ func (t *ListTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 		}
 	}
 
+	// Combine default ignore patterns with user-specified ones
+	ignorePatterns := append([]string{}, defaultIgnorePatterns...)
+	ignorePatterns = append(ignorePatterns, params.Ignore...)
+
 	entries, err := os.ReadDir(listPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
@@ -79,6 +116,11 @@ func (t *ListTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 
 	var files []FileEntry
 	for _, entry := range entries {
+		// Check if entry should be ignored
+		if shouldIgnore(entry.Name(), entry.IsDir(), ignorePatterns) {
+			continue
+		}
+
 		info, _ := entry.Info()
 		size := int64(0)
 		if info != nil {
@@ -117,4 +159,33 @@ func (t *ListTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 
 func (t *ListTool) EinoTool() einotool.InvokableTool {
 	return &einoToolWrapper{tool: t}
+}
+
+// shouldIgnore checks if a file/directory should be ignored based on patterns.
+func shouldIgnore(name string, isDir bool, patterns []string) bool {
+	checkName := name
+	if isDir {
+		checkName = name + "/"
+	}
+
+	for _, pattern := range patterns {
+		// Handle directory patterns (ending with /)
+		if strings.HasSuffix(pattern, "/") {
+			if isDir && (name+"/" == pattern || name == strings.TrimSuffix(pattern, "/")) {
+				return true
+			}
+		} else {
+			// Handle file patterns
+			if matched, _ := filepath.Match(pattern, name); matched {
+				return true
+			}
+			// Also check with directory suffix
+			if isDir {
+				if matched, _ := filepath.Match(pattern, checkName); matched {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
