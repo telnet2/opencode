@@ -102,12 +102,11 @@ func (p *Processor) executeSingleTool(
 			toolPart.Metadata[k] = v
 		}
 
+		// Publish event (SDK compatible: uses MessagePartUpdated)
 		event.Publish(event.Event{
-			Type: event.PartUpdated,
-			Data: event.PartUpdatedData{
-				SessionID: state.message.SessionID,
-				MessageID: state.message.ID,
-				Part:      toolPart,
+			Type: event.MessagePartUpdated,
+			Data: event.MessagePartUpdatedData{
+				Part: toolPart,
 			},
 		})
 
@@ -147,13 +146,11 @@ func (p *Processor) executeSingleTool(
 	// Save updated part
 	p.savePart(ctx, state.message.ID, toolPart)
 
-	// Publish event
+	// Publish event (SDK compatible: uses MessagePartUpdated)
 	event.Publish(event.Event{
-		Type: event.PartUpdated,
-		Data: event.PartUpdatedData{
-			SessionID: state.message.SessionID,
-			MessageID: state.message.ID,
-			Part:      toolPart,
+		Type: event.MessagePartUpdated,
+		Data: event.MessagePartUpdatedData{
+			Part: toolPart,
 		},
 	})
 
@@ -176,12 +173,11 @@ func (p *Processor) failTool(
 
 	p.savePart(ctx, state.message.ID, toolPart)
 
+	// Publish event (SDK compatible: uses MessagePartUpdated)
 	event.Publish(event.Event{
-		Type: event.PartUpdated,
-		Data: event.PartUpdatedData{
-			SessionID: state.message.SessionID,
-			MessageID: state.message.ID,
-			Part:      toolPart,
+		Type: event.MessagePartUpdated,
+		Data: event.MessagePartUpdatedData{
+			Part: toolPart,
 		},
 	})
 

@@ -121,10 +121,10 @@ func (p *Processor) runLoop(
 	// Notify callback
 	callback(assistantMsg, nil)
 
-	// Publish event
+	// Publish event (SDK compatible: uses "info" field)
 	event.Publish(event.Event{
 		Type: event.MessageCreated,
-		Data: event.MessageCreatedData{Message: assistantMsg},
+		Data: event.MessageCreatedData{Info: assistantMsg},
 	})
 
 	// Get agent config
@@ -372,9 +372,10 @@ func (p *Processor) saveMessage(ctx context.Context, sessionID string, msg *type
 		return err
 	}
 
+	// Publish event (SDK compatible: uses "info" field)
 	event.Publish(event.Event{
 		Type: event.MessageUpdated,
-		Data: event.MessageUpdatedData{Message: msg},
+		Data: event.MessageUpdatedData{Info: msg},
 	})
 
 	return nil

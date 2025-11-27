@@ -141,7 +141,7 @@ func TestEventBelongsToSession(t *testing.T) {
 			event: event.Event{
 				Type: event.MessageCreated,
 				Data: event.MessageCreatedData{
-					Message: &types.Message{
+					Info: &types.Message{
 						ID:        "msg-1",
 						SessionID: "session-123",
 					},
@@ -155,7 +155,7 @@ func TestEventBelongsToSession(t *testing.T) {
 			event: event.Event{
 				Type: event.MessageCreated,
 				Data: event.MessageCreatedData{
-					Message: &types.Message{
+					Info: &types.Message{
 						ID:        "msg-1",
 						SessionID: "session-456",
 					},
@@ -165,24 +165,26 @@ func TestEventBelongsToSession(t *testing.T) {
 			expected:  false,
 		},
 		{
-			name: "FileEdited matches",
+			name: "FileEdited matches (session-agnostic)",
 			event: event.Event{
 				Type: event.FileEdited,
 				Data: event.FileEditedData{
-					File:      "/path/to/file.go",
-					SessionID: "session-123",
+					File: "/path/to/file.go",
 				},
 			},
 			sessionID: "session-123",
-			expected:  true,
+			expected:  true, // FileEdited is now session-agnostic in SDK format
 		},
 		{
-			name: "PartUpdated matches",
+			name: "MessagePartUpdated matches",
 			event: event.Event{
-				Type: event.PartUpdated,
-				Data: event.PartUpdatedData{
-					SessionID: "session-123",
-					MessageID: "msg-1",
+				Type: event.MessagePartUpdated,
+				Data: event.MessagePartUpdatedData{
+					Part: &types.TextPart{
+						ID:        "part-1",
+						SessionID: "session-123",
+						MessageID: "msg-1",
+					},
 				},
 			},
 			sessionID: "session-123",
@@ -458,11 +460,11 @@ func TestSessionEvents_EventFiltering(t *testing.T) {
 	// Give connection time to establish
 	time.Sleep(50 * time.Millisecond)
 
-	// Publish event for matching session
+	// Publish event for matching session (SDK compatible: uses "info" field)
 	event.PublishSync(event.Event{
 		Type: event.MessageCreated,
 		Data: event.MessageCreatedData{
-			Message: &types.Message{
+			Info: &types.Message{
 				ID:        "msg-1",
 				SessionID: "session-123",
 			},
@@ -473,7 +475,7 @@ func TestSessionEvents_EventFiltering(t *testing.T) {
 	event.PublishSync(event.Event{
 		Type: event.MessageCreated,
 		Data: event.MessageCreatedData{
-			Message: &types.Message{
+			Info: &types.Message{
 				ID:        "msg-2",
 				SessionID: "session-456",
 			},

@@ -143,14 +143,12 @@ func (p *Processor) processMessageChunk(
 				(*currentTextPart).Text = *accumulatedContent
 			}
 
-			// Publish delta event
+			// Publish delta event (SDK compatible: uses MessagePartUpdated)
 			event.Publish(event.Event{
-				Type: event.PartUpdated,
-				Data: event.PartUpdatedData{
-					SessionID: state.message.SessionID,
-					MessageID: state.message.ID,
-					Part:      *currentTextPart,
-					Delta:     &delta,
+				Type: event.MessagePartUpdated,
+				Data: event.MessagePartUpdatedData{
+					Part:  *currentTextPart,
+					Delta: delta,
 				},
 			})
 
@@ -204,12 +202,11 @@ func (p *Processor) processMessageChunk(
 				toolPart.Input = input
 			}
 
+			// Publish tool part update (SDK compatible: uses MessagePartUpdated)
 			event.Publish(event.Event{
-				Type: event.PartUpdated,
-				Data: event.PartUpdatedData{
-					SessionID: state.message.SessionID,
-					MessageID: state.message.ID,
-					Part:      toolPart,
+				Type: event.MessagePartUpdated,
+				Data: event.MessagePartUpdatedData{
+					Part: toolPart,
 				},
 			})
 
