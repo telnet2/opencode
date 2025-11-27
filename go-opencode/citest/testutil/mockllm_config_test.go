@@ -137,3 +137,101 @@ func TestSaveMockLLMConfig(t *testing.T) {
 		t.Errorf("Response count mismatch: got %d, want %d", len(loaded.Responses), len(config.Responses))
 	}
 }
+
+func TestChunkSplitting(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    string
+		mode       string
+		size       int
+		maxChunks  int
+		wantCount  int
+		wantChunks []string
+	}{
+		{
+			name:       "word mode default",
+			content:    "Hello World",
+			mode:       "word",
+			wantCount:  2,
+			wantChunks: []string{"Hello ", "World"},
+		},
+		{
+			name:       "word mode with max chunks",
+			content:    "one two three four",
+			mode:       "word",
+			maxChunks:  2,
+			wantCount:  2,
+			wantChunks: []string{"one ", "two three four"},
+		},
+		{
+			name:       "char mode",
+			content:    "Hello World",
+			mode:       "char",
+			size:       5,
+			wantCount:  3,
+			wantChunks: []string{"Hello", " Worl", "d"},
+		},
+		{
+			name:       "char mode with max",
+			content:    "abcdefghij",
+			mode:       "char",
+			size:       2,
+			maxChunks:  3,
+			wantCount:  3,
+			wantChunks: []string{"ab", "cd", "efghij"},
+		},
+		{
+			name:      "fixed mode 3 chunks",
+			content:   "123456789",
+			mode:      "fixed",
+			maxChunks: 3,
+			wantCount: 3,
+		},
+		{
+			name:      "fixed mode 2 chunks",
+			content:   "Hello World!",
+			mode:      "fixed",
+			maxChunks: 2,
+			wantCount: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			config := DefaultMockLLMConfig()
+			config.Settings.ChunkMode = tc.mode
+			config.Settings.ChunkSize = tc.size
+			config.Settings.MaxChunks = tc.maxChunks
+
+			server := NewMockLLMServerWithConfig(config)
+			defer server.Close()
+
+			chunks := server.splitIntoChunks(tc.content)
+
+			if len(chunks) != tc.wantCount {
+				t.Errorf("chunk count: got %d, want %d", len(chunks), tc.wantCount)
+			}
+
+			if tc.wantChunks != nil {
+				for i, want := range tc.wantChunks {
+					if i >= len(chunks) {
+						t.Errorf("missing chunk %d: want %q", i, want)
+						continue
+					}
+					if chunks[i] != want {
+						t.Errorf("chunk[%d]: got %q, want %q", i, chunks[i], want)
+					}
+				}
+			}
+
+			// Verify all content is preserved
+			joined := ""
+			for _, c := range chunks {
+				joined += c
+			}
+			if joined != tc.content {
+				t.Errorf("content not preserved: got %q, want %q", joined, tc.content)
+			}
+		})
+	}
+}
