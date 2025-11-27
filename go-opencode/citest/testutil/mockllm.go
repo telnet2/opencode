@@ -432,14 +432,9 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 			flusher.Flush()
 		}
 	} else {
-		// Stream content word by word
-		words := strings.Fields(resp.content)
-		for i, word := range words {
-			content := word
-			if i < len(words)-1 {
-				content += " "
-			}
-
+		// Split content into chunks based on settings
+		chunks := m.splitIntoChunks(resp.content)
+		for _, chunkContent := range chunks {
 			chunk := map[string]interface{}{
 				"id":      "chatcmpl-mockllm-" + generateMockID(),
 				"object":  "chat.completion.chunk",
@@ -449,7 +444,7 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 					{
 						"index": 0,
 						"delta": map[string]interface{}{
-							"content": content,
+							"content": chunkContent,
 						},
 					},
 				},
@@ -486,6 +481,70 @@ func (m *MockLLMServer) writeStreamingResponse(w http.ResponseWriter, resp *mock
 	w.Write([]byte("data: " + string(data) + "\n\n"))
 	w.Write([]byte("data: [DONE]\n\n"))
 	flusher.Flush()
+}
+
+// splitIntoChunks splits content based on the configured chunk mode.
+func (m *MockLLMServer) splitIntoChunks(content string) []string {
+	mode := m.config.Settings.ChunkMode
+	size := m.config.Settings.ChunkSize
+	maxChunks := m.config.Settings.MaxChunks
+
+	var chunks []string
+
+	switch mode {
+	case "char":
+		// Split by character count
+		if size <= 0 {
+			size = 1
+		}
+		for i := 0; i < len(content); i += size {
+			end := i + size
+			if end > len(content) {
+				end = len(content)
+			}
+			chunks = append(chunks, content[i:end])
+		}
+
+	case "fixed":
+		// Fixed number of chunks (use maxChunks as the target count)
+		numChunks := maxChunks
+		if numChunks <= 0 {
+			numChunks = 1
+		}
+		chunkLen := (len(content) + numChunks - 1) / numChunks
+		if chunkLen < 1 {
+			chunkLen = 1
+		}
+		for i := 0; i < len(content); i += chunkLen {
+			end := i + chunkLen
+			if end > len(content) {
+				end = len(content)
+			}
+			chunks = append(chunks, content[i:end])
+		}
+		// For fixed mode, maxChunks is the target, not a limit
+		return chunks
+
+	default: // "word" mode (default)
+		// Split by words
+		words := strings.Fields(content)
+		for i, word := range words {
+			chunk := word
+			if i < len(words)-1 {
+				chunk += " "
+			}
+			chunks = append(chunks, chunk)
+		}
+	}
+
+	// Apply maxChunks limit (except for "fixed" mode which returns early)
+	if maxChunks > 0 && len(chunks) > maxChunks {
+		// Combine excess chunks into the last one
+		combined := strings.Join(chunks[maxChunks-1:], "")
+		chunks = append(chunks[:maxChunks-1], combined)
+	}
+
+	return chunks
 }
 
 // generateMockID generates a simple mock ID.
