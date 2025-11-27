@@ -35,6 +35,7 @@ require (
 	github.com/sst/opencode-sdk-go v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/jsonc v0.3.2
+	gopkg.in/yaml.v3 v3.0.1
 	mvdan.cc/sh/v3 v3.12.0
 )
 
@@ -114,7 +115,8 @@ require (
 	golang.org/x/tools v0.36.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/sst/opencode-sdk-go => ../packages/sdk/go
+
+replace github.com/cloudwego/eino-ext/components/model/claude => /Users/joohwi.lee/repos/cloudwego/eino-ext/components/model/claude

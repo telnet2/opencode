@@ -140,47 +140,105 @@ func modelPriority(modelID string) int {
 	}
 }
 
+// Npm package to provider type mapping
+const (
+	NpmOpenAI           = "@ai-sdk/openai"
+	NpmOpenAICompatible = "@ai-sdk/openai-compatible"
+	NpmAnthropic        = "@ai-sdk/anthropic"
+)
+
 // InitializeProviders creates and registers all providers from config.
 func InitializeProviders(ctx context.Context, config *types.Config) (*Registry, error) {
 	registry := NewRegistry(config)
 
-	// Initialize Anthropic if API key is available
-	if cfg, ok := config.Provider["anthropic"]; ok && cfg.APIKey != "" {
-		provider, err := NewAnthropicProvider(ctx, &AnthropicConfig{
-			APIKey:    cfg.APIKey,
-			BaseURL:   cfg.BaseURL,
-			MaxTokens: 8192,
-		})
-		if err == nil {
-			registry.Register(provider)
+	// Iterate through all configured providers
+	for name, cfg := range config.Provider {
+		if cfg.Disable {
+			continue
 		}
-	}
 
-	// Initialize OpenAI if API key is available
-	if cfg, ok := config.Provider["openai"]; ok && cfg.APIKey != "" {
-		provider, err := NewOpenAIProvider(ctx, &OpenAIConfig{
-			APIKey:    cfg.APIKey,
-			BaseURL:   cfg.BaseURL,
-			Model:     cfg.Model,
-			MaxTokens: 4096,
-		})
-		if err == nil {
-			registry.Register(provider)
+		apiKey, baseURL := getProviderCredentials(cfg)
+
+		// Determine provider type from npm field or provider name
+		npm := cfg.Npm
+		if npm == "" {
+			// Fall back to provider name for backward compatibility
+			npm = inferNpmFromProviderName(name)
 		}
-	}
 
-	// Initialize ARK if API key is available
-	if cfg, ok := config.Provider["ark"]; ok && cfg.APIKey != "" {
-		provider, err := NewArkProvider(ctx, &ArkConfig{
-			APIKey:    cfg.APIKey,
-			BaseURL:   cfg.BaseURL,
-			Model:     cfg.Model,
-			MaxTokens: 4096,
-		})
-		if err == nil {
+		var provider Provider
+		var err error
+
+		switch npm {
+		case NpmAnthropic:
+			if apiKey != "" {
+				provider, err = NewAnthropicProvider(ctx, &AnthropicConfig{
+					ID:        name,
+					APIKey:    apiKey,
+					BaseURL:   baseURL,
+					Model:     cfg.Model,
+					MaxTokens: 8192,
+				})
+			}
+
+		case NpmOpenAI, NpmOpenAICompatible:
+			// OpenAI and OpenAI-compatible use the same provider with different baseURL
+			if apiKey != "" || baseURL != "" {
+				// OpenAI-compatible may not require API key for local models
+				provider, err = NewOpenAIProvider(ctx, &OpenAIConfig{
+					ID:        name,
+					APIKey:    apiKey,
+					BaseURL:   baseURL,
+					Model:     cfg.Model,
+					MaxTokens: 4096,
+				})
+			}
+
+		default:
+			// Try to infer from well-known provider names
+			switch name {
+			case "ark":
+				if apiKey != "" {
+					provider, err = NewArkProvider(ctx, &ArkConfig{
+						APIKey:    apiKey,
+						BaseURL:   baseURL,
+						Model:     cfg.Model,
+						MaxTokens: 4096,
+					})
+				}
+			}
+		}
+
+		if err != nil {
+			// Log error but continue with other providers
+			continue
+		}
+		if provider != nil {
 			registry.Register(provider)
 		}
 	}
 
 	return registry, nil
+}
+
+// inferNpmFromProviderName maps well-known provider names to npm packages.
+func inferNpmFromProviderName(name string) string {
+	switch name {
+	case "anthropic", "claude":
+		return NpmAnthropic
+	case "openai":
+		return NpmOpenAI
+	default:
+		return ""
+	}
+}
+
+// getProviderCredentials extracts API key and base URL from provider config.
+// Uses TypeScript-style nested options only.
+func getProviderCredentials(cfg types.ProviderConfig) (apiKey, baseURL string) {
+	if cfg.Options != nil {
+		apiKey = cfg.Options.APIKey
+		baseURL = cfg.Options.BaseURL
+	}
+	return apiKey, baseURL
 }

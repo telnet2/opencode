@@ -57,8 +57,8 @@ type ToolPart struct {
 	SessionID  string         `json:"sessionID"` // SDK compatible
 	MessageID  string         `json:"messageID"` // SDK compatible
 	Type       string         `json:"type"`      // always "tool"
-	ToolCallID string         `json:"toolCallID"`
-	ToolName   string         `json:"toolName"`
+	ToolCallID string         `json:"callID"`   // SDK compatible: TypeScript uses callID
+	ToolName   string         `json:"tool"`     // SDK compatible: TypeScript uses tool
 	Input      map[string]any `json:"input"`
 	State      string         `json:"state"` // "pending" | "running" | "completed" | "error"
 	Output     *string        `json:"output,omitempty"`
