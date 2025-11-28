@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/mcp"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/session"
@@ -17,7 +18,6 @@ import (
 )
 
 var (
-	runModel        string
 	runAgent        string
 	runContinue     bool
 	runSession      string
@@ -37,14 +37,13 @@ var runCmd = &cobra.Command{
 
 Examples:
   opencode run "Fix the bug in main.go"
-  opencode run --model anthropic/claude-sonnet-4 "Explain this code"
+  opencode -m anthropic/claude-sonnet-4 run "Explain this code"
   opencode run --continue  # Continue last session
   opencode run --file main.go "Review this file"`,
 	RunE: runInteractive,
 }
 
 func init() {
-	runCmd.Flags().StringVarP(&runModel, "model", "m", "", "Model to use (provider/model format)")
 	runCmd.Flags().StringVar(&runAgent, "agent", "", "Agent to use")
 	runCmd.Flags().BoolVarP(&runContinue, "continue", "c", false, "Continue the last session")
 	runCmd.Flags().StringVarP(&runSession, "session", "s", "", "Session ID to continue")
@@ -76,9 +75,9 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Override model if specified
-	if runModel != "" {
-		appConfig.Model = runModel
+	// Override model if specified via global flag
+	if model := GetGlobalModel(); model != "" {
+		appConfig.Model = model
 	}
 
 	// Build message from args
@@ -99,6 +98,34 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 
 	// Initialize tool registry
 	toolReg := tool.DefaultRegistry(workDir)
+
+	// Initialize MCP client and servers from config
+	var mcpClient *mcp.Client
+	if appConfig.MCP != nil && len(appConfig.MCP) > 0 {
+		mcpClient = mcp.NewClient()
+		for name, cfg := range appConfig.MCP {
+			enabled := cfg.Enabled == nil || *cfg.Enabled
+			mcpCfg := &mcp.Config{
+				Enabled:     enabled,
+				Type:        mcp.TransportType(cfg.Type),
+				URL:         cfg.URL,
+				Headers:     cfg.Headers,
+				Command:     cfg.Command,
+				Environment: cfg.Environment,
+				Timeout:     cfg.Timeout,
+			}
+			if err := mcpClient.AddServer(ctx, name, mcpCfg); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: MCP server %s failed: %v\n", name, err)
+				continue
+			}
+		}
+		// Register MCP tools into the tool registry
+		mcp.RegisterMCPTools(mcpClient, toolReg)
+	}
+	// Ensure MCP client is closed on exit
+	if mcpClient != nil {
+		defer mcpClient.Close()
+	}
 
 	// Initialize permission checker
 	permChecker := permission.NewChecker()
