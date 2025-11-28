@@ -1,31 +1,35 @@
-# OpenCode Server Makefile
+# OpenCode Makefile
 
 .PHONY: build run test clean fmt lint deps
 
 # Build variables
 VERSION ?= 0.1.0
 BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
-LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
+LDFLAGS := -ldflags "-X github.com/opencode-ai/opencode/cmd/opencode/commands.Version=$(VERSION) -X github.com/opencode-ai/opencode/cmd/opencode/commands.BuildTime=$(BUILD_TIME)"
 
 # Binary output
 BIN_DIR := bin
-BINARY := $(BIN_DIR)/opencode-server
+BINARY := $(BIN_DIR)/opencode
 
 # Default target
 all: build
 
-# Build the server
+# Build the CLI
 build:
 	@mkdir -p $(BIN_DIR)
-	go build $(LDFLAGS) -o $(BINARY) ./cmd/opencode-server
+	go build $(LDFLAGS) -o $(BINARY) ./cmd/opencode
+
+# Run interactive session
+run: build
+	$(BINARY) run
 
 # Run the server
-run: build
-	$(BINARY) --port 8080
+serve: build
+	$(BINARY) serve --port 8080
 
 # Run with a specific directory
 run-dir: build
-	$(BINARY) --port 8080 --directory $(DIR)
+	$(BINARY) run --directory $(DIR)
 
 # Run tests
 test:
@@ -68,13 +72,18 @@ mocks:
 version:
 	@echo $(VERSION)
 
+# Show merged configuration
+show-config: build
+	$(BINARY) --show-config
+
 # Help
 help:
-	@echo "OpenCode Server Makefile"
+	@echo "OpenCode Makefile"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make build        - Build the server binary"
-	@echo "  make run          - Build and run the server"
+	@echo "  make build        - Build the opencode binary"
+	@echo "  make run          - Build and run interactive session"
+	@echo "  make serve        - Build and run the server"
 	@echo "  make test         - Run tests"
 	@echo "  make test-coverage- Run tests with coverage report"
 	@echo "  make fmt          - Format code"
@@ -82,4 +91,5 @@ help:
 	@echo "  make deps         - Install/update dependencies"
 	@echo "  make clean        - Clean build artifacts"
 	@echo "  make dev          - Run in development mode with hot reload"
+	@echo "  make show-config  - Show merged configuration"
 	@echo "  make help         - Show this help"

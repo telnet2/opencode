@@ -88,14 +88,18 @@ func (c *Client) connectServer(ctx context.Context, name string, config *Config)
 		timeout = 5 * time.Second
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
 	var transport sdkmcp.Transport
+	var connectCtx context.Context
+	var connectCancel context.CancelFunc
 
 	switch config.Type {
 	case TransportTypeRemote:
-		// Use SSE transport for remote HTTP servers
+		// For SSE transport, use a long-lived context (background) because
+		// the SSE connection stays open for the lifetime of the session.
+		// The HTTP client timeout handles the initial connection timeout.
+		connectCtx = context.Background()
+		connectCancel = func() {} // no-op
+
 		httpClient := &http.Client{Timeout: timeout}
 		transport = &sdkmcp.SSEClientTransport{
 			Endpoint:   config.URL,
@@ -106,6 +110,9 @@ func (c *Client) connectServer(ctx context.Context, name string, config *Config)
 		if len(config.Command) == 0 {
 			return nil, fmt.Errorf("empty command")
 		}
+
+		// For stdio transport, we can use a timeout context for the initial connection
+		connectCtx, connectCancel = context.WithTimeout(ctx, timeout)
 
 		cmd := exec.Command(config.Command[0], config.Command[1:]...)
 
@@ -128,8 +135,9 @@ func (c *Client) connectServer(ctx context.Context, name string, config *Config)
 	}
 
 	// Connect using the SDK client
-	session, err := c.sdkClient.Connect(ctx, transport, nil)
+	session, err := c.sdkClient.Connect(connectCtx, transport, nil)
 	if err != nil {
+		connectCancel()
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
@@ -144,11 +152,17 @@ func (c *Client) connectServer(ctx context.Context, name string, config *Config)
 		}
 	}
 
-	// List tools
-	if err := server.listTools(ctx); err != nil {
+	// List tools - use a separate context for this operation
+	listCtx, listCancel := context.WithTimeout(context.Background(), timeout)
+	defer listCancel()
+	if err := server.listTools(listCtx); err != nil {
 		// Non-fatal, tools might not be supported
 		server.tools = []Tool{}
 	}
+
+	// For stdio transport, cancel the connect context now that setup is complete
+	// For SSE, connectCancel is a no-op since we use background context
+	connectCancel()
 
 	server.status = StatusConnected
 	return server, nil
