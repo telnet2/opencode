@@ -29,6 +29,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.50
 	github.com/joho/godotenv v1.5.1
+	github.com/mark3labs/mcp-go v0.43.1
 	github.com/modelcontextprotocol/go-sdk v1.1.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.1
@@ -75,6 +76,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
@@ -92,6 +94,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
+	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

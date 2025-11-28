@@ -11,6 +11,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
+	"github.com/opencode-ai/opencode/internal/mcp"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/server"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -66,6 +67,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Override model if specified via global flag
+	if model := GetGlobalModel(); model != "" {
+		appConfig.Model = model
+	}
+
 	// Initialize storage
 	store := storage.New(paths.StoragePath())
 
@@ -87,6 +93,19 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Create server
 	srv := server.New(serverConfig, appConfig, store, providerReg, toolReg)
 
+	// Initialize MCP servers from config
+	if err := srv.InitializeMCP(ctx); err != nil {
+		logging.Warn().Err(err).Msg("Failed to initialize some MCP servers")
+	}
+
+	// Register MCP tools in tool registry for session processor
+	if srv.MCPClient() != nil && srv.ToolRegistry() != nil {
+		mcp.RegisterMCPTools(srv.MCPClient(), srv.ToolRegistry())
+		logging.Info().
+			Int("mcpToolCount", len(srv.MCPClient().Tools())).
+			Msg("Registered MCP tools in tool registry")
+	}
+
 	// Start server in goroutine
 	go func() {
 		logging.Info().
@@ -105,6 +124,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	<-quit
 
 	logging.Info().Msg("Shutting down server...")
+
+	// Close MCP servers
+	if err := srv.CloseMCP(); err != nil {
+		logging.Warn().Err(err).Msg("Error closing MCP servers")
+	}
 
 	// Graceful shutdown with timeout
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

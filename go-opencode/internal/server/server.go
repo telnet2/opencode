@@ -218,6 +218,16 @@ func (s *Server) Router() *chi.Mux {
 	return s.router
 }
 
+// MCPClient returns the MCP client for tool registration.
+func (s *Server) MCPClient() *mcp.Client {
+	return s.mcpClient
+}
+
+// ToolRegistry returns the tool registry.
+func (s *Server) ToolRegistry() *tool.Registry {
+	return s.toolReg
+}
+
 // Context keys
 type contextKey string
 
