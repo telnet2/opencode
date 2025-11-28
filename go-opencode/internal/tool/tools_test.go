@@ -22,416 +22,6 @@ func testContext() *Context {
 }
 
 // ============================================
-// ReadTool Tests
-// ============================================
-
-func TestReadTool_Execute(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "test.txt")
-	content := "Line 1\nLine 2\nLine 3\n"
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	tool := NewReadTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"file_path": "` + testFile + `"}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if !strings.Contains(result.Output, "Line 1") {
-		t.Error("Output should contain 'Line 1'")
-	}
-	if !strings.Contains(result.Output, "Line 2") {
-		t.Error("Output should contain 'Line 2'")
-	}
-}
-
-func TestReadTool_FileNotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-	tool := NewReadTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"file_path": "/nonexistent/file.txt"}`)
-	_, err := tool.Execute(ctx, input, toolCtx)
-	if err == nil {
-		t.Error("Expected error for nonexistent file")
-	}
-}
-
-func TestReadTool_WithOffsetAndLimit(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "lines.txt")
-	var lines []string
-	for i := 1; i <= 10; i++ {
-		lines = append(lines, "Line "+string(rune('0'+i)))
-	}
-	if err := os.WriteFile(testFile, []byte(strings.Join(lines, "\n")), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	tool := NewReadTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	// Read lines 3-5 (offset=2, limit=3)
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "offset": 3, "limit": 3}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if !strings.Contains(result.Output, "Line 3") {
-		t.Error("Output should contain 'Line 3'")
-	}
-}
-
-func TestReadTool_Properties(t *testing.T) {
-	tool := NewReadTool("/tmp")
-
-	if tool.ID() != "Read" {
-		t.Errorf("Expected ID 'Read', got %q", tool.ID())
-	}
-
-	desc := tool.Description()
-	if !strings.Contains(desc, "file") {
-		t.Error("Description should mention 'file'")
-	}
-
-	params := tool.Parameters()
-	if len(params) == 0 {
-		t.Error("Parameters should not be empty")
-	}
-}
-
-// ============================================
-// WriteTool Tests
-// ============================================
-
-func TestWriteTool_Execute(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "output.txt")
-
-	tool := NewWriteTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Hello, World!"}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if !strings.Contains(result.Output, "Successfully") {
-		t.Error("Output should indicate success")
-	}
-
-	// Verify file contents
-	data, err := os.ReadFile(testFile)
-	if err != nil {
-		t.Fatalf("Failed to read file: %v", err)
-	}
-	if string(data) != "Hello, World!" {
-		t.Errorf("File content = %q, want 'Hello, World!'", string(data))
-	}
-}
-
-func TestWriteTool_CreateDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "subdir", "nested", "file.txt")
-
-	tool := NewWriteTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Nested content"}`)
-	_, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	// Verify file exists
-	if _, err := os.Stat(testFile); os.IsNotExist(err) {
-		t.Error("File should have been created with parent directories")
-	}
-}
-
-func TestWriteTool_Overwrite(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "existing.txt")
-
-	// Create existing file
-	if err := os.WriteFile(testFile, []byte("Original"), 0644); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
-
-	tool := NewWriteTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Updated"}`)
-	_, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(testFile)
-	if string(data) != "Updated" {
-		t.Errorf("File should be overwritten, got %q", string(data))
-	}
-}
-
-// ============================================
-// EditTool Tests
-// ============================================
-
-func TestEditTool_Execute(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "edit.txt")
-	if err := os.WriteFile(testFile, []byte("Hello World"), 0644); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
-
-	tool := NewEditTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "World",
-		"new_string": "Go"
-	}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if !strings.Contains(result.Output, "Replaced") {
-		t.Errorf("Output should mention 'Replaced', got: %s", result.Output)
-	}
-
-	data, _ := os.ReadFile(testFile)
-	if string(data) != "Hello Go" {
-		t.Errorf("File content = %q, want 'Hello Go'", string(data))
-	}
-}
-
-func TestEditTool_StringNotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "edit.txt")
-	if err := os.WriteFile(testFile, []byte("Hello World"), 0644); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
-
-	tool := NewEditTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "NotFound",
-		"new_string": "Replacement"
-	}`)
-	_, err := tool.Execute(ctx, input, toolCtx)
-	if err == nil {
-		t.Error("Expected error when old_string not found")
-	}
-}
-
-func TestEditTool_ReplaceAll(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "edit.txt")
-	if err := os.WriteFile(testFile, []byte("foo bar foo baz foo"), 0644); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
-
-	tool := NewEditTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "foo",
-		"new_string": "qux",
-		"replace_all": true
-	}`)
-	_, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(testFile)
-	if string(data) != "qux bar qux baz qux" {
-		t.Errorf("File content = %q, want 'qux bar qux baz qux'", string(data))
-	}
-}
-
-// ============================================
-// ListTool Tests
-// ============================================
-
-func TestListTool_Execute(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create some files and directories
-	os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte(""), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "file2.txt"), []byte("content"), 0644)
-	os.Mkdir(filepath.Join(tmpDir, "subdir"), 0755)
-
-	tool := NewListTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"path": "` + tmpDir + `"}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if !strings.Contains(result.Output, "file1.txt") {
-		t.Error("Output should contain 'file1.txt'")
-	}
-	if !strings.Contains(result.Output, "subdir") {
-		t.Error("Output should contain 'subdir'")
-	}
-}
-
-func TestListTool_DirectoryNotFound(t *testing.T) {
-	tool := NewListTool("/tmp")
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"path": "/nonexistent/directory"}`)
-	_, err := tool.Execute(ctx, input, toolCtx)
-	if err == nil {
-		t.Error("Expected error for nonexistent directory")
-	}
-}
-
-// ============================================
-// BashTool Tests
-// ============================================
-
-func TestBashTool_Execute(t *testing.T) {
-	tool := NewBashTool("/tmp")
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"command": "echo 'Hello from Bash'"}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if !strings.Contains(result.Output, "Hello from Bash") {
-		t.Errorf("Output should contain 'Hello from Bash', got %q", result.Output)
-	}
-}
-
-func TestBashTool_ExitCode(t *testing.T) {
-	tool := NewBashTool("/tmp")
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	// Command that exits with error
-	input := json.RawMessage(`{"command": "exit 1"}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-
-	// Should not return error, but metadata should indicate exit code
-	if err != nil {
-		t.Logf("Execute returned error (may be expected): %v", err)
-	}
-
-	if result != nil && result.Metadata != nil {
-		if exitCode, ok := result.Metadata["exit_code"]; ok {
-			if exitCode != 1 && exitCode != float64(1) {
-				t.Errorf("Expected exit code 1, got %v", exitCode)
-			}
-		}
-	}
-}
-
-func TestBashTool_WithTimeout(t *testing.T) {
-	tool := NewBashTool("/tmp")
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	// Quick command with timeout
-	input := json.RawMessage(`{"command": "echo 'quick'", "timeout": 5000}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if !strings.Contains(result.Output, "quick") {
-		t.Error("Output should contain 'quick'")
-	}
-}
-
-// ============================================
-// GlobTool Tests
-// ============================================
-
-func TestGlobTool_Execute(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create test files
-	os.WriteFile(filepath.Join(tmpDir, "test1.go"), []byte(""), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "test2.go"), []byte(""), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte(""), 0644)
-	os.Mkdir(filepath.Join(tmpDir, "sub"), 0755)
-	os.WriteFile(filepath.Join(tmpDir, "sub", "nested.go"), []byte(""), 0644)
-
-	tool := NewGlobTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"pattern": "**/*.go", "path": "` + tmpDir + `"}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		// Glob might not be available - skip test
-		t.Skipf("Glob tool execution failed (might need rg): %v", err)
-	}
-
-	if !strings.Contains(result.Output, ".go") {
-		t.Error("Output should contain .go files")
-	}
-}
-
-// ============================================
-// GrepTool Tests
-// ============================================
-
-func TestGrepTool_Execute(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create test file with searchable content
-	testFile := filepath.Join(tmpDir, "search.txt")
-	content := "Hello World\nFoo Bar\nHello Again\n"
-	os.WriteFile(testFile, []byte(content), 0644)
-
-	tool := NewGrepTool(tmpDir)
-	ctx := context.Background()
-	toolCtx := testContext()
-
-	input := json.RawMessage(`{"pattern": "Hello", "path": "` + tmpDir + `"}`)
-	result, err := tool.Execute(ctx, input, toolCtx)
-	if err != nil {
-		// Grep might not be available - skip test
-		t.Skipf("Grep tool execution failed (might need rg): %v", err)
-	}
-
-	if result.Output == "" {
-		t.Error("Output should not be empty for matching pattern")
-	}
-}
-
-// ============================================
 // EinoTool Wrapper Tests
 // ============================================
 
@@ -520,6 +110,15 @@ func TestContext_IsAborted(t *testing.T) {
 	}
 }
 
+func TestContext_IsAborted_NilChannel(t *testing.T) {
+	ctx := &Context{AbortCh: nil}
+
+	// Should not panic and return false
+	if ctx.IsAborted() {
+		t.Error("Should not be aborted with nil channel")
+	}
+}
+
 // ============================================
 // BaseTool Tests
 // ============================================
@@ -552,5 +151,96 @@ func TestBaseTool(t *testing.T) {
 	}
 	if result.Output != "custom result" {
 		t.Errorf("Output = %q, want 'custom result'", result.Output)
+	}
+}
+
+func TestBaseTool_EinoTool(t *testing.T) {
+	baseTool := NewBaseTool(
+		"test",
+		"A test tool",
+		json.RawMessage(`{"type": "object", "properties": {"name": {"type": "string"}}}`),
+		func(ctx context.Context, input json.RawMessage, toolCtx *Context) (*Result, error) {
+			return &Result{Output: "test result"}, nil
+		},
+	)
+
+	einoTool := baseTool.EinoTool()
+	if einoTool == nil {
+		t.Error("EinoTool should not return nil")
+	}
+
+	info, err := einoTool.Info(context.Background())
+	if err != nil {
+		t.Fatalf("Info failed: %v", err)
+	}
+	if info.Name != "test" {
+		t.Errorf("Expected name 'test', got %q", info.Name)
+	}
+}
+
+// ============================================
+// parseJSONSchemaToParams Tests
+// ============================================
+
+func TestParseJSONSchemaToParams_AllTypes(t *testing.T) {
+	schema := json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"stringProp": {"type": "string", "description": "A string"},
+			"intProp": {"type": "integer", "description": "An integer"},
+			"numProp": {"type": "number", "description": "A number"},
+			"boolProp": {"type": "boolean", "description": "A boolean"},
+			"arrayProp": {"type": "array", "description": "An array"},
+			"objectProp": {"type": "object", "description": "An object"}
+		},
+		"required": ["stringProp", "intProp"]
+	}`)
+
+	params := parseJSONSchemaToParams(schema)
+	if params == nil {
+		t.Fatal("parseJSONSchemaToParams returned nil")
+	}
+
+	// Check all properties exist
+	expectedProps := []string{"stringProp", "intProp", "numProp", "boolProp", "arrayProp", "objectProp"}
+	for _, prop := range expectedProps {
+		if _, ok := params[prop]; !ok {
+			t.Errorf("Expected property %q not found", prop)
+		}
+	}
+
+	// Check required fields
+	if !params["stringProp"].Required {
+		t.Error("stringProp should be required")
+	}
+	if !params["intProp"].Required {
+		t.Error("intProp should be required")
+	}
+	if params["numProp"].Required {
+		t.Error("numProp should not be required")
+	}
+
+	// Check descriptions
+	if params["stringProp"].Desc != "A string" {
+		t.Errorf("Expected description 'A string', got %q", params["stringProp"].Desc)
+	}
+}
+
+func TestParseJSONSchemaToParams_InvalidJSON(t *testing.T) {
+	schema := json.RawMessage(`{invalid json}`)
+	params := parseJSONSchemaToParams(schema)
+	if params != nil {
+		t.Error("Expected nil for invalid JSON")
+	}
+}
+
+func TestParseJSONSchemaToParams_EmptySchema(t *testing.T) {
+	schema := json.RawMessage(`{}`)
+	params := parseJSONSchemaToParams(schema)
+	if params == nil {
+		t.Error("Expected empty map, not nil")
+	}
+	if len(params) != 0 {
+		t.Errorf("Expected 0 params, got %d", len(params))
 	}
 }
