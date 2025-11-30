@@ -4,6 +4,7 @@ import { Config } from "../config/config"
 import { mergeDeep, sortBy } from "remeda"
 import { NoSuchModelError, type LanguageModel, type Provider as SDK } from "ai"
 import { Log } from "../util/log"
+import { Traffic } from "../util/traffic"
 import { BunProc } from "../bun"
 import { Plugin } from "../plugin"
 import { ModelsDev } from "./models"
@@ -549,8 +550,8 @@ export namespace Provider {
 
       const customFetch = options["fetch"]
 
-      options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
-        // Preserve custom fetch if it exists, wrap it with timeout logic
+      // Create base fetch with timeout handling
+      const baseFetchWithTimeout = async (input: any, init?: BunFetchRequestInit) => {
         const fetchFn = customFetch ?? fetch
         const opts = init ?? {}
 
@@ -570,6 +571,9 @@ export namespace Provider {
           timeout: false,
         })
       }
+
+      // Wrap with traffic logging if enabled
+      options["fetch"] = Traffic.createLoggingFetch("provider", baseFetchWithTimeout)
 
       // Special case: google-vertex-anthropic uses a subpath import
       const bundledKey = provider.id === "google-vertex-anthropic" ? "@ai-sdk/google-vertex/anthropic" : pkg

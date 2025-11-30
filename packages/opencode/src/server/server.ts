@@ -1,4 +1,5 @@
 import { Log } from "../util/log"
+import { Traffic } from "../util/traffic"
 import { Bus } from "../bus"
 import { describeRoute, generateSpecs, validator, resolver, openAPIRouteHandler } from "hono-openapi"
 import { Hono } from "hono"
@@ -105,6 +106,57 @@ export namespace Server {
         const message = err instanceof Error && err.stack ? err.stack : err.toString()
         return c.json(new NamedError.Unknown({ message }).toObject(), {
           status: 500,
+        })
+      })
+      // Client traffic logging middleware
+      .use(async (c, next) => {
+        if (!Traffic.isEnabled()) {
+          return next()
+        }
+
+        const requestId = Traffic.generateRequestId()
+        const startTime = Date.now()
+        const method = c.req.method
+        const url = c.req.url
+        const path = c.req.path
+
+        // Skip logging for certain paths to avoid noise
+        const skipPaths = ["/log", "/event", "/global/event", "/client-tools/pending"]
+        if (skipPaths.some((skip) => path.startsWith(skip))) {
+          return next()
+        }
+
+        // Log request
+        let requestBody: string | undefined
+        try {
+          // Clone the request to read body without consuming it
+          const contentType = c.req.header("content-type") ?? ""
+          if (contentType.includes("application/json") || contentType.includes("text/")) {
+            requestBody = await c.req.text()
+            // Recreate the request with the body for downstream handlers
+            // Note: Hono caches the body, so we can read it again
+          }
+        } catch {
+          // Ignore body read errors
+        }
+
+        await Traffic.logRequest("client", requestId, {
+          method,
+          url,
+          headers: c.req.raw.headers,
+          body: requestBody,
+        })
+
+        await next()
+
+        const duration = Date.now() - startTime
+
+        // Log response
+        await Traffic.logResponse("client", requestId, {
+          status: c.res.status,
+          statusText: c.res.statusText,
+          headers: c.res.headers,
+          duration,
         })
       })
       .use(async (c, next) => {

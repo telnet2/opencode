@@ -16,6 +16,7 @@ export namespace Global {
     data,
     bin: path.join(data, "bin"),
     log: path.join(data, "log"),
+    traffic: path.join(data, "traffic"),
     cache,
     config,
     state,
@@ -27,6 +28,7 @@ await Promise.all([
   fs.mkdir(Global.Path.config, { recursive: true }),
   fs.mkdir(Global.Path.state, { recursive: true }),
   fs.mkdir(Global.Path.log, { recursive: true }),
+  fs.mkdir(Global.Path.traffic, { recursive: true }),
   fs.mkdir(Global.Path.bin, { recursive: true }),
 ])
 
