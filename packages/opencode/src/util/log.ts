@@ -20,6 +20,18 @@ export namespace Log {
     return levelPriority[input] >= levelPriority[level]
   }
 
+  // Store original console methods for internal use
+  const originalConsole = {
+    log: console.log.bind(console),
+    info: console.info.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console),
+    debug: console.debug.bind(console),
+  }
+
+  // Export original console for cases where we need raw console output
+  export const raw = originalConsole
+
   export type Logger = {
     debug(message?: any, extra?: Record<string, any>): void
     info(message?: any, extra?: Record<string, any>): void
@@ -52,6 +64,62 @@ export namespace Log {
   }
   let write = (msg: any) => Bun.stderr.write(msg)
 
+  // Track whether console interception is active
+  let consoleIntercepted = false
+
+  // Format console arguments into a string
+  function formatConsoleArgs(args: any[]): string {
+    return args
+      .map((arg) => {
+        if (arg === undefined) return "undefined"
+        if (arg === null) return "null"
+        if (arg instanceof Error) return `${arg.name}: ${arg.message}${arg.stack ? "\n" + arg.stack : ""}`
+        if (typeof arg === "object") {
+          try {
+            return JSON.stringify(arg)
+          } catch {
+            return String(arg)
+          }
+        }
+        return String(arg)
+      })
+      .join(" ")
+  }
+
+  // Intercept console methods to also write to log file
+  function interceptConsole() {
+    if (consoleIntercepted) return
+    consoleIntercepted = true
+
+    const createInterceptor = (originalMethod: (...args: any[]) => void, levelStr: string) => {
+      return (...args: any[]) => {
+        // Format and write to log file
+        const timestamp = new Date().toISOString().split(".")[0]
+        const formatted = formatConsoleArgs(args)
+        write(`${levelStr.padEnd(6)}${timestamp} CONSOLE ${formatted}\n`)
+        // Also call original method (for TUI console panel or print mode)
+        originalMethod(...args)
+      }
+    }
+
+    console.log = createInterceptor(originalConsole.log, "INFO")
+    console.info = createInterceptor(originalConsole.info, "INFO")
+    console.warn = createInterceptor(originalConsole.warn, "WARN")
+    console.error = createInterceptor(originalConsole.error, "ERROR")
+    console.debug = createInterceptor(originalConsole.debug, "DEBUG")
+  }
+
+  // Restore original console methods
+  export function restoreConsole() {
+    if (!consoleIntercepted) return
+    consoleIntercepted = false
+    console.log = originalConsole.log
+    console.info = originalConsole.info
+    console.warn = originalConsole.warn
+    console.error = originalConsole.error
+    console.debug = originalConsole.debug
+  }
+
   export async function init(options: Options) {
     if (options.level) level = options.level
     cleanup(Global.Path.log)
@@ -68,6 +136,9 @@ export namespace Log {
       writer.flush()
       return num
     }
+
+    // Intercept console methods to also write to log file
+    interceptConsole()
   }
 
   async function cleanup(dir: string) {
