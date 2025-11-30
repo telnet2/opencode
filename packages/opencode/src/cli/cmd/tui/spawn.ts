@@ -3,6 +3,7 @@ import { Instance } from "@/project/instance"
 import path from "path"
 import { Server } from "@/server/server"
 import { upgrade } from "@/cli/upgrade"
+import { Log } from "@/util/log"
 
 export const TuiSpawnCommand = cmd({
   command: "spawn [project]",
@@ -23,6 +24,9 @@ export const TuiSpawnCommand = cmd({
         default: "127.0.0.1",
       }),
   handler: async (args) => {
+    // Capture console.log/error/warn/debug to log file in TUI mode
+    Log.captureConsole()
+
     upgrade()
     const server = Server.listen({
       port: args.port,
