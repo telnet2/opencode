@@ -184,6 +184,13 @@ func (p *Processor) runLoop(
 			messages, _ = p.loadMessages(ctx, sessionID)
 		}
 
+		// Reload messages to include the current assistant message and tool results
+		messages, err = p.loadMessages(ctx, sessionID)
+		if err != nil {
+			return fmt.Errorf("failed to reload messages: %w", err)
+		}
+		fmt.Printf("[loop] Reloaded %d messages for step %d\n", len(messages), step)
+
 		// Build completion request
 		req, err := p.buildCompletionRequest(ctx, sessionID, messages, assistantMsg, agent, model)
 		if err != nil {
@@ -310,10 +317,13 @@ func (p *Processor) runLoop(
 
 		case "tool_use", "tool_calls":
 			// Execute tools and continue loop
+			fmt.Printf("[loop] Got tool_use/tool_calls, calling executeToolCalls with %d parts\n", len(state.parts))
 			if err := p.executeToolCalls(ctx, state, agent, callback); err != nil {
+				fmt.Printf("[loop] executeToolCalls returned error: %v\n", err)
 				// Tool execution errors don't stop the loop
 				// The error is captured in the tool part
 			}
+			fmt.Printf("[loop] executeToolCalls completed, step=%d\n", step)
 			step++
 			continue
 
@@ -430,16 +440,29 @@ func (p *Processor) buildCompletionRequest(
 		Content: systemPrompt.Build(),
 	})
 
+	fmt.Printf("[build] Processing %d messages for completion request\n", len(messages))
+
 	// Add conversation history
 	for _, msg := range messages {
+		fmt.Printf("[build] Message: role=%s, id=%s\n", msg.Role, msg.ID)
+
 		// Skip errored messages without content
 		if msg.Error != nil && !p.hasUsableContent(ctx, msg) {
+			fmt.Printf("[build] Skipping errored message without content\n")
 			continue
 		}
 
 		// Load parts for this message
 		parts, err := p.loadParts(ctx, msg.ID)
 		if err != nil {
+			fmt.Printf("[build] Failed to load parts for message %s: %v\n", msg.ID, err)
+			continue
+		}
+		fmt.Printf("[build] Loaded %d parts for message %s\n", len(parts), msg.ID)
+
+		// Skip messages with no parts (e.g., newly created empty assistant messages)
+		if len(parts) == 0 {
+			fmt.Printf("[build] Skipping message %s with no parts\n", msg.ID)
 			continue
 		}
 
@@ -450,6 +473,9 @@ func (p *Processor) buildCompletionRequest(
 		if msg.Role == "assistant" {
 			for _, part := range parts {
 				if toolPart, ok := part.(*types.ToolPart); ok {
+					fmt.Printf("[build] Found ToolPart: tool=%s, status=%s, callID=%s, output=%q\n",
+						toolPart.Tool, toolPart.State.Status, toolPart.CallID, truncateStr(toolPart.State.Output, 100))
+
 					// Only completed or errored tool parts should be added as results
 					if toolPart.State.Status == "completed" || toolPart.State.Status == "error" {
 						var toolContent string
@@ -458,6 +484,9 @@ func (p *Processor) buildCompletionRequest(
 						} else if toolPart.State.Error != "" {
 							toolContent = "Error: " + toolPart.State.Error
 						}
+
+						fmt.Printf("[build] Adding tool result message for callID=%s, content length=%d\n",
+							toolPart.CallID, len(toolContent))
 
 						toolMsg := &schema.Message{
 							Role:       schema.Tool,
