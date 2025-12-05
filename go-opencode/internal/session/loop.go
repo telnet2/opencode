@@ -97,13 +97,22 @@ func (p *Processor) runLoop(
 	}
 	// Load and log user message parts
 	userParts, _ := p.loadParts(ctx, lastMsg.ID)
+	var compactionPart *types.CompactionPart
 	for i, part := range userParts {
 		switch pt := part.(type) {
 		case *types.TextPart:
 			fmt.Printf("[loop] User message part %d: type=text content=%q\n", i, truncateStr(pt.Text, 50))
+		case *types.CompactionPart:
+			fmt.Printf("[loop] User message part %d: type=compaction auto=%v\n", i, pt.Auto)
+			compactionPart = pt
 		default:
 			fmt.Printf("[loop] User message part %d: type=%T\n", i, pt)
 		}
+	}
+
+	// If this is a compaction request, process it
+	if compactionPart != nil {
+		return p.processCompaction(ctx, sessionID, messages, compactionPart, callback)
 	}
 
 	// Get provider and model

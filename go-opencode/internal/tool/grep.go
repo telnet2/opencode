@@ -35,7 +35,7 @@ func NewGrepTool(workDir string) *GrepTool {
 	return &GrepTool{workDir: workDir}
 }
 
-func (t *GrepTool) ID() string          { return "Grep" }
+func (t *GrepTool) ID() string          { return "grep" }
 func (t *GrepTool) Description() string { return grepDescription }
 
 func (t *GrepTool) Parameters() json.RawMessage {

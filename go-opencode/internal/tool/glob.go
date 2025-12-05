@@ -34,7 +34,7 @@ func NewGlobTool(workDir string) *GlobTool {
 	return &GlobTool{workDir: workDir}
 }
 
-func (t *GlobTool) ID() string          { return "Glob" }
+func (t *GlobTool) ID() string          { return "glob" }
 func (t *GlobTool) Description() string { return globDescription }
 
 func (t *GlobTool) Parameters() json.RawMessage {

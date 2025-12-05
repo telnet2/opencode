@@ -251,3 +251,146 @@ func TestMessageError_JSON(t *testing.T) {
 		t.Errorf("Name mismatch: got %s, want UnknownError", decoded.Name)
 	}
 }
+
+func TestMessage_SummaryField_UserMessage(t *testing.T) {
+	// User message should have summary as an object
+	msg := Message{
+		ID:        "msg-user-1",
+		SessionID: "session-1",
+		Role:      "user",
+		Agent:     "main",
+		Summary: &UserMessageSummary{
+			Title: "Fixed a bug",
+			Body:  "Fixed the rendering issue",
+			Diffs: []FileDiff{{File: "main.go", Additions: 5, Deletions: 2}},
+		},
+		Time: MessageTime{Created: 1700000000000},
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	// Verify summary is an object
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal to map failed: %v", err)
+	}
+
+	summary, ok := raw["summary"].(map[string]any)
+	if !ok {
+		t.Fatalf("summary should be an object, got %T: %v", raw["summary"], raw["summary"])
+	}
+	if summary["title"] != "Fixed a bug" {
+		t.Errorf("summary.title mismatch: got %v", summary["title"])
+	}
+
+	// Round-trip test
+	var decoded Message
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if decoded.Summary == nil || decoded.Summary.Title != "Fixed a bug" {
+		t.Error("Summary not properly decoded")
+	}
+}
+
+func TestMessage_SummaryField_AssistantMessage(t *testing.T) {
+	// Assistant message should have summary as a boolean
+	msg := Message{
+		ID:         "msg-assistant-1",
+		SessionID:  "session-1",
+		Role:       "assistant",
+		ParentID:   "msg-user-1",
+		ModelID:    "claude-3-opus",
+		ProviderID: "anthropic",
+		IsSummary:  true, // This is a compaction summary message
+		Cost:       0.05,
+		Tokens: &TokenUsage{
+			Input:  1000,
+			Output: 500,
+			Cache:  CacheUsage{Read: 0, Write: 0},
+		},
+		Time: MessageTime{Created: 1700000000000},
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	// Verify summary is a boolean
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal to map failed: %v", err)
+	}
+
+	summary, ok := raw["summary"].(bool)
+	if !ok {
+		t.Fatalf("summary should be a boolean, got %T: %v", raw["summary"], raw["summary"])
+	}
+	if !summary {
+		t.Error("summary should be true")
+	}
+
+	// Round-trip test
+	var decoded Message
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if !decoded.IsSummary {
+		t.Error("IsSummary not properly decoded")
+	}
+}
+
+func TestMessage_SummaryField_OmittedWhenNotSet(t *testing.T) {
+	// Test that summary is omitted when not set
+	msg := Message{
+		ID:        "msg-user-1",
+		SessionID: "session-1",
+		Role:      "user",
+		Agent:     "main",
+		Time:      MessageTime{Created: 1700000000000},
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal to map failed: %v", err)
+	}
+
+	if _, ok := raw["summary"]; ok {
+		t.Error("summary should be omitted when not set")
+	}
+
+	// Same for assistant without IsSummary
+	msg2 := Message{
+		ID:         "msg-assistant-1",
+		SessionID:  "session-1",
+		Role:       "assistant",
+		ParentID:   "msg-user-1",
+		ModelID:    "claude-3-opus",
+		ProviderID: "anthropic",
+		IsSummary:  false,
+		Cost:       0.05,
+		Tokens: &TokenUsage{
+			Input:  1000,
+			Output: 500,
+			Cache:  CacheUsage{Read: 0, Write: 0},
+		},
+		Time: MessageTime{Created: 1700000000000},
+	}
+
+	data2, _ := json.Marshal(msg2)
+	var raw2 map[string]any
+	json.Unmarshal(data2, &raw2)
+
+	if _, ok := raw2["summary"]; ok {
+		t.Error("summary should be omitted when IsSummary is false")
+	}
+}

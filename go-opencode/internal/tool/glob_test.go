@@ -77,8 +77,8 @@ func TestGlobTool_NoMatches(t *testing.T) {
 func TestGlobTool_Properties(t *testing.T) {
 	tool := NewGlobTool("/tmp")
 
-	if tool.ID() != "Glob" {
-		t.Errorf("Expected ID 'Glob', got %q", tool.ID())
+	if tool.ID() != "glob" {
+		t.Errorf("Expected ID 'glob', got %q", tool.ID())
 	}
 
 	desc := tool.Description()

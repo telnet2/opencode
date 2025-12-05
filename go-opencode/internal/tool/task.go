@@ -80,7 +80,7 @@ func (t *TaskTool) SetExecutor(executor TaskExecutor) {
 	t.executor = executor
 }
 
-func (t *TaskTool) ID() string          { return "Task" }
+func (t *TaskTool) ID() string          { return "task" }
 func (t *TaskTool) Description() string { return taskDescription }
 
 func (t *TaskTool) Parameters() json.RawMessage {

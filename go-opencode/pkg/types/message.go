@@ -1,5 +1,7 @@
 package types
 
+import "encoding/json"
+
 // Message represents either a User or Assistant message in a conversation.
 type Message struct {
 	ID        string      `json:"id"`
@@ -12,7 +14,7 @@ type Message struct {
 	Model   *ModelRef           `json:"model,omitempty"`
 	System  *string             `json:"system,omitempty"`
 	Tools   map[string]bool     `json:"tools,omitempty"`
-	Summary *UserMessageSummary `json:"summary,omitempty"` // Summary with title and diffs
+	Summary *UserMessageSummary `json:"-"` // Summary with title and diffs (for user messages)
 
 	// Assistant-specific fields
 	ParentID   string        `json:"parentID,omitempty"`   // Links to the user message that prompted this
@@ -20,10 +22,65 @@ type Message struct {
 	ProviderID string        `json:"providerID,omitempty"`
 	Mode       string        `json:"mode,omitempty"`       // Agent name (e.g., "Coder", "Build")
 	Path       *MessagePath  `json:"path,omitempty"`       // Current working directory and root
+	IsSummary  bool          `json:"-"`                    // True if this is a summary/compaction message (for assistant messages)
 	Finish     *string       `json:"finish,omitempty"`
 	Cost       float64       `json:"cost"`                 // Required by TUI
 	Tokens     *TokenUsage   `json:"tokens,omitempty"`
 	Error      *MessageError `json:"error,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling to handle the summary field
+// differently based on message role.
+func (m Message) MarshalJSON() ([]byte, error) {
+	type Alias Message
+	aux := struct {
+		Alias
+		Summary any `json:"summary,omitempty"`
+	}{
+		Alias: Alias(m),
+	}
+
+	// Set the appropriate summary field based on role
+	if m.Role == "user" && m.Summary != nil {
+		aux.Summary = m.Summary
+	} else if m.Role == "assistant" && m.IsSummary {
+		aux.Summary = true
+	}
+
+	return json.Marshal(aux)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling to handle the summary field
+// differently based on message role.
+func (m *Message) UnmarshalJSON(data []byte) error {
+	type Alias Message
+	aux := struct {
+		*Alias
+		Summary json.RawMessage `json:"summary,omitempty"`
+	}{
+		Alias: (*Alias)(m),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Parse summary based on role
+	if len(aux.Summary) > 0 {
+		if m.Role == "user" {
+			var summary UserMessageSummary
+			if err := json.Unmarshal(aux.Summary, &summary); err == nil {
+				m.Summary = &summary
+			}
+		} else if m.Role == "assistant" {
+			var isSummary bool
+			if err := json.Unmarshal(aux.Summary, &isSummary); err == nil {
+				m.IsSummary = isSummary
+			}
+		}
+	}
+
+	return nil
 }
 
 // MessagePath contains the current working directory and project root.

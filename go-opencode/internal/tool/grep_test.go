@@ -110,8 +110,8 @@ func TestGrepTool_WithGlobFilter(t *testing.T) {
 func TestGrepTool_Properties(t *testing.T) {
 	tool := NewGrepTool("/tmp")
 
-	if tool.ID() != "Grep" {
-		t.Errorf("Expected ID 'Grep', got %q", tool.ID())
+	if tool.ID() != "grep" {
+		t.Errorf("Expected ID 'grep', got %q", tool.ID())
 	}
 
 	desc := tool.Description()

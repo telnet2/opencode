@@ -40,7 +40,7 @@ func NewReadTool(workDir string) *ReadTool {
 	return &ReadTool{workDir: workDir}
 }
 
-func (t *ReadTool) ID() string          { return "Read" }
+func (t *ReadTool) ID() string          { return "read" }
 func (t *ReadTool) Description() string { return readDescription }
 
 func (t *ReadTool) Parameters() json.RawMessage {

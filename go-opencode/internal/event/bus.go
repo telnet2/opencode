@@ -15,13 +15,14 @@ import (
 type EventType string
 
 const (
-	SessionCreated     EventType = "session.created"
-	SessionUpdated     EventType = "session.updated"
-	SessionDeleted     EventType = "session.deleted"
-	SessionIdle        EventType = "session.idle"
-	SessionStatus      EventType = "session.status"
-	SessionDiff        EventType = "session.diff"
-	SessionError       EventType = "session.error"
+	SessionCreated   EventType = "session.created"
+	SessionUpdated   EventType = "session.updated"
+	SessionDeleted   EventType = "session.deleted"
+	SessionIdle      EventType = "session.idle"
+	SessionStatus    EventType = "session.status"
+	SessionDiff      EventType = "session.diff"
+	SessionError     EventType = "session.error"
+	SessionCompacted EventType = "session.compacted"
 	MessageCreated     EventType = "message.created"
 	MessageUpdated     EventType = "message.updated"
 	MessageRemoved     EventType = "message.removed"
