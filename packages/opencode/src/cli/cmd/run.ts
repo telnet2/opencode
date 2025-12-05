@@ -117,21 +117,6 @@ export const RunCommand = cmd({
     }
     const customPrompt = getCustomPrompt()
 
-    // Parse custom prompt from CLI args
-    const getCustomPrompt = () => {
-      if (args.promptInline) {
-        return { type: "inline" as const, value: args.promptInline }
-      }
-      if (args.promptFile) {
-        return { type: "file" as const, value: args.promptFile }
-      }
-      if (args.prompt) {
-        return args.prompt // Auto-detect
-      }
-      return undefined
-    }
-    const customPrompt = getCustomPrompt()
-
     const fileParts: any[] = []
     if (args.file) {
       const files = Array.isArray(args.file) ? args.file : [args.file]
