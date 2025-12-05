@@ -91,8 +91,8 @@ func TestWriteTool_Overwrite(t *testing.T) {
 func TestWriteTool_Properties(t *testing.T) {
 	tool := NewWriteTool("/tmp")
 
-	if tool.ID() != "Write" {
-		t.Errorf("Expected ID 'Write', got %q", tool.ID())
+	if tool.ID() != "write" {
+		t.Errorf("Expected ID 'write', got %q", tool.ID())
 	}
 
 	desc := tool.Description()

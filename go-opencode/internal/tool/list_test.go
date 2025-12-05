@@ -117,8 +117,8 @@ func TestListTool_EmptyDirectory(t *testing.T) {
 func TestListTool_Properties(t *testing.T) {
 	tool := NewListTool("/tmp")
 
-	if tool.ID() != "List" {
-		t.Errorf("Expected ID 'List', got %q", tool.ID())
+	if tool.ID() != "list" {
+		t.Errorf("Expected ID 'list', got %q", tool.ID())
 	}
 
 	desc := tool.Description()

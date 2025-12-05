@@ -141,6 +141,21 @@ func (p *StepFinishPart) PartID() string        { return p.ID }
 func (p *StepFinishPart) PartSessionID() string { return p.SessionID }
 func (p *StepFinishPart) PartMessageID() string { return p.MessageID }
 
+// CompactionPart represents a request to compact/summarize the conversation.
+// SDK compatible: includes sessionID and messageID fields.
+type CompactionPart struct {
+	ID        string `json:"id"`
+	SessionID string `json:"sessionID"` // SDK compatible
+	MessageID string `json:"messageID"` // SDK compatible
+	Type      string `json:"type"`      // always "compaction"
+	Auto      bool   `json:"auto"`      // Whether this was triggered automatically
+}
+
+func (p *CompactionPart) PartType() string      { return "compaction" }
+func (p *CompactionPart) PartID() string        { return p.ID }
+func (p *CompactionPart) PartSessionID() string { return p.SessionID }
+func (p *CompactionPart) PartMessageID() string { return p.MessageID }
+
 // RawPart is used for JSON unmarshaling of parts.
 type RawPart struct {
 	ID   string          `json:"id"`
@@ -188,6 +203,12 @@ func UnmarshalPart(data []byte) (Part, error) {
 		return &p, nil
 	case "step-finish":
 		var p StepFinishPart
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "compaction":
+		var p CompactionPart
 		if err := json.Unmarshal(data, &p); err != nil {
 			return nil, err
 		}

@@ -293,15 +293,18 @@ func TestToolState(t *testing.T) {
 }
 
 func TestCompactionPart(t *testing.T) {
-	part := &CompactionPart{
-		ID:      "test-id",
-		Type:    "compaction",
-		Summary: "This is a summary",
-		Count:   5,
+	part := &types.CompactionPart{
+		ID:        "test-id",
+		SessionID: "session-1",
+		MessageID: "msg-1",
+		Type:      "compaction",
+		Auto:      false,
 	}
 
 	assert.Equal(t, "compaction", part.PartType())
 	assert.Equal(t, "test-id", part.PartID())
+	assert.Equal(t, "session-1", part.PartSessionID())
+	assert.Equal(t, "msg-1", part.PartMessageID())
 }
 
 func TestSessionState(t *testing.T) {

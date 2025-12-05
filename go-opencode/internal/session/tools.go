@@ -425,7 +425,7 @@ func countLines(text string) int {
 	return lines
 }
 
-// generateUnifiedDiff creates a proper unified diff format from diffs
+// generateUnifiedDiff creates a proper unified diff format from diffs with context lines
 func generateUnifiedDiff(diffs []diffmatchpatch.Diff, path string) string {
 	if len(diffs) == 0 {
 		return ""
@@ -443,64 +443,175 @@ func generateUnifiedDiff(diffs []diffmatchpatch.Diff, path string) string {
 		return ""
 	}
 
-	var buf strings.Builder
-
-	// Write file headers
-	buf.WriteString("--- a/")
-	buf.WriteString(path)
-	buf.WriteString("\n")
-	buf.WriteString("+++ b/")
-	buf.WriteString(path)
-	buf.WriteString("\n")
-
-	// Calculate line numbers for hunk header
-	oldLine := 1
-	newLine := 1
-	oldCount := 0
-	newCount := 0
-
-	// First pass: count total lines for hunk header
-	for _, d := range diffs {
-		lines := countLines(d.Text)
-		switch d.Type {
-		case diffmatchpatch.DiffEqual:
-			oldCount += lines
-			newCount += lines
-		case diffmatchpatch.DiffDelete:
-			oldCount += lines
-		case diffmatchpatch.DiffInsert:
-			newCount += lines
-		}
+	// Convert diffs to lines with their types
+	type diffLine struct {
+		text     string
+		diffType diffmatchpatch.Operation
 	}
+	var allLines []diffLine
 
-	// Write hunk header
-	buf.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n", oldLine, oldCount, newLine, newCount))
-
-	// Write diff content with proper prefixes
 	for _, d := range diffs {
 		text := d.Text
 		lines := strings.Split(text, "\n")
-
 		// Handle trailing newline - if text ends with \n, the last split element is empty
 		if len(lines) > 0 && lines[len(lines)-1] == "" {
 			lines = lines[:len(lines)-1]
 		}
-
 		for _, line := range lines {
-			switch d.Type {
+			allLines = append(allLines, diffLine{text: line, diffType: d.Type})
+		}
+	}
+
+	// Find ranges of changes with context (3 lines before and after)
+	const contextLines = 3
+	type hunk struct {
+		startOld, countOld int
+		startNew, countNew int
+		lines              []diffLine
+	}
+
+	var hunks []hunk
+	var currentHunk *hunk
+	oldLineNum := 1
+	newLineNum := 1
+
+	for i, line := range allLines {
+		isChange := line.diffType != diffmatchpatch.DiffEqual
+
+		if isChange {
+			// Start a new hunk or extend current one
+			if currentHunk == nil {
+				// Calculate start positions including context
+				contextStart := i - contextLines
+				if contextStart < 0 {
+					contextStart = 0
+				}
+
+				// Calculate old/new line numbers at context start
+				startOld := 1
+				startNew := 1
+				for j := 0; j < contextStart; j++ {
+					switch allLines[j].diffType {
+					case diffmatchpatch.DiffEqual:
+						startOld++
+						startNew++
+					case diffmatchpatch.DiffDelete:
+						startOld++
+					case diffmatchpatch.DiffInsert:
+						startNew++
+					}
+				}
+
+				currentHunk = &hunk{
+					startOld: startOld,
+					startNew: startNew,
+				}
+
+				// Add context lines before the change
+				for j := contextStart; j < i; j++ {
+					currentHunk.lines = append(currentHunk.lines, allLines[j])
+				}
+			}
+			currentHunk.lines = append(currentHunk.lines, line)
+		} else if currentHunk != nil {
+			// Check if we should end the hunk or continue with context
+			// Look ahead to see if there's another change within context range
+			nextChangeIdx := -1
+			for j := i + 1; j < len(allLines) && j <= i+contextLines*2; j++ {
+				if allLines[j].diffType != diffmatchpatch.DiffEqual {
+					nextChangeIdx = j
+					break
+				}
+			}
+
+			if nextChangeIdx != -1 && nextChangeIdx <= i+contextLines*2 {
+				// Another change is close, include this line and continue
+				currentHunk.lines = append(currentHunk.lines, line)
+			} else {
+				// Add remaining context lines and close hunk
+				for j := i; j < len(allLines) && j < i+contextLines; j++ {
+					if allLines[j].diffType == diffmatchpatch.DiffEqual {
+						currentHunk.lines = append(currentHunk.lines, allLines[j])
+					} else {
+						break
+					}
+				}
+
+				// Calculate counts
+				for _, l := range currentHunk.lines {
+					switch l.diffType {
+					case diffmatchpatch.DiffEqual:
+						currentHunk.countOld++
+						currentHunk.countNew++
+					case diffmatchpatch.DiffDelete:
+						currentHunk.countOld++
+					case diffmatchpatch.DiffInsert:
+						currentHunk.countNew++
+					}
+				}
+
+				hunks = append(hunks, *currentHunk)
+				currentHunk = nil
+			}
+		}
+
+		// Track line numbers
+		switch line.diffType {
+		case diffmatchpatch.DiffEqual:
+			oldLineNum++
+			newLineNum++
+		case diffmatchpatch.DiffDelete:
+			oldLineNum++
+		case diffmatchpatch.DiffInsert:
+			newLineNum++
+		}
+	}
+
+	// Close any remaining hunk
+	if currentHunk != nil {
+		for _, l := range currentHunk.lines {
+			switch l.diffType {
+			case diffmatchpatch.DiffEqual:
+				currentHunk.countOld++
+				currentHunk.countNew++
+			case diffmatchpatch.DiffDelete:
+				currentHunk.countOld++
+			case diffmatchpatch.DiffInsert:
+				currentHunk.countNew++
+			}
+		}
+		hunks = append(hunks, *currentHunk)
+	}
+
+	// Build output
+	var buf strings.Builder
+
+	// Write file headers
+	buf.WriteString("Index: ")
+	buf.WriteString(path)
+	buf.WriteString("\n")
+	buf.WriteString("===================================================================\n")
+	buf.WriteString("--- ")
+	buf.WriteString(path)
+	buf.WriteString("\n")
+	buf.WriteString("+++ ")
+	buf.WriteString(path)
+	buf.WriteString("\n")
+
+	// Write each hunk
+	for _, h := range hunks {
+		buf.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n", h.startOld, h.countOld, h.startNew, h.countNew))
+		for _, line := range h.lines {
+			switch line.diffType {
 			case diffmatchpatch.DiffEqual:
 				buf.WriteString(" ")
-				buf.WriteString(line)
-				buf.WriteString("\n")
 			case diffmatchpatch.DiffDelete:
 				buf.WriteString("-")
-				buf.WriteString(line)
-				buf.WriteString("\n")
 			case diffmatchpatch.DiffInsert:
 				buf.WriteString("+")
-				buf.WriteString(line)
-				buf.WriteString("\n")
 			}
+			buf.WriteString(line.text)
+			buf.WriteString("\n")
 		}
 	}
 
