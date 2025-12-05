@@ -41,9 +41,13 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 // createSession handles POST /session
 func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 	var req CreateSessionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON body")
-		return
+
+	// Body is optional - handle empty body or missing Content-Type
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON body")
+			return
+		}
 	}
 
 	directory := req.Directory
@@ -52,7 +56,7 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if directory == "" {
-		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "directory is required")
+		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "directory is required (context directory not set)")
 		return
 	}
 
@@ -130,27 +134,25 @@ func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w)
 }
 
+// SessionStatusInfo represents the status of a session.
+// Type can be "idle", "busy", or "retry".
+type SessionStatusInfo struct {
+	Type    string `json:"type"`
+	Attempt int    `json:"attempt,omitempty"` // Only for retry
+	Message string `json:"message,omitempty"` // Only for retry
+	Next    int64  `json:"next,omitempty"`    // Only for retry
+}
+
 // getSessionStatus handles GET /session/status
+// Returns a map of sessionID -> SessionStatusInfo for all active (non-idle) sessions.
+// Sessions not in the map are considered idle by the client.
 func (s *Server) getSessionStatus(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.URL.Query().Get("sessionID")
-	if sessionID == "" {
-		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "sessionID required")
-		return
-	}
+	// Return map of sessionID -> status for all non-idle sessions
+	// TODO: implement actual status tracking
+	// For now, return empty map (all sessions are idle)
+	statuses := make(map[string]SessionStatusInfo)
 
-	session, err := s.sessionService.Get(r.Context(), sessionID)
-	if err != nil {
-		writeError(w, http.StatusNotFound, ErrCodeNotFound, "Session not found")
-		return
-	}
-
-	status := map[string]any{
-		"sessionID": session.ID,
-		"title":     session.Title,
-		"status":    "idle", // TODO: track actual status
-	}
-
-	writeJSON(w, http.StatusOK, status)
+	writeJSON(w, http.StatusOK, statuses)
 }
 
 // getChildren handles GET /session/{sessionID}/children
@@ -270,6 +272,11 @@ func (s *Server) getDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ensure we return [] instead of null
+	if diffs == nil {
+		diffs = []types.FileDiff{}
+	}
+
 	writeJSON(w, http.StatusOK, diffs)
 }
 
@@ -281,6 +288,11 @@ func (s *Server) getTodo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 		return
+	}
+
+	// Ensure we return [] instead of null
+	if todos == nil {
+		todos = []map[string]any{}
 	}
 
 	writeJSON(w, http.StatusOK, todos)

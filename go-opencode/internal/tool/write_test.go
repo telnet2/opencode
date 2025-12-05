@@ -17,7 +17,7 @@ func TestWriteTool_Execute(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Hello, World!"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": "Hello, World!"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -45,7 +45,7 @@ func TestWriteTool_CreateDirectory(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Nested content"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": "Nested content"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -76,7 +76,7 @@ func TestWriteTool_Overwrite(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "Updated"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": "Updated"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -116,8 +116,8 @@ func TestWriteTool_Properties(t *testing.T) {
 	if !ok {
 		t.Error("Schema should have properties")
 	}
-	if _, ok := props["file_path"]; !ok {
-		t.Error("Schema should have file_path property")
+	if _, ok := props["filePath"]; !ok {
+		t.Error("Schema should have filePath property")
 	}
 	if _, ok := props["content"]; !ok {
 		t.Error("Schema should have content property")
@@ -145,7 +145,7 @@ func TestWriteTool_EmptyContent(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": ""}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": ""}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -172,7 +172,7 @@ func TestWriteTool_Metadata(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "content": "` + content + `"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": "` + content + `"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)

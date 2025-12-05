@@ -173,11 +173,11 @@ func ConvertToEinoMessages(messages []*types.Message, parts map[string][]types.P
 				case *types.TextPart:
 					content += p.Text
 				case *types.ToolPart:
-					inputJSON, _ := json.Marshal(p.Input)
+					inputJSON, _ := json.Marshal(p.State.Input)
 					toolCalls = append(toolCalls, schema.ToolCall{
-						ID: p.ToolCallID,
+						ID: p.CallID,
 						Function: schema.FunctionCall{
-							Name:      p.ToolName,
+							Name:      p.Tool,
 							Arguments: string(inputJSON),
 						},
 					})

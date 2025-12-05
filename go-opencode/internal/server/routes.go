@@ -51,8 +51,8 @@ func (s *Server) setupRoutes() {
 	})
 
 	// Event streaming (SSE)
-	r.Get("/event", s.sessionEvents)
-	r.Get("/global/event", s.globalEvents)
+	r.Get("/event", s.allEvents)           // Main event endpoint for TUI
+	r.Get("/global/event", s.globalEvents) // Global events (cross-project)
 
 	// File operations
 	r.Route("/file", func(r chi.Router) {

@@ -55,10 +55,11 @@ type TaskResult struct {
 }
 
 // TaskInput represents the input for the task tool.
+// SDK compatible: uses camelCase field names to match TypeScript.
 type TaskInput struct {
 	Description  string `json:"description"`
 	Prompt       string `json:"prompt"`
-	SubagentType string `json:"subagent_type"`
+	SubagentType string `json:"subagentType"`
 	Model        string `json:"model,omitempty"`
 	Resume       string `json:"resume,omitempty"`
 }
@@ -94,7 +95,7 @@ func (t *TaskTool) Parameters() json.RawMessage {
 				"type": "string",
 				"description": "The detailed task for the agent to perform"
 			},
-			"subagent_type": {
+			"subagentType": {
 				"type": "string",
 				"description": "The type of specialized agent to use (general, explore, plan)"
 			},
@@ -108,7 +109,7 @@ func (t *TaskTool) Parameters() json.RawMessage {
 				"description": "Optional agent ID to resume from"
 			}
 		},
-		"required": ["description", "prompt", "subagent_type"]
+		"required": ["description", "prompt", "subagentType"]
 	}`)
 }
 
@@ -126,7 +127,7 @@ func (t *TaskTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 		return nil, fmt.Errorf("prompt is required")
 	}
 	if params.SubagentType == "" {
-		return nil, fmt.Errorf("subagent_type is required")
+		return nil, fmt.Errorf("subagentType is required")
 	}
 
 	// Get subagent configuration
