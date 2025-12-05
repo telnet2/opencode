@@ -1,8 +1,6 @@
 module github.com/opencode-ai/opencode
 
-go 1.23.0
-
-toolchain go1.24.7
+go 1.25
 
 require (
 	// Eino LLM Framework
@@ -32,6 +30,7 @@ require (
 	github.com/mark3labs/mcp-go v0.43.1
 	github.com/modelcontextprotocol/go-sdk v1.1.0
 	github.com/rs/zerolog v1.34.0
+	github.com/sergi/go-diff v1.4.0
 	github.com/spf13/cobra v1.10.1
 	github.com/sst/opencode-sdk-go v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
@@ -117,7 +116,7 @@ require (
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 replace github.com/sst/opencode-sdk-go => ../packages/sdk/go

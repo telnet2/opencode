@@ -32,15 +32,25 @@ func (p *Processor) processStream(
 	currentToolParts = make(map[string]*types.ToolPart)
 	accumulatedToolInputs = make(map[string]string)
 
-	// Emit step start
-	stepStartPart := &types.TextPart{
-		ID:   generatePartID(),
-		Type: "step-start",
+	// Emit step-start part at the beginning of inference
+	stepStartPart := &types.StepStartPart{
+		ID:        generatePartID(),
+		SessionID: state.message.SessionID,
+		MessageID: state.message.ID,
+		Type:      "step-start",
 	}
-	_ = stepStartPart // We'll add step tracking later
+	state.parts = append(state.parts, stepStartPart)
+	p.savePart(ctx, state.message.ID, stepStartPart)
+	event.Publish(event.Event{
+		Type: event.MessagePartUpdated,
+		Data: event.MessagePartUpdatedData{Part: stepStartPart},
+	})
+	callback(state.message, state.parts)
 
 	fmt.Printf("[stream] Starting to receive chunks\n")
 	chunkCount := 0
+	var lastChunkTime time.Time
+	var lastEventTime time.Time // For throttling event publishing
 
 	for {
 		select {
@@ -60,13 +70,19 @@ func (p *Processor) processStream(
 			return "error", err
 		}
 		chunkCount++
-		fmt.Printf("[stream] Chunk %d: content=%q, toolCalls=%d, responseMeta=%v\n",
-			chunkCount, truncate(msg.Content, 50), len(msg.ToolCalls), msg.ResponseMeta != nil)
+		now := time.Now()
+		var delta time.Duration
+		if !lastChunkTime.IsZero() {
+			delta = now.Sub(lastChunkTime)
+		}
+		lastChunkTime = now
+		fmt.Printf("[stream] Chunk %d (+%v): content=%q, toolCalls=%d, responseMeta=%v\n",
+			chunkCount, delta, truncate(msg.Content, 50), len(msg.ToolCalls), msg.ResponseMeta != nil)
 
 		// Process the message chunk
 		finishReason = p.processMessageChunk(ctx, msg, state, callback,
 			&currentTextPart, &currentReasoningPart, currentToolParts,
-			&accumulatedContent, accumulatedToolInputs)
+			&accumulatedContent, accumulatedToolInputs, &lastEventTime)
 
 		if finishReason != "" {
 			break
@@ -105,11 +121,35 @@ func (p *Processor) processStream(
 	// Determine finish reason from accumulated state
 	if finishReason == "" {
 		if len(currentToolParts) > 0 {
-			finishReason = "tool_use"
+			finishReason = "tool-calls" // SDK compatible: TypeScript uses "tool-calls"
 		} else {
 			finishReason = "stop"
 		}
 	}
+
+	// Normalize finish reason to SDK-compatible format
+	// TypeScript uses "tool-calls" but some providers return "tool_use"
+	if finishReason == "tool_use" {
+		finishReason = "tool-calls"
+	}
+
+	// Emit step-finish part at the end of inference with cost and token info
+	stepFinishPart := &types.StepFinishPart{
+		ID:        generatePartID(),
+		SessionID: state.message.SessionID,
+		MessageID: state.message.ID,
+		Type:      "step-finish",
+		Reason:    finishReason,
+		Cost:      state.message.Cost,
+		Tokens:    state.message.Tokens,
+	}
+	state.parts = append(state.parts, stepFinishPart)
+	p.savePart(ctx, state.message.ID, stepFinishPart)
+	event.Publish(event.Event{
+		Type: event.MessagePartUpdated,
+		Data: event.MessagePartUpdatedData{Part: stepFinishPart},
+	})
+	callback(state.message, state.parts)
 
 	fmt.Printf("[stream] Finished with reason=%s, parts=%d, tokens=%v\n",
 		finishReason, len(state.parts), state.message.Tokens)
@@ -125,6 +165,27 @@ func truncate(s string, n int) string {
 	return s[:n] + "..."
 }
 
+// MinEventInterval is the minimum time between streaming events.
+// This ensures the TUI has time to process each event before the next arrives.
+// Set to slightly above TUI's 16ms batching window to prevent batching.
+const MinEventInterval = 20 * time.Millisecond
+
+// throttledPublish publishes an event with optional throttling to prevent TUI batching.
+func throttledPublish(e event.Event, lastEventTime *time.Time) {
+	if lastEventTime != nil && !lastEventTime.IsZero() {
+		elapsed := time.Since(*lastEventTime)
+		if elapsed < MinEventInterval {
+			sleepTime := MinEventInterval - elapsed
+			fmt.Printf("[stream] THROTTLE sleep=%v (elapsed=%v)\n", sleepTime, elapsed)
+			time.Sleep(sleepTime)
+		}
+	}
+	event.Publish(e)
+	if lastEventTime != nil {
+		*lastEventTime = time.Now()
+	}
+}
+
 // processMessageChunk handles a single message chunk from the stream.
 func (p *Processor) processMessageChunk(
 	ctx context.Context,
@@ -136,6 +197,7 @@ func (p *Processor) processMessageChunk(
 	currentToolParts map[string]*types.ToolPart,
 	accumulatedContent *string,
 	accumulatedToolInputs map[string]string,
+	lastEventTime *time.Time,
 ) string {
 	var finishReason string
 
@@ -158,13 +220,14 @@ func (p *Processor) processMessageChunk(
 
 			// Publish delta event for FIRST chunk (SDK compatible)
 			// This ensures the TUI receives and displays the first text chunk
-			event.Publish(event.Event{
+			// Note: Uses throttledPublish to prevent TUI batching
+			throttledPublish(event.Event{
 				Type: event.MessagePartUpdated,
 				Data: event.MessagePartUpdatedData{
 					Part:  *currentTextPart,
 					Delta: msg.Content, // First chunk IS the delta
 				},
-			})
+			}, lastEventTime)
 
 			callback(state.message, state.parts)
 		} else {
@@ -183,13 +246,14 @@ func (p *Processor) processMessageChunk(
 			}
 
 			// Publish delta event (SDK compatible: uses MessagePartUpdated)
-			event.Publish(event.Event{
+			// Note: Uses throttledPublish to prevent TUI batching
+			throttledPublish(event.Event{
 				Type: event.MessagePartUpdated,
 				Data: event.MessagePartUpdatedData{
 					Part:  *currentTextPart,
 					Delta: delta,
 				},
-			})
+			}, lastEventTime)
 
 			callback(state.message, state.parts)
 		}
@@ -282,6 +346,7 @@ func (p *Processor) processMessageChunk(
 			}
 
 			// Publish tool part update (SDK compatible: uses MessagePartUpdated)
+			// Note: Must use async Publish so SSE select loop can process events
 			event.Publish(event.Event{
 				Type: event.MessagePartUpdated,
 				Data: event.MessagePartUpdatedData{

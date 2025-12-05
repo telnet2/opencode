@@ -25,6 +25,25 @@ type SessionIdleData struct {
 	SessionID string `json:"sessionID"`
 }
 
+// SessionStatusData is the data for session.status events.
+// SDK compatible: uses "sessionID" and "status" fields.
+type SessionStatusData struct {
+	SessionID string            `json:"sessionID"`
+	Status    SessionStatusInfo `json:"status"`
+}
+
+// SessionStatusInfo represents the current status of a session.
+type SessionStatusInfo struct {
+	Type string `json:"type"` // "busy" | "idle"
+}
+
+// SessionDiffData is the data for session.diff events.
+// SDK compatible: uses "sessionID" and "diff" fields.
+type SessionDiffData struct {
+	SessionID string           `json:"sessionID"`
+	Diff      []types.FileDiff `json:"diff"`
+}
+
 // SessionErrorData is the data for session.error events.
 type SessionErrorData struct {
 	SessionID string              `json:"sessionID,omitempty"`

@@ -238,6 +238,31 @@ func TestGetConfig(t *testing.T) {
 	}
 }
 
+func TestGetConfigIncludesKeybinds(t *testing.T) {
+	srv := setupTestServer(t)
+
+	req := httptest.NewRequest("GET", "/config", nil)
+	w := httptest.NewRecorder()
+
+	srv.getConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200, got %d", w.Code)
+	}
+
+	var cfg types.Config
+	if err := json.NewDecoder(w.Body).Decode(&cfg); err != nil {
+		t.Fatalf("Failed to decode: %v", err)
+	}
+
+	if cfg.Keybinds.SessionInterrupt != "escape" {
+		t.Errorf("Expected default session_interrupt to be escape, got %q", cfg.Keybinds.SessionInterrupt)
+	}
+	if cfg.Keybinds.Leader != "ctrl+x" {
+		t.Errorf("Expected default leader to be ctrl+x, got %q", cfg.Keybinds.Leader)
+	}
+}
+
 func TestReadFile_NotFound(t *testing.T) {
 	srv := setupTestServer(t)
 

@@ -3,17 +3,17 @@ package types
 
 // Session represents a conversation session with the LLM.
 type Session struct {
-	ID           string          `json:"id"`
-	ProjectID    string          `json:"projectID"`
-	Directory    string          `json:"directory"`
-	ParentID     *string         `json:"parentID,omitempty"`
-	Title        string          `json:"title"`
-	Version      string          `json:"version"`
-	Summary      SessionSummary  `json:"summary"`
-	Share        *SessionShare   `json:"share,omitempty"`
-	Time         SessionTime     `json:"time"`
-	Revert       *SessionRevert  `json:"revert,omitempty"`
-	CustomPrompt *CustomPrompt   `json:"customPrompt,omitempty"`
+	ID           string         `json:"id"`
+	ProjectID    string         `json:"projectID"`
+	Directory    string         `json:"directory"`
+	ParentID     *string        `json:"parentID,omitempty"`
+	Title        string         `json:"title"`
+	Version      string         `json:"version"`
+	Summary      SessionSummary `json:"summary"`
+	Share        *SessionShare  `json:"share,omitempty"`
+	Time         SessionTime    `json:"time"`
+	Revert       *SessionRevert `json:"revert,omitempty"`
+	CustomPrompt *CustomPrompt  `json:"customPrompt,omitempty"`
 }
 
 // SessionSummary contains statistics about code changes in a session.
@@ -26,7 +26,7 @@ type SessionSummary struct {
 
 // FileDiff represents a diff for a single file.
 type FileDiff struct {
-	Path      string `json:"path"`
+	File      string `json:"file"`
 	Additions int    `json:"additions"`
 	Deletions int    `json:"deletions"`
 	Before    string `json:"before,omitempty"`
@@ -79,10 +79,10 @@ const (
 
 // Project represents a project (worktree) that can contain sessions.
 type Project struct {
-	ID       string       `json:"id"`
-	Worktree string       `json:"worktree"`
-	VCS      *string      `json:"vcs,omitempty"` // "git" or nil
-	Time     ProjectTime  `json:"time"`
+	ID       string      `json:"id"`
+	Worktree string      `json:"worktree"`
+	VCS      *string     `json:"vcs,omitempty"` // "git" or nil
+	Time     ProjectTime `json:"time"`
 }
 
 // ProjectTime contains timestamps for a project.

@@ -2,25 +2,42 @@ package types
 
 // Message represents either a User or Assistant message in a conversation.
 type Message struct {
-	ID        string       `json:"id"`
-	SessionID string       `json:"sessionID"`
-	Role      string       `json:"role"` // "user" | "assistant"
-	Time      MessageTime  `json:"time"`
+	ID        string      `json:"id"`
+	SessionID string      `json:"sessionID"`
+	Role      string      `json:"role"` // "user" | "assistant"
+	Time      MessageTime `json:"time"`
 
 	// User-specific fields
-	Agent  string          `json:"agent,omitempty"`
-	Model  *ModelRef       `json:"model,omitempty"`
-	System *string         `json:"system,omitempty"`
-	Tools  map[string]bool `json:"tools,omitempty"`
+	Agent   string              `json:"agent,omitempty"`
+	Model   *ModelRef           `json:"model,omitempty"`
+	System  *string             `json:"system,omitempty"`
+	Tools   map[string]bool     `json:"tools,omitempty"`
+	Summary *UserMessageSummary `json:"summary,omitempty"` // Summary with title and diffs
 
 	// Assistant-specific fields
+	ParentID   string        `json:"parentID,omitempty"`   // Links to the user message that prompted this
 	ModelID    string        `json:"modelID,omitempty"`
 	ProviderID string        `json:"providerID,omitempty"`
 	Mode       string        `json:"mode,omitempty"`       // Agent name (e.g., "Coder", "Build")
+	Path       *MessagePath  `json:"path,omitempty"`       // Current working directory and root
 	Finish     *string       `json:"finish,omitempty"`
 	Cost       float64       `json:"cost"`                 // Required by TUI
 	Tokens     *TokenUsage   `json:"tokens,omitempty"`
 	Error      *MessageError `json:"error,omitempty"`
+}
+
+// MessagePath contains the current working directory and project root.
+type MessagePath struct {
+	Cwd  string `json:"cwd"`
+	Root string `json:"root"`
+}
+
+// UserMessageSummary contains summary information for a user message.
+// Uses FileDiff from session.go for diffs.
+type UserMessageSummary struct {
+	Title string     `json:"title,omitempty"`
+	Body  string     `json:"body,omitempty"`
+	Diffs []FileDiff `json:"diffs,omitempty"`
 }
 
 // MessageTime contains timestamps for a message.

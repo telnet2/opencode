@@ -86,6 +86,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create user message
+	// SDK compatible: user messages include summary field (initially with empty diffs)
 	userMsg := &types.Message{
 		ID:        generateID(),
 		SessionID: sessionID,
@@ -93,6 +94,9 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		Agent:     req.Agent,
 		Model:     req.Model,
 		Tools:     req.Tools,
+		Summary: &types.UserMessageSummary{
+			Diffs: []types.FileDiff{}, // SDK compatible: empty diffs array
+		},
 		Time: types.MessageTime{
 			Created: nowMillis(),
 		},
