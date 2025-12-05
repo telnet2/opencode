@@ -839,6 +839,7 @@ export namespace WorkflowExecutor {
       : await Provider.defaultModel().then((m) => ({ providerID: m.providerID, modelID: m.modelID }))
 
     const model = await Provider.getModel(modelSpec.providerID, modelSpec.modelID)
+    const language = await Provider.getLanguage(model)
 
     // Build the system prompt based on output format
     let systemPrompt: string
@@ -861,7 +862,7 @@ export namespace WorkflowExecutor {
 
     // Call the LLM
     const result = await generateText({
-      model: model.language,
+      model: language,
       system: systemPrompt,
       prompt,
       temperature: step.temperature ?? 0.1,
@@ -916,12 +917,13 @@ export namespace WorkflowExecutor {
       : await Provider.defaultModel().then((m) => ({ providerID: m.providerID, modelID: m.modelID }))
 
     const llmModel = await Provider.getModel(model.providerID, model.modelID)
+    const language = await Provider.getLanguage(llmModel)
 
     log.info("evaluating LLM condition", { prompt: prompt.slice(0, 100) })
 
     // Call the LLM for yes/no evaluation
     const result = await generateText({
-      model: llmModel.language,
+      model: language,
       system: `You are a decision-making assistant. Evaluate the following condition/question and respond with ONLY "true" or "false" (no other text, no explanation).`,
       prompt,
       temperature: 0.1,
