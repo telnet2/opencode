@@ -252,11 +252,11 @@ func TestConvertToEinoMessages(t *testing.T) {
 		"msg2": {
 			&types.TextPart{ID: "p2", Type: "text", Text: "Hi there"},
 			&types.ToolPart{
-				ID:         "p3",
-				Type:       "tool_use",
-				ToolCallID: "call-123",
-				ToolName:   "read_file",
-				Input:      map[string]any{"path": "/test.txt"},
+				ID:     "p3",
+				Type:   "tool",
+				CallID: "call-123",
+				Tool:   "read_file",
+				State:  types.ToolState{Input: map[string]any{"path": "/test.txt"}},
 			},
 		},
 	}

@@ -50,7 +50,7 @@ func TestEinoToolWrapper_InvokableRun(t *testing.T) {
 	tool := NewReadTool(tmpDir)
 	einoTool := tool.EinoTool()
 
-	argsJSON := `{"file_path": "` + testFile + `"}`
+	argsJSON := `{"filePath": "` + testFile + `"}`
 	result, err := einoTool.InvokableRun(context.Background(), argsJSON)
 	if err != nil {
 		t.Fatalf("InvokableRun failed: %v", err)

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -151,12 +152,16 @@ const (
 func InitializeProviders(ctx context.Context, config *types.Config) (*Registry, error) {
 	registry := NewRegistry(config)
 
+	// Track which providers are configured
+	configuredProviders := make(map[string]bool)
+
 	// Iterate through all configured providers
 	for name, cfg := range config.Provider {
 		if cfg.Disable {
 			continue
 		}
 
+		configuredProviders[name] = true
 		apiKey, baseURL := getProviderCredentials(cfg)
 
 		// Determine provider type from npm field or provider name
@@ -218,6 +223,39 @@ func InitializeProviders(ctx context.Context, config *types.Config) (*Registry, 
 		}
 	}
 
+	// Auto-register default providers from environment variables if not already configured
+	if !configuredProviders["anthropic"] {
+		if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+			fmt.Printf("[provider] Auto-registering anthropic provider from ANTHROPIC_API_KEY\n")
+			provider, err := NewAnthropicProvider(ctx, &AnthropicConfig{
+				ID:        "anthropic",
+				APIKey:    apiKey,
+				MaxTokens: 8192,
+			})
+			if err != nil {
+				fmt.Printf("[provider] Failed to create anthropic provider: %v\n", err)
+			} else if provider != nil {
+				registry.Register(provider)
+				fmt.Printf("[provider] Successfully registered anthropic provider\n")
+			}
+		} else {
+			fmt.Printf("[provider] ANTHROPIC_API_KEY not set\n")
+		}
+	}
+
+	if !configuredProviders["openai"] {
+		if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
+			provider, err := NewOpenAIProvider(ctx, &OpenAIConfig{
+				ID:        "openai",
+				APIKey:    apiKey,
+				MaxTokens: 4096,
+			})
+			if err == nil && provider != nil {
+				registry.Register(provider)
+			}
+		}
+	}
+
 	return registry, nil
 }
 
@@ -234,7 +272,6 @@ func inferNpmFromProviderName(name string) string {
 }
 
 // getProviderCredentials extracts API key and base URL from provider config.
-// Uses TypeScript-style nested options only.
 func getProviderCredentials(cfg types.ProviderConfig) (apiKey, baseURL string) {
 	if cfg.Options != nil {
 		apiKey = cfg.Options.APIKey

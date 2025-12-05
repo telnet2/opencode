@@ -158,10 +158,10 @@ func buildSummaryPrompt(ctx context.Context, p *Processor, messages []*types.Mes
 				prompt.WriteString(pt.Text)
 				prompt.WriteString("\n")
 			case *types.ToolPart:
-				prompt.WriteString(fmt.Sprintf("[Tool: %s]\n", pt.ToolName))
-				if pt.Output != nil {
+				prompt.WriteString(fmt.Sprintf("[Tool: %s]\n", pt.Tool))
+				if pt.State.Output != "" {
 					// Truncate long outputs
-					output := *pt.Output
+					output := pt.State.Output
 					if len(output) > 500 {
 						output = output[:500] + "..."
 					}

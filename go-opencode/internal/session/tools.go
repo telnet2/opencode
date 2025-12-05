@@ -23,7 +23,7 @@ func (p *Processor) executeToolCalls(
 	var pendingTools []*types.ToolPart
 	for _, part := range state.parts {
 		if toolPart, ok := part.(*types.ToolPart); ok {
-			if toolPart.State == "running" {
+			if toolPart.State.Status == "running" {
 				pendingTools = append(pendingTools, toolPart)
 			}
 		}
@@ -50,10 +50,10 @@ func (p *Processor) executeSingleTool(
 	callback ProcessCallback,
 ) error {
 	// Get the tool from registry
-	t, ok := p.toolRegistry.Get(toolPart.ToolName)
+	t, ok := p.toolRegistry.Get(toolPart.Tool)
 	if !ok {
 		return p.failTool(ctx, state, toolPart, callback,
-			fmt.Sprintf("Tool not found: %s", toolPart.ToolName))
+			fmt.Sprintf("Tool not found: %s", toolPart.Tool))
 	}
 
 	// Check permissions
@@ -67,7 +67,7 @@ func (p *Processor) executeSingleTool(
 	}
 
 	// Prepare input JSON
-	inputJSON, err := json.Marshal(toolPart.Input)
+	inputJSON, err := json.Marshal(toolPart.State.Input)
 	if err != nil {
 		return p.failTool(ctx, state, toolPart, callback,
 			fmt.Sprintf("Failed to marshal input: %v", err))
@@ -83,7 +83,7 @@ func (p *Processor) executeSingleTool(
 	toolCtx := &tool.Context{
 		SessionID: state.message.SessionID,
 		MessageID: state.message.ID,
-		CallID:    toolPart.ToolCallID,
+		CallID:    toolPart.CallID,
 		Agent:     agent.Name,
 		WorkDir:   "",
 		AbortCh:   abortCh,
@@ -94,12 +94,12 @@ func (p *Processor) executeSingleTool(
 
 	// Set metadata callback for real-time updates
 	toolCtx.OnMetadata = func(title string, meta map[string]any) {
-		toolPart.Title = &title
-		if toolPart.Metadata == nil {
-			toolPart.Metadata = make(map[string]any)
+		toolPart.State.Title = title
+		if toolPart.State.Metadata == nil {
+			toolPart.State.Metadata = make(map[string]any)
 		}
 		for k, v := range meta {
-			toolPart.Metadata[k] = v
+			toolPart.State.Metadata[k] = v
 		}
 
 		// Publish event (SDK compatible: uses MessagePartUpdated)
@@ -121,26 +121,34 @@ func (p *Processor) executeSingleTool(
 
 	// Update tool part with result
 	now := time.Now().UnixMilli()
-	toolPart.State = "completed"
-	toolPart.Output = &result.Output
-	toolPart.Title = &result.Title
-	toolPart.Time.End = &now
+	toolPart.State.Status = "completed"
+	toolPart.State.Output = result.Output
+	toolPart.State.Title = result.Title
+	toolPart.State.Time.End = &now
 
 	if result.Metadata != nil {
-		if toolPart.Metadata == nil {
-			toolPart.Metadata = make(map[string]any)
+		if toolPart.State.Metadata == nil {
+			toolPart.State.Metadata = make(map[string]any)
 		}
 		for k, v := range result.Metadata {
-			toolPart.Metadata[k] = v
+			toolPart.State.Metadata[k] = v
 		}
 	}
 
-	// Handle attachments
+	// Handle attachments - convert to types.FilePart and add to state
 	if len(result.Attachments) > 0 {
-		if toolPart.Metadata == nil {
-			toolPart.Metadata = make(map[string]any)
+		toolPart.State.Attachments = make([]types.FilePart, len(result.Attachments))
+		for i, att := range result.Attachments {
+			toolPart.State.Attachments[i] = types.FilePart{
+				ID:        generatePartID(),
+				SessionID: state.message.SessionID,
+				MessageID: state.message.ID,
+				Type:      "file",
+				Filename:  att.Filename,
+				Mime:      att.MediaType,
+				URL:       att.URL,
+			}
 		}
-		toolPart.Metadata["attachments"] = result.Attachments
 	}
 
 	// Save updated part
@@ -167,9 +175,9 @@ func (p *Processor) failTool(
 	errMsg string,
 ) error {
 	now := time.Now().UnixMilli()
-	toolPart.State = "error"
-	toolPart.Error = &errMsg
-	toolPart.Time.End = &now
+	toolPart.State.Status = "error"
+	toolPart.State.Error = errMsg
+	toolPart.State.Time.End = &now
 
 	p.savePart(ctx, state.message.ID, toolPart)
 
@@ -200,10 +208,10 @@ func (p *Processor) checkToolPermission(
 	var action permission.PermissionAction
 	var pattern []string
 
-	switch toolPart.ToolName {
+	switch toolPart.Tool {
 	case "Bash":
 		permType = permission.PermBash
-		if cmd, ok := toolPart.Input["command"].(string); ok {
+		if cmd, ok := toolPart.State.Input["command"].(string); ok {
 			pattern = []string{cmd}
 		}
 		switch agent.Permission.Bash {
@@ -217,7 +225,7 @@ func (p *Processor) checkToolPermission(
 
 	case "Write", "Edit":
 		permType = permission.PermEdit
-		if path, ok := toolPart.Input["file_path"].(string); ok {
+		if path, ok := toolPart.State.Input["filePath"].(string); ok {
 			pattern = []string{path}
 		}
 		switch agent.Permission.Write {
@@ -239,8 +247,8 @@ func (p *Processor) checkToolPermission(
 		Pattern:   pattern,
 		SessionID: state.message.SessionID,
 		MessageID: state.message.ID,
-		CallID:    toolPart.ToolCallID,
-		Title:     fmt.Sprintf("Allow %s?", toolPart.ToolName),
+		CallID:    toolPart.CallID,
+		Title:     fmt.Sprintf("Allow %s?", toolPart.Tool),
 	}
 
 	return p.permissionChecker.Check(ctx, req, action)
@@ -255,13 +263,13 @@ func (p *Processor) checkDoomLoop(
 ) error {
 	// Count identical tool calls
 	count := 0
-	inputJSON, _ := json.Marshal(toolPart.Input)
+	inputJSON, _ := json.Marshal(toolPart.State.Input)
 	inputStr := string(inputJSON)
 
 	for _, part := range state.parts {
 		if tp, ok := part.(*types.ToolPart); ok {
-			if tp.ToolName == toolPart.ToolName && tp.State == "completed" {
-				otherInput, _ := json.Marshal(tp.Input)
+			if tp.Tool == toolPart.Tool && tp.State.Status == "completed" {
+				otherInput, _ := json.Marshal(tp.State.Input)
 				if string(otherInput) == inputStr {
 					count++
 				}
@@ -280,7 +288,7 @@ func (p *Processor) checkDoomLoop(
 		return nil
 
 	case "deny":
-		return fmt.Errorf("doom loop detected: %s called %d times with same input", toolPart.ToolName, count)
+		return fmt.Errorf("doom loop detected: %s called %d times with same input", toolPart.Tool, count)
 
 	case "ask", "":
 		if p.permissionChecker == nil {
@@ -290,11 +298,11 @@ func (p *Processor) checkDoomLoop(
 		// Request permission from user
 		req := permission.Request{
 			Type:      permission.PermDoomLoop,
-			Pattern:   []string{toolPart.ToolName},
+			Pattern:   []string{toolPart.Tool},
 			SessionID: state.message.SessionID,
 			MessageID: state.message.ID,
-			CallID:    toolPart.ToolCallID,
-			Title:     fmt.Sprintf("Allow repeated %s call?", toolPart.ToolName),
+			CallID:    toolPart.CallID,
+			Title:     fmt.Sprintf("Allow repeated %s call?", toolPart.Tool),
 		}
 
 		return p.permissionChecker.Ask(ctx, req)

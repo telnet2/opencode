@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/cloudwego/eino/components/model"
@@ -203,6 +204,20 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 // The CompletionStream is tested indirectly through integration tests.
 
 func TestInitializeProviders_NoConfig(t *testing.T) {
+	// Save and clear environment variables that might auto-register providers
+	savedAnthropicKey := os.Getenv("ANTHROPIC_API_KEY")
+	savedOpenAIKey := os.Getenv("OPENAI_API_KEY")
+	os.Unsetenv("ANTHROPIC_API_KEY")
+	os.Unsetenv("OPENAI_API_KEY")
+	defer func() {
+		if savedAnthropicKey != "" {
+			os.Setenv("ANTHROPIC_API_KEY", savedAnthropicKey)
+		}
+		if savedOpenAIKey != "" {
+			os.Setenv("OPENAI_API_KEY", savedOpenAIKey)
+		}
+	}()
+
 	config := &types.Config{
 		Provider: make(map[string]types.ProviderConfig),
 	}

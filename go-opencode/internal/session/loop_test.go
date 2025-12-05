@@ -101,7 +101,7 @@ func TestAgenticLoopWithRealLLM(t *testing.T) {
 			case *types.TextPart:
 				t.Logf("  Part %d: TextPart text=%q", i, pt.Text)
 			case *types.ToolPart:
-				t.Logf("  Part %d: ToolPart tool=%s", i, pt.ToolName)
+				t.Logf("  Part %d: ToolPart tool=%s", i, pt.Tool)
 			default:
 				t.Logf("  Part %d: Unknown type %T", i, p)
 			}

@@ -55,6 +55,10 @@ var providerTestConfigs = []ProviderTestConfig{
 }
 
 func TestRegistry_LLMIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	// Load .env file from project root
 	_ = godotenv.Load("../../.env")
 
