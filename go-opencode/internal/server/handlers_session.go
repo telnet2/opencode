@@ -235,17 +235,34 @@ func (s *Server) unshareSession(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w)
 }
 
+// SummarizeSessionRequest represents the request body for summarizing a session.
+type SummarizeSessionRequest struct {
+	ProviderID string `json:"providerID"`
+	ModelID    string `json:"modelID"`
+}
+
 // summarizeSession handles POST /session/{sessionID}/summarize
 func (s *Server) summarizeSession(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
-	summary, err := s.sessionService.Summarize(r.Context(), sessionID)
+	var req SummarizeSessionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON body: providerID and modelID are required")
+		return
+	}
+
+	if req.ProviderID == "" || req.ModelID == "" {
+		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "providerID and modelID are required")
+		return
+	}
+
+	err := s.sessionService.Summarize(r.Context(), sessionID, req.ProviderID, req.ModelID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, summary)
+	writeJSON(w, http.StatusOK, true)
 }
 
 // initSession handles POST /session/{sessionID}/init

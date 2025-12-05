@@ -36,7 +36,7 @@ func NewWriteTool(workDir string) *WriteTool {
 	return &WriteTool{workDir: workDir}
 }
 
-func (t *WriteTool) ID() string          { return "Write" }
+func (t *WriteTool) ID() string          { return "write" }
 func (t *WriteTool) Description() string { return writeDescription }
 
 func (t *WriteTool) Parameters() json.RawMessage {

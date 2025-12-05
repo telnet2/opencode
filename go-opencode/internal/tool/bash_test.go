@@ -69,8 +69,8 @@ func TestBashTool_WithTimeout(t *testing.T) {
 func TestBashTool_Properties(t *testing.T) {
 	tool := NewBashTool("/tmp")
 
-	if tool.ID() != "Bash" {
-		t.Errorf("Expected ID 'Bash', got %q", tool.ID())
+	if tool.ID() != "bash" {
+		t.Errorf("Expected ID 'bash', got %q", tool.ID())
 	}
 
 	desc := tool.Description()

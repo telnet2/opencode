@@ -78,8 +78,8 @@ func TestReadTool_WithOffsetAndLimit(t *testing.T) {
 func TestReadTool_Properties(t *testing.T) {
 	tool := NewReadTool("/tmp")
 
-	if tool.ID() != "Read" {
-		t.Errorf("Expected ID 'Read', got %q", tool.ID())
+	if tool.ID() != "read" {
+		t.Errorf("Expected ID 'read', got %q", tool.ID())
 	}
 
 	desc := tool.Description()

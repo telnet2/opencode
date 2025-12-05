@@ -50,6 +50,11 @@ type SessionErrorData struct {
 	Error     *types.MessageError `json:"error,omitempty"`
 }
 
+// SessionCompactedData is the data for session.compacted events.
+type SessionCompactedData struct {
+	SessionID string `json:"sessionID"`
+}
+
 // MessageCreatedData is the data for message.created events.
 // SDK compatible: uses "info" field for message object.
 type MessageCreatedData struct {

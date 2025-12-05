@@ -41,7 +41,7 @@ func NewEditTool(workDir string) *EditTool {
 	return &EditTool{workDir: workDir}
 }
 
-func (t *EditTool) ID() string          { return "Edit" }
+func (t *EditTool) ID() string          { return "edit" }
 func (t *EditTool) Description() string { return editDescription }
 
 func (t *EditTool) Parameters() json.RawMessage {
