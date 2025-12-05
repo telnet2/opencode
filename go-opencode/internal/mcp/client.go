@@ -88,31 +88,47 @@ func (c *Client) connectServer(ctx context.Context, name string, config *Config)
 		timeout = 5 * time.Second
 	}
 
-	var transport sdkmcp.Transport
-	var connectCtx context.Context
-	var connectCancel context.CancelFunc
+	server := &mcpServer{
+		name:   name,
+		config: config,
+		status: StatusConnecting,
+	}
 
 	switch config.Type {
 	case TransportTypeRemote:
-		// For SSE transport, use a long-lived context (background) because
-		// the SSE connection stays open for the lifetime of the session.
-		// The HTTP client timeout handles the initial connection timeout.
-		connectCtx = context.Background()
-		connectCancel = func() {} // no-op
-
-		httpClient := &http.Client{Timeout: timeout}
-		transport = &sdkmcp.SSEClientTransport{
-			Endpoint:   config.URL,
-			HTTPClient: httpClient,
+		httpClient := httpClientWithHeaders(nil, config.Headers)
+		transports := []struct {
+			name      string
+			transport sdkmcp.Transport
+		}{
+			{name: "streamable", transport: &sdkmcp.StreamableClientTransport{Endpoint: config.URL, HTTPClient: httpClient}},
+			{name: "sse", transport: &sdkmcp.SSEClientTransport{Endpoint: config.URL, HTTPClient: httpClient}},
 		}
+
+		var lastErr error
+		for _, candidate := range transports {
+			session, err := c.connectWithTransport(context.Background(), candidate.transport, timeout, server)
+			if err != nil {
+				lastErr = fmt.Errorf("%s transport: %w", candidate.name, err)
+				continue
+			}
+			server.session = session
+			server.status = StatusConnected
+			return server, nil
+		}
+
+		if lastErr == nil {
+			lastErr = fmt.Errorf("failed to connect: unknown error")
+		}
+		return nil, lastErr
 
 	case TransportTypeLocal, TransportTypeStdio:
 		if len(config.Command) == 0 {
 			return nil, fmt.Errorf("empty command")
 		}
 
-		// For stdio transport, we can use a timeout context for the initial connection
-		connectCtx, connectCancel = context.WithTimeout(ctx, timeout)
+		connectCtx, connectCancel := context.WithTimeout(ctx, timeout)
+		defer connectCancel()
 
 		cmd := exec.Command(config.Command[0], config.Command[1:]...)
 
@@ -122,50 +138,82 @@ func (c *Client) connectServer(ctx context.Context, name string, config *Config)
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 		}
 
-		transport = &sdkmcp.CommandTransport{Command: cmd}
+		session, err := c.connectWithTransport(connectCtx, &sdkmcp.CommandTransport{Command: cmd}, timeout, server)
+		if err != nil {
+			return nil, err
+		}
+		server.session = session
+		server.status = StatusConnected
+		return server, nil
 
 	default:
 		return nil, fmt.Errorf("unknown transport type: %s", config.Type)
 	}
+}
 
-	server := &mcpServer{
-		name:   name,
-		config: config,
-		status: StatusConnecting,
-	}
-
-	// Connect using the SDK client
-	session, err := c.sdkClient.Connect(connectCtx, transport, nil)
+func (c *Client) connectWithTransport(ctx context.Context, transport sdkmcp.Transport, timeout time.Duration, server *mcpServer) (*sdkmcp.ClientSession, error) {
+	session, err := c.sdkClient.Connect(ctx, transport, nil)
 	if err != nil {
-		connectCancel()
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
 	server.session = session
 
-	// Get server info from initialization result
-	initResult := session.InitializeResult()
-	if initResult != nil {
+	// Capture server info from initialization result if available
+	if initResult := session.InitializeResult(); initResult != nil {
 		server.serverInfo = &ServerInfo{
 			Name:    initResult.ServerInfo.Name,
 			Version: initResult.ServerInfo.Version,
 		}
 	}
 
-	// List tools - use a separate context for this operation
 	listCtx, listCancel := context.WithTimeout(context.Background(), timeout)
 	defer listCancel()
 	if err := server.listTools(listCtx); err != nil {
-		// Non-fatal, tools might not be supported
-		server.tools = []Tool{}
+		session.Close()
+		return nil, fmt.Errorf("failed to list tools: %w", err)
 	}
 
-	// For stdio transport, cancel the connect context now that setup is complete
-	// For SSE, connectCancel is a no-op since we use background context
-	connectCancel()
+	return session, nil
+}
 
-	server.status = StatusConnected
-	return server, nil
+func httpClientWithHeaders(base *http.Client, headers map[string]string) *http.Client {
+	if base == nil {
+		base = &http.Client{}
+	}
+
+	// Copy to avoid mutating caller-provided client
+	client := *base
+	client.Timeout = 0 // no global timeout; rely on per-request contexts
+
+	if len(headers) == 0 {
+		return &client
+	}
+
+	transport := client.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+
+	client.Transport = &headerRoundTripper{
+		headers: headers,
+		next:    transport,
+	}
+
+	return &client
+}
+
+type headerRoundTripper struct {
+	headers map[string]string
+	next    http.RoundTripper
+}
+
+func (h *headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	cloned := req.Clone(req.Context())
+	for k, v := range h.headers {
+		cloned.Header.Set(k, v)
+	}
+	return h.next.RoundTrip(cloned)
 }
 
 // listTools lists available tools from the server using the SDK.

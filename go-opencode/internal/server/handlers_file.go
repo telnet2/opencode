@@ -258,6 +258,21 @@ var symbolKindsFilter = map[lsp.SymbolKind]bool{
 	lsp.SymbolKindStruct:    true, // 23
 }
 
+// getVCSInfo handles GET /vcs
+// Returns the current git branch name.
+func (s *Server) getVCSInfo(w http.ResponseWriter, r *http.Request) {
+	directory := getDirectory(r.Context())
+
+	// Get current branch
+	cmd := exec.Command("git", "branch", "--show-current")
+	cmd.Dir = directory
+	branch, _ := cmd.Output()
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"branch": strings.TrimSpace(string(branch)),
+	})
+}
+
 // searchSymbols handles GET /find/symbol
 func (s *Server) searchSymbols(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("query")

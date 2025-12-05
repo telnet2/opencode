@@ -86,6 +86,9 @@ func (s *Server) setupRoutes() {
 	// Authentication
 	r.Put("/auth/{providerID}", s.setAuth)
 
+	// VCS (Version Control System)
+	r.Get("/vcs", s.getVCSInfo)
+
 	// Advanced features
 	r.Get("/lsp", s.getLSPStatus)
 	r.Get("/agent", s.listAgents)

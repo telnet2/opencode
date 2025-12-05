@@ -120,7 +120,7 @@ func (p *Processor) compactMessages(
 	// Create compaction marker in session
 	// This would be used to inject the summary into future prompts
 	session.Summary.Diffs = append(session.Summary.Diffs, types.FileDiff{
-		Path:   "__compaction__",
+		File:   "__compaction__",
 		Before: "",
 		After:  summary.String(),
 	})
@@ -193,4 +193,3 @@ func estimateTokens(text string) int {
 	// Rough estimate: ~4 characters per token
 	return len(text) / 4
 }
-
