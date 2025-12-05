@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/opencode-ai/opencode/internal/event"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -104,6 +105,15 @@ func (p *Processor) Process(ctx context.Context, sessionID string, agent *Agent,
 	p.sessions[sessionID] = state
 	p.mu.Unlock()
 
+	// Emit session.status busy event
+	event.Publish(event.Event{
+		Type: event.SessionStatus,
+		Data: event.SessionStatusData{
+			SessionID: sessionID,
+			Status:    event.SessionStatusInfo{Type: "busy"},
+		},
+	})
+
 	// Ensure cleanup
 	defer func() {
 		p.mu.Lock()
@@ -114,6 +124,21 @@ func (p *Processor) Process(ctx context.Context, sessionID string, agent *Agent,
 			waiter <- nil
 		}
 		p.mu.Unlock()
+
+		// Emit session.status idle event (SDK compatible: TUI uses this to stop progress bar)
+		event.Publish(event.Event{
+			Type: event.SessionStatus,
+			Data: event.SessionStatusData{
+				SessionID: sessionID,
+				Status:    event.SessionStatusInfo{Type: "idle"},
+			},
+		})
+
+		// Emit session.idle event when processing completes
+		event.Publish(event.Event{
+			Type: event.SessionIdle,
+			Data: event.SessionIdleData{SessionID: sessionID},
+		})
 	}()
 
 	// Run the agentic loop

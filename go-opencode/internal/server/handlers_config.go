@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -14,6 +15,9 @@ import (
 
 // getConfig handles GET /config
 func (s *Server) getConfig(w http.ResponseWriter, r *http.Request) {
+	if s.appConfig != nil {
+		s.appConfig.Keybinds = types.MergeKeybinds(types.DefaultKeybinds(), s.appConfig.Keybinds)
+	}
 	writeJSON(w, http.StatusOK, s.appConfig)
 }
 
@@ -37,19 +41,37 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 // ProviderModel represents a model in models.dev format for TUI compatibility.
+// SDK compatible: uses "capabilities" with nested boolean structure to match TypeScript.
 type ProviderModel struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	ReleaseDate string            `json:"release_date"`
-	Attachment  bool              `json:"attachment"`
-	Reasoning   bool              `json:"reasoning"`
-	Temperature bool              `json:"temperature"`
-	ToolCall    bool              `json:"tool_call"`
-	Cost        ModelCost         `json:"cost"`
-	Limit       ModelLimit        `json:"limit"`
-	Options     map[string]any    `json:"options"`
-	Modalities  *ModelModalities  `json:"modalities,omitempty"`
-	Status      string            `json:"status,omitempty"`
+	ID           string             `json:"id"`
+	Name         string             `json:"name"`
+	ReleaseDate  string             `json:"release_date"`
+	Capabilities *ModelCapabilities `json:"capabilities"`
+	Cost         ModelCost          `json:"cost"`
+	Limit        ModelLimit         `json:"limit"`
+	Options      map[string]any     `json:"options"`
+	Status       string             `json:"status,omitempty"`
+}
+
+// ModelCapabilities represents model capabilities and modalities.
+// SDK compatible: matches TypeScript Model.capabilities structure.
+type ModelCapabilities struct {
+	Temperature bool                 `json:"temperature"`
+	Reasoning   bool                 `json:"reasoning"`
+	Attachment  bool                 `json:"attachment"`
+	ToolCall    bool                 `json:"toolcall"`
+	Input       ModalityCapabilities `json:"input"`
+	Output      ModalityCapabilities `json:"output"`
+}
+
+// ModalityCapabilities represents input/output modality capabilities.
+// SDK compatible: matches TypeScript input/output capability structure.
+type ModalityCapabilities struct {
+	Text  bool `json:"text"`
+	Audio bool `json:"audio"`
+	Image bool `json:"image"`
+	Video bool `json:"video"`
+	PDF   bool `json:"pdf"`
 }
 
 // ModelCost represents model pricing.
@@ -64,12 +86,6 @@ type ModelCost struct {
 type ModelLimit struct {
 	Context int `json:"context"`
 	Output  int `json:"output"`
-}
-
-// ModelModalities represents model input/output modalities.
-type ModelModalities struct {
-	Input  []string `json:"input"`
-	Output []string `json:"output"`
 }
 
 // ProviderInfo represents provider information in models.dev format for TUI compatibility.
@@ -102,40 +118,49 @@ func getDefaultProviders() []ProviderInfo {
 					ID:          "claude-sonnet-4-20250514",
 					Name:        "Claude Sonnet 4",
 					ReleaseDate: "2025-05-14",
-					Attachment:  true,
-					Reasoning:   false,
-					Temperature: true,
-					ToolCall:    true,
-					Cost:        ModelCost{Input: 3.0, Output: 15.0, CacheRead: 0.3, CacheWrite: 3.75},
-					Limit:       ModelLimit{Context: 200000, Output: 64000},
-					Options:     map[string]any{},
-					Modalities:  &ModelModalities{Input: []string{"text", "image", "pdf"}, Output: []string{"text"}},
+					Capabilities: &ModelCapabilities{
+						Temperature: true,
+						Reasoning:   false,
+						Attachment:  true,
+						ToolCall:    true,
+						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: true},
+						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
+					},
+					Cost:    ModelCost{Input: 3.0, Output: 15.0, CacheRead: 0.3, CacheWrite: 3.75},
+					Limit:   ModelLimit{Context: 200000, Output: 64000},
+					Options: map[string]any{},
 				},
 				"claude-opus-4-20250514": {
 					ID:          "claude-opus-4-20250514",
 					Name:        "Claude Opus 4",
 					ReleaseDate: "2025-05-14",
-					Attachment:  true,
-					Reasoning:   false,
-					Temperature: true,
-					ToolCall:    true,
-					Cost:        ModelCost{Input: 15.0, Output: 75.0, CacheRead: 1.5, CacheWrite: 18.75},
-					Limit:       ModelLimit{Context: 200000, Output: 32000},
-					Options:     map[string]any{},
-					Modalities:  &ModelModalities{Input: []string{"text", "image", "pdf"}, Output: []string{"text"}},
+					Capabilities: &ModelCapabilities{
+						Temperature: true,
+						Reasoning:   false,
+						Attachment:  true,
+						ToolCall:    true,
+						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: true},
+						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
+					},
+					Cost:    ModelCost{Input: 15.0, Output: 75.0, CacheRead: 1.5, CacheWrite: 18.75},
+					Limit:   ModelLimit{Context: 200000, Output: 32000},
+					Options: map[string]any{},
 				},
 				"claude-3-5-haiku-20241022": {
 					ID:          "claude-3-5-haiku-20241022",
 					Name:        "Claude 3.5 Haiku",
 					ReleaseDate: "2024-10-22",
-					Attachment:  true,
-					Reasoning:   false,
-					Temperature: true,
-					ToolCall:    true,
-					Cost:        ModelCost{Input: 0.8, Output: 4.0, CacheRead: 0.08, CacheWrite: 1.0},
-					Limit:       ModelLimit{Context: 200000, Output: 8192},
-					Options:     map[string]any{},
-					Modalities:  &ModelModalities{Input: []string{"text", "image", "pdf"}, Output: []string{"text"}},
+					Capabilities: &ModelCapabilities{
+						Temperature: true,
+						Reasoning:   false,
+						Attachment:  true,
+						ToolCall:    true,
+						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: true},
+						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
+					},
+					Cost:    ModelCost{Input: 0.8, Output: 4.0, CacheRead: 0.08, CacheWrite: 1.0},
+					Limit:   ModelLimit{Context: 200000, Output: 8192},
+					Options: map[string]any{},
 				},
 			},
 		},
@@ -149,27 +174,33 @@ func getDefaultProviders() []ProviderInfo {
 					ID:          "gpt-4o",
 					Name:        "GPT-4o",
 					ReleaseDate: "2024-05-13",
-					Attachment:  true,
-					Reasoning:   false,
-					Temperature: true,
-					ToolCall:    true,
-					Cost:        ModelCost{Input: 2.5, Output: 10.0},
-					Limit:       ModelLimit{Context: 128000, Output: 16384},
-					Options:     map[string]any{},
-					Modalities:  &ModelModalities{Input: []string{"text", "image"}, Output: []string{"text"}},
+					Capabilities: &ModelCapabilities{
+						Temperature: true,
+						Reasoning:   false,
+						Attachment:  true,
+						ToolCall:    true,
+						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: false},
+						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
+					},
+					Cost:    ModelCost{Input: 2.5, Output: 10.0},
+					Limit:   ModelLimit{Context: 128000, Output: 16384},
+					Options: map[string]any{},
 				},
 				"gpt-4o-mini": {
 					ID:          "gpt-4o-mini",
 					Name:        "GPT-4o Mini",
 					ReleaseDate: "2024-07-18",
-					Attachment:  true,
-					Reasoning:   false,
-					Temperature: true,
-					ToolCall:    true,
-					Cost:        ModelCost{Input: 0.15, Output: 0.6},
-					Limit:       ModelLimit{Context: 128000, Output: 16384},
-					Options:     map[string]any{},
-					Modalities:  &ModelModalities{Input: []string{"text", "image"}, Output: []string{"text"}},
+					Capabilities: &ModelCapabilities{
+						Temperature: true,
+						Reasoning:   false,
+						Attachment:  true,
+						ToolCall:    true,
+						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: false},
+						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
+					},
+					Cost:    ModelCost{Input: 0.15, Output: 0.6},
+					Limit:   ModelLimit{Context: 128000, Output: 16384},
+					Options: map[string]any{},
 				},
 			},
 		},
@@ -480,13 +511,232 @@ func (s *Server) readMCPResource(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// AgentInfo represents agent information returned by the /agent endpoint.
+// SDK compatible: matches TypeScript Agent.Info structure.
+type AgentInfo struct {
+	Name        string              `json:"name"`
+	Description string              `json:"description,omitempty"`
+	Mode        string              `json:"mode"`
+	BuiltIn     bool                `json:"builtIn"`
+	Prompt      string              `json:"prompt,omitempty"`
+	Tools       map[string]bool     `json:"tools"`
+	Options     map[string]any      `json:"options"`
+	Permission  AgentPermissionInfo `json:"permission"`
+	Temperature float64             `json:"temperature,omitempty"`
+	TopP        float64             `json:"topP,omitempty"`
+	Model       *AgentModelRef      `json:"model,omitempty"`
+	Color       string              `json:"color,omitempty"`
+}
+
+// AgentPermissionInfo represents agent permission settings.
+type AgentPermissionInfo struct {
+	Edit        string            `json:"edit,omitempty"`
+	Bash        map[string]string `json:"bash,omitempty"`
+	WebFetch    string            `json:"webfetch,omitempty"`
+	ExternalDir string            `json:"external_directory,omitempty"`
+	DoomLoop    string            `json:"doom_loop,omitempty"`
+}
+
+// AgentModelRef references a model for an agent.
+type AgentModelRef struct {
+	ProviderID string `json:"providerID"`
+	ModelID    string `json:"modelID"`
+}
+
 // listAgents handles GET /agent
+// Returns full agent objects matching TypeScript Agent.Info structure.
 func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
-	agents := []map[string]any{
-		{"id": "coder", "name": "Coder", "description": "General coding assistant"},
-		{"id": "build", "name": "Build", "description": "Build and test assistant"},
+	// Start with built-in agents
+	agents := getBuiltInAgents()
+
+	// Merge with config agents
+	if s.appConfig != nil && s.appConfig.Agent != nil {
+		for name, cfg := range s.appConfig.Agent {
+			// Find existing or create new
+			var agent *AgentInfo
+			for i := range agents {
+				if agents[i].Name == name {
+					agent = &agents[i]
+					break
+				}
+			}
+
+			if agent == nil {
+				// New custom agent
+				newAgent := AgentInfo{
+					Name:    name,
+					Mode:    "all",
+					BuiltIn: false,
+					Tools:   make(map[string]bool),
+					Options: make(map[string]any),
+					Permission: AgentPermissionInfo{
+						Edit:        "allow",
+						Bash:        map[string]string{"*": "allow"},
+						WebFetch:    "allow",
+						DoomLoop:    "ask",
+						ExternalDir: "ask",
+					},
+				}
+				agents = append(agents, newAgent)
+				agent = &agents[len(agents)-1]
+			}
+
+			// Apply config overrides
+			if cfg.Description != "" {
+				agent.Description = cfg.Description
+			}
+			if cfg.Prompt != "" {
+				agent.Prompt = cfg.Prompt
+			}
+			if cfg.Mode != "" {
+				agent.Mode = cfg.Mode
+			}
+			if cfg.Temperature != nil {
+				agent.Temperature = *cfg.Temperature
+			}
+			if cfg.TopP != nil {
+				agent.TopP = *cfg.TopP
+			}
+			if cfg.Color != "" {
+				agent.Color = cfg.Color
+			}
+			if cfg.Model != "" {
+				// Parse model string "provider/model"
+				parts := strings.SplitN(cfg.Model, "/", 2)
+				if len(parts) == 2 {
+					agent.Model = &AgentModelRef{
+						ProviderID: parts[0],
+						ModelID:    parts[1],
+					}
+				}
+			}
+			if cfg.Tools != nil {
+				for k, v := range cfg.Tools {
+					agent.Tools[k] = v
+				}
+			}
+			agent.BuiltIn = false // Mark as customized
+		}
 	}
+
 	writeJSON(w, http.StatusOK, agents)
+}
+
+// getBuiltInAgents returns the default built-in agents.
+func getBuiltInAgents() []AgentInfo {
+	defaultPermission := AgentPermissionInfo{
+		Edit:        "allow",
+		Bash:        map[string]string{"*": "allow"},
+		WebFetch:    "allow",
+		DoomLoop:    "ask",
+		ExternalDir: "ask",
+	}
+
+	planPermission := AgentPermissionInfo{
+		Edit: "deny",
+		Bash: map[string]string{
+			"cut*":             "allow",
+			"diff*":            "allow",
+			"du*":              "allow",
+			"file *":           "allow",
+			"find * -delete*":  "ask",
+			"find * -exec*":    "ask",
+			"find * -fprint*":  "ask",
+			"find * -fls*":     "ask",
+			"find * -fprintf*": "ask",
+			"find * -ok*":      "ask",
+			"find *":           "allow",
+			"git diff*":        "allow",
+			"git log*":         "allow",
+			"git show*":        "allow",
+			"git status*":      "allow",
+			"git branch":       "allow",
+			"git branch -v":    "allow",
+			"grep*":            "allow",
+			"head*":            "allow",
+			"less*":            "allow",
+			"ls*":              "allow",
+			"more*":            "allow",
+			"pwd*":             "allow",
+			"rg*":              "allow",
+			"sort --output=*":  "ask",
+			"sort -o *":        "ask",
+			"sort*":            "allow",
+			"stat*":            "allow",
+			"tail*":            "allow",
+			"tree -o *":        "ask",
+			"tree*":            "allow",
+			"uniq*":            "allow",
+			"wc*":              "allow",
+			"whereis*":         "allow",
+			"which*":           "allow",
+			"*":                "ask",
+		},
+		WebFetch: "allow",
+	}
+
+	return []AgentInfo{
+		{
+			Name:        "general",
+			Description: "General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.",
+			Mode:        "subagent",
+			BuiltIn:     true,
+			Tools: map[string]bool{
+				"todoread":  false,
+				"todowrite": false,
+			},
+			Options:    map[string]any{},
+			Permission: defaultPermission,
+		},
+		{
+			Name:        "explore",
+			Description: `Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.`,
+			Mode:        "subagent",
+			BuiltIn:     true,
+			Tools: map[string]bool{
+				"todoread":  false,
+				"todowrite": false,
+				"edit":      false,
+				"write":     false,
+			},
+			Options:    map[string]any{},
+			Permission: defaultPermission,
+			Prompt: `You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
+
+Your strengths:
+- Rapidly finding files using glob patterns
+- Searching code and text with powerful regex patterns
+- Reading and analyzing file contents
+
+Guidelines:
+- Use Glob for broad file pattern matching
+- Use Grep for searching file contents with regex
+- Use Read when you know the specific file path you need to read
+- Use Bash for file operations like copying, moving, or listing directory contents
+- Adapt your search approach based on the thoroughness level specified by the caller
+- Return file paths as absolute paths in your final response
+- For clear communication, avoid using emojis
+- Do not create any files, or run bash commands that modify the user's system state in any way
+
+Complete the user's search request efficiently and report your findings clearly.`,
+		},
+		{
+			Name:       "build",
+			Mode:       "primary",
+			BuiltIn:    true,
+			Tools:      map[string]bool{},
+			Options:    map[string]any{},
+			Permission: defaultPermission,
+		},
+		{
+			Name:       "plan",
+			Mode:       "primary",
+			BuiltIn:    true,
+			Tools:      map[string]bool{},
+			Options:    map[string]any{},
+			Permission: planPermission,
+		},
+	}
 }
 
 // getFormatterStatus handles GET /formatter
@@ -536,33 +786,141 @@ func (s *Server) formatFile(w http.ResponseWriter, r *http.Request) {
 	writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Either 'path' or 'paths' is required")
 }
 
-// listCommands handles GET /command
-func (s *Server) listCommands(w http.ResponseWriter, r *http.Request) {
-	// Start with builtin commands
-	commands := make([]map[string]any, 0)
-	for _, cmd := range command.BuiltinCommands() {
-		commands = append(commands, map[string]any{
-			"name":        cmd.Name,
-			"description": cmd.Description,
-			"source":      cmd.Source,
-		})
-	}
+// CommandInfo represents command information returned by the /command endpoint.
+// SDK compatible: matches TypeScript Command.Info structure.
+type CommandInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Template    string `json:"template"`
+	Agent       string `json:"agent,omitempty"`
+	Model       string `json:"model,omitempty"`
+	Subtask     bool   `json:"subtask,omitempty"`
+}
 
-	// Add custom commands from executor
+// listCommands handles GET /command
+// Returns full command objects matching TypeScript Command.Info structure.
+func (s *Server) listCommands(w http.ResponseWriter, r *http.Request) {
+	commands := make([]CommandInfo, 0)
+
+	// Add built-in commands with templates
+	builtinCommands := getBuiltInCommands(s.config.Directory)
+	commands = append(commands, builtinCommands...)
+
+	// Add custom commands from executor (config and file-based)
 	if s.commandExecutor != nil {
 		for _, cmd := range s.commandExecutor.List() {
-			commands = append(commands, map[string]any{
-				"name":        cmd.Name,
-				"description": cmd.Description,
-				"source":      cmd.Source,
-				"agent":       cmd.Agent,
-				"model":       cmd.Model,
-				"subtask":     cmd.Subtask,
+			commands = append(commands, CommandInfo{
+				Name:        cmd.Name,
+				Description: cmd.Description,
+				Template:    cmd.Template,
+				Agent:       cmd.Agent,
+				Model:       cmd.Model,
+				Subtask:     cmd.Subtask,
 			})
 		}
 	}
 
 	writeJSON(w, http.StatusOK, commands)
+}
+
+// getBuiltInCommands returns the built-in commands with their templates.
+func getBuiltInCommands(workDir string) []CommandInfo {
+	return []CommandInfo{
+		{
+			Name:        "init",
+			Description: "create/update AGENTS.md",
+			Template: `Please analyze this codebase and create an AGENTS.md file containing:
+1. Build/lint/test commands - especially for running a single test
+2. Code style guidelines including imports, formatting, types, naming conventions, error handling, etc.
+
+The file you create will be given to agentic coding agents (such as yourself) that operate in this repository. Make it about 20 lines long.
+If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (in .github/copilot-instructions.md), make sure to include them.
+
+If there's already an AGENTS.md, improve it if it's located in ` + workDir + `
+
+$ARGUMENTS
+`,
+		},
+		{
+			Name:        "review",
+			Description: "review changes [commit|branch|pr], defaults to uncommitted",
+			Template: `You are a code reviewer. Your job is to review code changes and provide actionable feedback.
+
+---
+
+Input: $ARGUMENTS
+
+---
+
+## Determining What to Review
+
+Based on the input provided, determine which type of review to perform:
+
+1. **No arguments (default)**: Review all uncommitted changes
+   - Run: ` + "`git diff`" + ` for unstaged changes
+   - Run: ` + "`git diff --cached`" + ` for staged changes
+
+2. **Commit hash** (40-char SHA or short hash): Review that specific commit
+   - Run: ` + "`git show $ARGUMENTS`" + `
+
+3. **Branch name**: Compare current branch to the specified branch
+   - Run: ` + "`git diff $ARGUMENTS...HEAD`" + `
+
+4. **PR URL or number** (contains "github.com" or "pull" or looks like a PR number): Review the pull request
+   - Run: ` + "`gh pr view $ARGUMENTS`" + ` to get PR context
+   - Run: ` + "`gh pr diff $ARGUMENTS`" + ` to get the diff
+
+Use best judgement when processing input.
+
+---
+
+## What to Look For
+
+**Bugs** - Your primary focus.
+- Logic errors, off-by-one mistakes, incorrect conditionals
+- Edge cases: null/empty inputs, error conditions, race conditions
+- Security issues: injection, auth bypass, data exposure
+- Broken error handling that swallows failures
+
+**Structure** - Does the code fit the codebase?
+- Does it follow existing patterns and conventions?
+- Are there established abstractions it should use but doesn't?
+
+**Performance** - Only flag if obviously problematic.
+- O(n²) on unbounded data, N+1 queries, blocking I/O on hot paths
+
+## Before You Flag Something
+
+Be certain. If you're going to call something a bug, you need to be confident it actually is one.
+
+- Only review the changes - do not review pre-existing code that wasn't modified
+- Don't flag something as a bug if you're unsure - investigate first
+- Don't flag style preferences as issues
+- Don't invent hypothetical problems - if an edge case matters, explain the realistic scenario where it breaks
+- If you need more context to be sure, use the tools below to get it
+
+## Tools
+
+Use these to inform your review:
+
+- **Explore agent** - Find how existing code handles similar problems. Check patterns, conventions, and prior art before claiming something doesn't fit.
+- **Exa Code Context** - Verify correct usage of libraries/APIs before flagging something as wrong.
+- **Exa Web Search** - Research best practices if you're unsure about a pattern.
+
+If you're uncertain about something and can't verify it with these tools, say "I'm not sure about X" rather than flagging it as a definite issue.
+
+## Tone and Approach
+
+1. If there is a bug, be direct and clear about why it is a bug.
+2. You should clearly communicate severity of issues, do not claim issues are more severe than they actually are.
+3. Critiques should clearly and explicitly communicate the scenarios, environments, or inputs that are necessary for the bug to arise. The comment should immediately indicate that the issue's severity depends on these factors.
+4. Your tone should be matter-of-fact and not accusatory or overly positive. It should read as a helpful AI assistant suggestion without sounding too much like a human reviewer.
+5. Write in a manner that allows reader to quickly understand issue without reading too closely.
+6. AVOID flattery, do not give any comments that are not helpful to the reader. Avoid phrasing like "Great job ...", "Thanks for ...".
+`,
+			Subtask: true,
+		},
+	}
 }
 
 // executeCommand handles POST /command/{name}

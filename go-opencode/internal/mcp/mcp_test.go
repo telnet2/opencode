@@ -2,9 +2,13 @@ package mcp
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewClient(t *testing.T) {
@@ -197,6 +201,28 @@ func TestServerInfo(t *testing.T) {
 	}
 	assert.Equal(t, "test-server", info.Name)
 	assert.Equal(t, "1.0.0", info.Version)
+}
+
+func TestHTTPClientWithHeaders(t *testing.T) {
+	headerCh := make(chan string, 1)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headerCh <- r.Header.Get("X-Test")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := httpClientWithHeaders(nil, map[string]string{"X-Test": "ok"})
+
+	req, err := http.NewRequest("GET", server.URL, nil)
+	require.NoError(t, err)
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, "ok", <-headerCh)
+	assert.Equal(t, time.Duration(0), client.Timeout)
 }
 
 func TestContent(t *testing.T) {

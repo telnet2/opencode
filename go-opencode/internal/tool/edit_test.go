@@ -206,8 +206,8 @@ func TestEditTool_FuzzyMatchSimilarity(t *testing.T) {
 func TestEditTool_Properties(t *testing.T) {
 	tool := NewEditTool("/tmp")
 
-	if tool.ID() != "Edit" {
-		t.Errorf("Expected ID 'Edit', got %q", tool.ID())
+	if tool.ID() != "edit" {
+		t.Errorf("Expected ID 'edit', got %q", tool.ID())
 	}
 
 	desc := tool.Description()

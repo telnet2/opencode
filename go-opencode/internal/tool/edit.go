@@ -41,7 +41,7 @@ func NewEditTool(workDir string) *EditTool {
 	return &EditTool{workDir: workDir}
 }
 
-func (t *EditTool) ID() string          { return "Edit" }
+func (t *EditTool) ID() string          { return "edit" }
 func (t *EditTool) Description() string { return editDescription }
 
 func (t *EditTool) Parameters() json.RawMessage {
@@ -130,6 +130,8 @@ func (t *EditTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 		Metadata: map[string]any{
 			"file":         params.FilePath,
 			"replacements": count,
+			"before":       text,
+			"after":        newText,
 		},
 	}, nil
 }
@@ -159,6 +161,11 @@ func (t *EditTool) fuzzyReplace(text string, params EditInput, toolCtx *Context)
 		return &Result{
 			Title:  fmt.Sprintf("Edited %s (normalized)", filepath.Base(params.FilePath)),
 			Output: "Replaced 1 occurrence (with line ending normalization)",
+			Metadata: map[string]any{
+				"file":   params.FilePath,
+				"before": text,
+				"after":  newText,
+			},
 		}, nil
 	}
 
@@ -183,6 +190,11 @@ func (t *EditTool) fuzzyReplace(text string, params EditInput, toolCtx *Context)
 		return &Result{
 			Title:  fmt.Sprintf("Edited %s (fuzzy)", filepath.Base(params.FilePath)),
 			Output: fmt.Sprintf("Replaced 1 occurrence (%.0f%% similarity)", similarity*100),
+			Metadata: map[string]any{
+				"file":   params.FilePath,
+				"before": text,
+				"after":  newText,
+			},
 		}, nil
 	}
 

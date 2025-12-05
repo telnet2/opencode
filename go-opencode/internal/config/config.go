@@ -13,21 +13,30 @@ import (
 )
 
 // Load loads configuration from multiple sources (priority order):
-// 1. Global config (~/.opencode/ - TypeScript compatible)
-// 2. Global config (~/.config/opencode/ - XDG compatible)
-// 3. Project config (.opencode/)
-// 4. OPENCODE_CONFIG file
-// 5. OPENCODE_CONFIG_CONTENT inline JSON
-// 6. Environment variables
+//  1. Global config (~/.opencode/ - TypeScript compatible)
+//  2. Global config (~/.config/opencode/ - XDG compatible)
+//  3. Project configs discovered while walking up from the working directory
+//     (opencode.json/opencode.jsonc and .opencode/opencode.json/opencode.jsonc)
+//  4. OPENCODE_CONFIG file
+//  5. OPENCODE_CONFIG_CONTENT inline JSON
+//  6. Environment variables
 func Load(directory string) (*types.Config, error) {
 	config := &types.Config{
 		Provider: make(map[string]types.ProviderConfig),
 		Agent:    make(map[string]types.AgentConfig),
+		Keybinds: types.DefaultKeybinds(),
 	}
 
 	// Track loaded files to avoid duplicates
 	loaded := make(map[string]bool)
 	var loadedFiles []string
+
+	// Normalize working directory for deterministic traversal
+	if directory != "" {
+		if absDir, err := filepath.Abs(directory); err == nil {
+			directory = absDir
+		}
+	}
 
 	loadOnce := func(path string, baseDir string) {
 		absPath, err := filepath.Abs(path)
@@ -60,13 +69,25 @@ func Load(directory string) (*types.Config, error) {
 	loadOnce(filepath.Join(globalPath, "opencode.json"), globalPath)
 	loadOnce(filepath.Join(globalPath, "opencode.jsonc"), globalPath)
 
-	// 3. Project config
+	var searchDirs []string
 	if directory != "" {
-		projectConfigDir := filepath.Join(directory, ".opencode")
-		loadOnce(filepath.Join(directory, "opencode.json"), directory)
-		loadOnce(filepath.Join(directory, "opencode.jsonc"), directory)
-		loadOnce(filepath.Join(projectConfigDir, "opencode.json"), projectConfigDir)
-		loadOnce(filepath.Join(projectConfigDir, "opencode.jsonc"), projectConfigDir)
+		searchDirs = walkUpDirectories(directory)
+	}
+
+	// 3. Project config (root -> leaf for top-level files)
+	if len(searchDirs) > 0 {
+		for i := len(searchDirs) - 1; i >= 0; i-- {
+			dir := searchDirs[i]
+			loadOnce(filepath.Join(dir, "opencode.jsonc"), dir)
+			loadOnce(filepath.Join(dir, "opencode.json"), dir)
+		}
+
+		// .opencode directories (leaf -> root, matching TS loader)
+		for _, dir := range searchDirs {
+			projectConfigDir := filepath.Join(dir, ".opencode")
+			loadOnce(filepath.Join(projectConfigDir, "opencode.jsonc"), projectConfigDir)
+			loadOnce(filepath.Join(projectConfigDir, "opencode.json"), projectConfigDir)
+		}
 	}
 
 	// 4. OPENCODE_CONFIG file override
@@ -227,6 +248,9 @@ func mergeConfig(target, source *types.Config) {
 	if source.Share != "" {
 		target.Share = source.Share
 	}
+
+	// Merge keybinds (per-field override)
+	target.Keybinds = types.MergeKeybinds(target.Keybinds, source.Keybinds)
 
 	// Merge tools
 	if source.Tools != nil {
@@ -390,4 +414,34 @@ func GetConfigDir() string {
 
 	// Fall back to XDG location
 	return GetPaths().Config
+}
+
+// walkUpDirectories returns a slice of directories from the starting directory
+// up to either the git root (if found) or filesystem root. The starting directory
+// is always the first element in the returned slice.
+func walkUpDirectories(start string) []string {
+	var dirs []string
+	current := start
+
+	for {
+		dirs = append(dirs, current)
+
+		if isGitRoot(current) {
+			break
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+
+	return dirs
+}
+
+// isGitRoot checks whether the provided directory contains a .git entry.
+func isGitRoot(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, ".git"))
+	return err == nil
 }

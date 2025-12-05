@@ -12,6 +12,7 @@ import (
 
 	"github.com/oklog/ulid/v2"
 
+	"github.com/opencode-ai/opencode/internal/event"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -273,6 +274,12 @@ func (s *Service) Fork(ctx context.Context, sessionID, messageID string) (*types
 
 // Abort aborts an active session.
 func (s *Service) Abort(ctx context.Context, sessionID string) error {
+	// Use the processor's abort mechanism which cancels the context
+	if s.processor != nil {
+		return s.processor.Abort(sessionID)
+	}
+
+	// Fallback to channel-based abort (legacy)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -317,14 +324,85 @@ func (s *Service) Unshare(ctx context.Context, sessionID string) error {
 	return s.storage.Put(ctx, []string{"session", session.ProjectID, session.ID}, session)
 }
 
-// Summarize generates a summary of the session.
-func (s *Service) Summarize(ctx context.Context, sessionID string) (*types.SessionSummary, error) {
+// Summarize initiates a compaction/summarization of the session.
+// This creates a user message with a compaction part and triggers the processing loop.
+func (s *Service) Summarize(ctx context.Context, sessionID, providerID, modelID string) error {
 	session, err := s.Get(ctx, sessionID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &session.Summary, nil
+	// Get the current agent from the last user message
+	messages, err := s.GetMessages(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	currentAgent := "default"
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "user" {
+			if messages[i].Agent != "" {
+				currentAgent = messages[i].Agent
+			}
+			break
+		}
+	}
+
+	// Create a user message with a compaction part
+	now := time.Now().UnixMilli()
+	userMsg := &types.Message{
+		ID:        ulid.Make().String(),
+		SessionID: sessionID,
+		Role:      "user",
+		Agent:     currentAgent,
+		Model: &types.ModelRef{
+			ProviderID: providerID,
+			ModelID:    modelID,
+		},
+		Time: types.MessageTime{
+			Created: now,
+		},
+	}
+
+	// Store the user message
+	if err := s.storage.Put(ctx, []string{"message", sessionID, userMsg.ID}, userMsg); err != nil {
+		return err
+	}
+
+	// Publish message created event
+	event.Publish(event.Event{
+		Type: event.MessageCreated,
+		Data: event.MessageCreatedData{Info: userMsg},
+	})
+
+	// Create the compaction part
+	compactionPart := &types.CompactionPart{
+		ID:        ulid.Make().String(),
+		SessionID: sessionID,
+		MessageID: userMsg.ID,
+		Type:      "compaction",
+		Auto:      false,
+	}
+
+	// Store the compaction part
+	if err := s.storage.Put(ctx, []string{"part", userMsg.ID, compactionPart.ID}, compactionPart); err != nil {
+		return err
+	}
+
+	// Publish part updated event
+	event.Publish(event.Event{
+		Type: event.MessagePartUpdated,
+		Data: event.MessagePartUpdatedData{Part: compactionPart},
+	})
+
+	// Trigger the processing loop
+	if s.processor != nil {
+		go func() {
+			s.processor.Process(context.Background(), session.ID, nil, nil)
+		}()
+	}
+
+	return nil
 }
 
 // GetDiffs returns diffs for a session.

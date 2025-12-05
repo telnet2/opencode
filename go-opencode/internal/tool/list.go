@@ -32,7 +32,7 @@ func NewListTool(workDir string) *ListTool {
 	return &ListTool{workDir: workDir}
 }
 
-func (t *ListTool) ID() string          { return "List" }
+func (t *ListTool) ID() string          { return "list" }
 func (t *ListTool) Description() string { return listDescription }
 
 func (t *ListTool) Parameters() json.RawMessage {

@@ -17,10 +17,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/event"
 )
+
+// SSE event counter for debugging
+var sseEventCounter uint64
+
+// SDKEvent represents an SDK-compatible event with proper JSON field ordering.
+// TypeScript expects: {"type": "...", "properties": {...}}
+type SDKEvent struct {
+	Type       event.EventType `json:"type"`
+	Properties any             `json:"properties"`
+}
 
 const (
 	// SSEHeartbeatInterval is the interval for SSE heartbeats.
@@ -31,28 +42,67 @@ const (
 type sseWriter struct {
 	w       http.ResponseWriter
 	flusher http.Flusher
+	rc      *http.ResponseController
 }
 
 // newSSEWriter creates a new SSE writer.
 func newSSEWriter(w http.ResponseWriter) (*sseWriter, error) {
+	// Use ResponseController for more reliable flushing (Go 1.20+)
+	rc := http.NewResponseController(w)
+
+	// Try to get flusher interface as well
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return nil, fmt.Errorf("streaming not supported")
 	}
 
-	return &sseWriter{w: w, flusher: flusher}, nil
+	return &sseWriter{w: w, flusher: flusher, rc: rc}, nil
 }
 
-// writeEvent writes an SSE event.
+// writeEvent writes an SSE event with optional throttling.
 func (s *sseWriter) writeEvent(eventType string, data any) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(s.w, "event: %s\n", eventType)
-	fmt.Fprintf(s.w, "data: %s\n\n", jsonData)
-	s.flusher.Flush()
+	// Log SSE event for debugging - include event type from data if available
+	count := atomic.AddUint64(&sseEventCounter, 1)
+	dataType := ""
+	switch d := data.(type) {
+	case SDKEvent:
+		dataType = string(d.Type)
+	case map[string]any:
+		// Handle both string and event.EventType (which is a string alias)
+		switch t := d["type"].(type) {
+		case string:
+			dataType = t
+		case event.EventType:
+			dataType = string(t)
+		}
+	}
+
+	t1 := time.Now()
+	fmt.Printf("[sse] #%d PRE-WRITE event=%s dataType=%s time=%s\n",
+		count, eventType, dataType, t1.Format("15:04:05.000"))
+
+	// Write SSE format: event type, data, and blank line
+	_, err = fmt.Fprintf(s.w, "event: %s\ndata: %s\n\n", eventType, jsonData)
+	if err != nil {
+		return err
+	}
+	t2 := time.Now()
+
+	// Flush immediately using ResponseController (more reliable than Flusher interface)
+	// This ensures data is sent even through middleware wrappers
+	if flushErr := s.rc.Flush(); flushErr != nil {
+		// Fallback to traditional flusher
+		s.flusher.Flush()
+	}
+	t3 := time.Now()
+
+	fmt.Printf("[sse] #%d POST-FLUSH event=%s dataType=%s write=%v flush=%v total=%v\n",
+		count, eventType, dataType, t2.Sub(t1), t3.Sub(t2), t3.Sub(t1))
 
 	return nil
 }
@@ -66,6 +116,7 @@ func (s *sseWriter) writeHeartbeat() {
 // allEvents handles SSE for all events (used by /event endpoint).
 // This is the main event endpoint that the TUI connects to.
 func (srv *Server) allEvents(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("[sse] allEvents: new connection from %s\n", r.RemoteAddr)
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -83,23 +134,27 @@ func (srv *Server) allEvents(w http.ResponseWriter, r *http.Request) {
 	sse.flusher.Flush()
 
 	// Send server.connected event first (SDK compatible)
-	connectedEvent := map[string]any{
-		"type":       "server.connected",
-		"properties": map[string]any{},
+	connectedEvent := SDKEvent{
+		Type:       "server.connected",
+		Properties: map[string]any{},
 	}
 	if err := sse.writeEvent("message", connectedEvent); err != nil {
 		return
 	}
 
-	// Channel for events
-	events := make(chan event.Event, 100)
+	// Channel for events - use small buffer for low-latency streaming
+	events := make(chan event.Event, 10)
 
 	// Subscribe to all events
+	var recvCounter uint64
 	unsub := event.SubscribeAll(func(e event.Event) {
+		count := atomic.AddUint64(&recvCounter, 1)
+		fmt.Printf("[sse] #%d recv type=%s time=%s\n",
+			count, e.Type, time.Now().Format("15:04:05.000"))
 		select {
 		case events <- e:
 		default:
-			// Drop event if channel is full
+			fmt.Printf("[sse] #%d DROPPED (channel full) type=%s\n", count, e.Type)
 		}
 	})
 	defer unsub()
@@ -108,18 +163,23 @@ func (srv *Server) allEvents(w http.ResponseWriter, r *http.Request) {
 	ticker := time.NewTicker(SSEHeartbeatInterval)
 	defer ticker.Stop()
 
+	fmt.Printf("[sse] allEvents: entering select loop, channel len=%d\n", len(events))
+
 	// Wait for client disconnect or context cancellation
 	for {
 		select {
 		case <-r.Context().Done():
+			fmt.Printf("[sse] allEvents: context done\n")
 			return
 		case e := <-events:
-			// SDK compatible format: use "properties" instead of "data"
-			data := map[string]any{
-				"type":       e.Type,
-				"properties": e.Data,
+			fmt.Printf("[sse] allEvents: got event from channel type=%s\n", e.Type)
+			// SDK compatible format: use struct for proper field ordering
+			data := SDKEvent{
+				Type:       e.Type,
+				Properties: e.Data,
 			}
 			if err := sse.writeEvent("message", data); err != nil {
+				fmt.Printf("[sse] allEvents: write error: %v\n", err)
 				return
 			}
 		case <-ticker.C:
@@ -130,6 +190,7 @@ func (srv *Server) allEvents(w http.ResponseWriter, r *http.Request) {
 
 // globalEvents handles SSE for all events.
 func (srv *Server) globalEvents(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("[sse] globalEvents: new connection from %s\n", r.RemoteAddr)
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -147,15 +208,19 @@ func (srv *Server) globalEvents(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	sse.flusher.Flush()
 
-	// Channel for events
-	events := make(chan event.Event, 100)
+	// Channel for events - use small buffer for low-latency streaming
+	events := make(chan event.Event, 10)
 
 	// Subscribe to all events
+	var recvCounter uint64
 	unsub := event.SubscribeAll(func(e event.Event) {
+		count := atomic.AddUint64(&recvCounter, 1)
+		fmt.Printf("[sse-global] #%d recv type=%s time=%s\n",
+			count, e.Type, time.Now().Format("15:04:05.000"))
 		select {
 		case events <- e:
 		default:
-			// Drop event if channel is full
+			fmt.Printf("[sse-global] #%d DROPPED (channel full) type=%s\n", count, e.Type)
 		}
 	})
 	defer unsub()
@@ -170,10 +235,10 @@ func (srv *Server) globalEvents(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case e := <-events:
-			// SDK compatible format: use "properties" instead of "data"
-			data := map[string]any{
-				"type":       e.Type,
-				"properties": e.Data,
+			// SDK compatible format: use struct for proper field ordering
+			data := SDKEvent{
+				Type:       e.Type,
+				Properties: e.Data,
 			}
 			if err := sse.writeEvent("message", data); err != nil {
 				return
@@ -209,8 +274,8 @@ func (srv *Server) sessionEvents(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	sse.flusher.Flush()
 
-	// Channel for events
-	events := make(chan event.Event, 100)
+	// Channel for events - use small buffer for low-latency streaming
+	events := make(chan event.Event, 10)
 
 	// Filter for session-specific events
 	unsub := event.SubscribeAll(func(e event.Event) {
@@ -233,10 +298,10 @@ func (srv *Server) sessionEvents(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case e := <-events:
-			// SDK compatible format: use "properties" instead of "data"
-			data := map[string]any{
-				"type":       e.Type,
-				"properties": e.Data,
+			// SDK compatible format: use struct for proper field ordering
+			data := SDKEvent{
+				Type:       e.Type,
+				Properties: e.Data,
 			}
 			if err := sse.writeEvent("message", data); err != nil {
 				return
@@ -263,6 +328,8 @@ func (srv *Server) eventBelongsToSession(e event.Event, sessionID string) bool {
 		return data.Info != nil && data.Info.ID == sessionID
 	case event.SessionDeletedData:
 		return data.Info != nil && data.Info.ID == sessionID
+	case event.SessionDiffData:
+		return data.SessionID == sessionID
 	case event.PermissionUpdatedData:
 		return data.SessionID == sessionID
 	case event.PermissionRepliedData:

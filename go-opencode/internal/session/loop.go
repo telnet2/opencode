@@ -58,12 +58,27 @@ func (p *Processor) runLoop(
 	var session types.Session
 	if err := p.storage.Get(ctx, []string{"session", sessionID}, &session); err != nil {
 		// Try to find session in any project
-		session, err := p.findSession(ctx, sessionID)
-		if err != nil {
-			return fmt.Errorf("session not found: %w", err)
+		foundSession, findErr := p.findSession(ctx, sessionID)
+		if findErr != nil {
+			return fmt.Errorf("session not found: %w", findErr)
 		}
-		_ = session
+		session = *foundSession
 	}
+
+	// Emit initial session.updated event
+	event.Publish(event.Event{
+		Type: event.SessionUpdated,
+		Data: event.SessionUpdatedData{Info: &session},
+	})
+
+	// Emit initial session.diff event (empty diffs at start)
+	event.Publish(event.Event{
+		Type: event.SessionDiff,
+		Data: event.SessionDiffData{
+			SessionID: sessionID,
+			Diff:      session.Summary.Diffs,
+		},
+	})
 
 	// Load messages
 	messages, err := p.loadMessages(ctx, sessionID)
@@ -82,13 +97,22 @@ func (p *Processor) runLoop(
 	}
 	// Load and log user message parts
 	userParts, _ := p.loadParts(ctx, lastMsg.ID)
+	var compactionPart *types.CompactionPart
 	for i, part := range userParts {
 		switch pt := part.(type) {
 		case *types.TextPart:
 			fmt.Printf("[loop] User message part %d: type=text content=%q\n", i, truncateStr(pt.Text, 50))
+		case *types.CompactionPart:
+			fmt.Printf("[loop] User message part %d: type=compaction auto=%v\n", i, pt.Auto)
+			compactionPart = pt
 		default:
 			fmt.Printf("[loop] User message part %d: type=%T\n", i, pt)
 		}
+	}
+
+	// If this is a compaction request, process it
+	if compactionPart != nil {
+		return p.processCompaction(ctx, sessionID, messages, compactionPart, callback)
 	}
 
 	// Get provider and model
@@ -125,9 +149,14 @@ func (p *Processor) runLoop(
 		ID:         generatePartID(),
 		SessionID:  sessionID,
 		Role:       "assistant",
+		ParentID:   lastMsg.ID, // Link to the user message that prompted this
 		ProviderID: providerID,
 		ModelID:    modelID,
 		Mode:       agent.Name, // Agent name (e.g., "Coder", "Build") - required by TUI
+		Path: &types.MessagePath{
+			Cwd:  session.Directory, // Current working directory from session
+			Root: session.Directory, // Root directory (same as cwd for now)
+		},
 		Time: types.MessageTime{
 			Created: now,
 		},
@@ -315,9 +344,10 @@ func (p *Processor) runLoop(
 			p.saveMessage(ctx, sessionID, assistantMsg)
 			return nil
 
-		case "tool_use", "tool_calls":
+		case "tool_use", "tool_calls", "tool-calls":
 			// Execute tools and continue loop
-			fmt.Printf("[loop] Got tool_use/tool_calls, calling executeToolCalls with %d parts\n", len(state.parts))
+			// Note: "tool-calls" is SDK compatible (TypeScript), "tool_use" is from some providers
+			fmt.Printf("[loop] Got tool_use/tool_calls/tool-calls, calling executeToolCalls with %d parts\n", len(state.parts))
 			if err := p.executeToolCalls(ctx, state, agent, callback); err != nil {
 				fmt.Printf("[loop] executeToolCalls returned error: %v\n", err)
 				// Tool execution errors don't stop the loop
