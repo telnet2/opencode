@@ -104,11 +104,13 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create user message parts
+	// Create user message parts (SDK compatible: include sessionID and messageID)
 	textPart := &types.TextPart{
-		ID:   generateID(),
-		Type: "text",
-		Text: content,
+		ID:        generateID(),
+		SessionID: sessionID,
+		MessageID: userMsg.ID,
+		Type:      "text",
+		Text:      content,
 	}
 	userParts := []types.Part{textPart}
 
@@ -118,23 +120,43 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add file parts if provided
-	for _, file := range req.Files {
-		file.ID = generateID()
-		file.Type = "file"
-		userParts = append(userParts, &file)
+	// Add file parts if provided (SDK compatible: include sessionID and messageID)
+	for i := range req.Files {
+		req.Files[i].ID = generateID()
+		req.Files[i].SessionID = sessionID
+		req.Files[i].MessageID = userMsg.ID
+		req.Files[i].Type = "file"
+		userParts = append(userParts, &req.Files[i])
 		// Save file part to storage
-		if err := s.sessionService.SavePart(r.Context(), userMsg.ID, &file); err != nil {
+		if err := s.sessionService.SavePart(r.Context(), userMsg.ID, &req.Files[i]); err != nil {
 			writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 			return
 		}
 	}
 
-	// Publish user message via SSE (not in HTTP response)
+	// Publish user message via SSE (SDK compatible: uses message.updated)
 	event.Publish(event.Event{
-		Type: "message.created",
-		Data: event.MessageCreatedData{Info: userMsg},
+		Type: event.MessageUpdated,
+		Data: event.MessageUpdatedData{Info: userMsg},
 	})
+
+	// Publish user message parts (SDK compatible: uses message.part.updated)
+	event.Publish(event.Event{
+		Type: event.MessagePartUpdated,
+		Data: event.MessagePartUpdatedData{
+			Part: textPart,
+		},
+	})
+
+	// Publish file parts if any
+	for i := range req.Files {
+		event.Publish(event.Event{
+			Type: event.MessagePartUpdated,
+			Data: event.MessagePartUpdatedData{
+				Part: &req.Files[i],
+			},
+		})
+	}
 
 	// Process message and generate response
 	// This is where the LLM provider is called
