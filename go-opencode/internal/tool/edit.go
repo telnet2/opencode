@@ -28,11 +28,12 @@ type EditTool struct {
 }
 
 // EditInput represents the input for the edit tool.
+// SDK compatible: uses camelCase field names to match TypeScript.
 type EditInput struct {
-	FilePath   string `json:"file_path"`
-	OldString  string `json:"old_string"`
-	NewString  string `json:"new_string"`
-	ReplaceAll bool   `json:"replace_all,omitempty"`
+	FilePath   string `json:"filePath"`
+	OldString  string `json:"oldString"`
+	NewString  string `json:"newString"`
+	ReplaceAll bool   `json:"replaceAll,omitempty"`
 }
 
 // NewEditTool creates a new edit tool.
@@ -47,24 +48,24 @@ func (t *EditTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"file_path": {
+			"filePath": {
 				"type": "string",
 				"description": "The absolute path to the file to edit"
 			},
-			"old_string": {
+			"oldString": {
 				"type": "string",
 				"description": "The exact text to replace"
 			},
-			"new_string": {
+			"newString": {
 				"type": "string",
 				"description": "The text to replace it with"
 			},
-			"replace_all": {
+			"replaceAll": {
 				"type": "boolean",
 				"description": "Replace all occurrences (default: false)"
 			}
 		},
-		"required": ["file_path", "old_string", "new_string"]
+		"required": ["filePath", "oldString", "newString"]
 	}`)
 }
 

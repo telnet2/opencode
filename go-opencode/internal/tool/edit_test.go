@@ -21,9 +21,9 @@ func TestEditTool_Execute(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "World",
-		"new_string": "Go"
+		"filePath": "` + testFile + `",
+		"oldString": "World",
+		"newString": "Go"
 	}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
@@ -52,13 +52,13 @@ func TestEditTool_StringNotFound(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "NotFound",
-		"new_string": "Replacement"
+		"filePath": "` + testFile + `",
+		"oldString": "NotFound",
+		"newString": "Replacement"
 	}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
-		t.Error("Expected error when old_string not found")
+		t.Error("Expected error when oldString not found")
 	}
 }
 
@@ -74,10 +74,10 @@ func TestEditTool_ReplaceAll(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "foo",
-		"new_string": "qux",
-		"replace_all": true
+		"filePath": "` + testFile + `",
+		"oldString": "foo",
+		"newString": "qux",
+		"replaceAll": true
 	}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
@@ -102,13 +102,13 @@ func TestEditTool_SameStrings(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "Hello",
-		"new_string": "Hello"
+		"filePath": "` + testFile + `",
+		"oldString": "Hello",
+		"newString": "Hello"
 	}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
-		t.Error("Expected error when old_string equals new_string")
+		t.Error("Expected error when oldString equals newString")
 	}
 	if !strings.Contains(err.Error(), "different") {
 		t.Errorf("Error should mention 'different', got: %v", err)
@@ -126,15 +126,15 @@ func TestEditTool_MultipleOccurrences(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	// Without replace_all, multiple occurrences should fail
+	// Without replaceAll, multiple occurrences should fail
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "foo",
-		"new_string": "qux"
+		"filePath": "` + testFile + `",
+		"oldString": "foo",
+		"newString": "qux"
 	}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
-		t.Error("Expected error when old_string appears multiple times without replace_all")
+		t.Error("Expected error when oldString appears multiple times without replaceAll")
 	}
 	if !strings.Contains(err.Error(), "3 times") {
 		t.Errorf("Error should mention occurrences, got: %v", err)
@@ -157,9 +157,9 @@ func TestEditTool_FuzzyMatchLineNormalization(t *testing.T) {
 
 	// Try to match with Unix-style line endings (should use normalized matching)
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "Hello\nWorld",
-		"new_string": "Goodbye\nWorld"
+		"filePath": "` + testFile + `",
+		"oldString": "Hello\nWorld",
+		"newString": "Goodbye\nWorld"
 	}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
@@ -187,9 +187,9 @@ func TestEditTool_FuzzyMatchSimilarity(t *testing.T) {
 
 	// Try to match with slightly different text (should use fuzzy matching)
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "Hello Wonderfull World",
-		"new_string": "Goodbye World"
+		"filePath": "` + testFile + `",
+		"oldString": "Hello Wonderfull World",
+		"newString": "Goodbye World"
 	}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 
@@ -231,17 +231,17 @@ func TestEditTool_Properties(t *testing.T) {
 	if !ok {
 		t.Error("Schema should have properties")
 	}
-	if _, ok := props["file_path"]; !ok {
-		t.Error("Schema should have file_path property")
+	if _, ok := props["filePath"]; !ok {
+		t.Error("Schema should have filePath property")
 	}
-	if _, ok := props["old_string"]; !ok {
-		t.Error("Schema should have old_string property")
+	if _, ok := props["oldString"]; !ok {
+		t.Error("Schema should have oldString property")
 	}
-	if _, ok := props["new_string"]; !ok {
-		t.Error("Schema should have new_string property")
+	if _, ok := props["newString"]; !ok {
+		t.Error("Schema should have newString property")
 	}
-	if _, ok := props["replace_all"]; !ok {
-		t.Error("Schema should have replace_all property")
+	if _, ok := props["replaceAll"]; !ok {
+		t.Error("Schema should have replaceAll property")
 	}
 }
 
@@ -264,9 +264,9 @@ func TestEditTool_FileNotFound(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "/nonexistent/file.txt",
-		"old_string": "foo",
-		"new_string": "bar"
+		"filePath": "/nonexistent/file.txt",
+		"oldString": "foo",
+		"newString": "bar"
 	}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
@@ -286,9 +286,9 @@ func TestEditTool_Metadata(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{
-		"file_path": "` + testFile + `",
-		"old_string": "World",
-		"new_string": "Go"
+		"filePath": "` + testFile + `",
+		"oldString": "World",
+		"newString": "Go"
 	}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {

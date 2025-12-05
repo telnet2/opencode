@@ -27,8 +27,8 @@ type SessionIdleData struct {
 
 // SessionErrorData is the data for session.error events.
 type SessionErrorData struct {
-	SessionID string             `json:"sessionID,omitempty"`
-	Error     *types.SessionError `json:"error,omitempty"`
+	SessionID string              `json:"sessionID,omitempty"`
+	Error     *types.MessageError `json:"error,omitempty"`
 }
 
 // MessageCreatedData is the data for message.created events.

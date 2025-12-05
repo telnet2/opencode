@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"time"
 
@@ -37,20 +38,29 @@ func (p *Processor) processStream(
 	}
 	_ = stepStartPart // We'll add step tracking later
 
+	fmt.Printf("[stream] Starting to receive chunks\n")
+	chunkCount := 0
+
 	for {
 		select {
 		case <-ctx.Done():
+			fmt.Printf("[stream] Context cancelled\n")
 			return "error", ctx.Err()
 		default:
 		}
 
 		msg, err := stream.Recv()
 		if err == io.EOF {
+			fmt.Printf("[stream] Received EOF after %d chunks\n", chunkCount)
 			break
 		}
 		if err != nil {
+			fmt.Printf("[stream] Error receiving chunk: %v\n", err)
 			return "error", err
 		}
+		chunkCount++
+		fmt.Printf("[stream] Chunk %d: content=%q, toolCalls=%d, responseMeta=%v\n",
+			chunkCount, truncate(msg.Content, 50), len(msg.ToolCalls), msg.ResponseMeta != nil)
 
 		// Process the message chunk
 		finishReason = p.processMessageChunk(ctx, msg, state, callback,
@@ -77,13 +87,13 @@ func (p *Processor) processStream(
 
 	// Finalize tool parts
 	for id, toolPart := range currentToolParts {
-		if accInput, ok := accumulatedToolInputs[id]; ok && toolPart.Input == nil {
+		if accInput, ok := accumulatedToolInputs[id]; ok && toolPart.State.Input == nil {
 			var input map[string]any
 			if err := json.Unmarshal([]byte(accInput), &input); err == nil {
-				toolPart.Input = input
+				toolPart.State.Input = input
 			}
 		}
-		toolPart.State = "running"
+		toolPart.State.Status = "running"
 		p.savePart(ctx, state.message.ID, toolPart)
 	}
 
@@ -96,7 +106,18 @@ func (p *Processor) processStream(
 		}
 	}
 
+	fmt.Printf("[stream] Finished with reason=%s, parts=%d, tokens=%v\n",
+		finishReason, len(state.parts), state.message.Tokens)
+
 	return finishReason, nil
+}
+
+// truncate truncates a string to the specified length.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }
 
 // processMessageChunk handles a single message chunk from the stream.
@@ -185,14 +206,18 @@ func (p *Processor) processMessageChunk(
 			// New tool call
 			now := time.Now().UnixMilli()
 			toolPart = &types.ToolPart{
-				ID:         generatePartID(),
-				SessionID:  state.message.SessionID,
-				MessageID:  state.message.ID,
-				Type:       "tool",
-				ToolCallID: tc.ID,
-				ToolName:   tc.Function.Name,
-				State:      "pending",
-				Time:       types.PartTime{Start: &now},
+				ID:        generatePartID(),
+				SessionID: state.message.SessionID,
+				MessageID: state.message.ID,
+				Type:      "tool",
+				CallID:    tc.ID,
+				Tool:      tc.Function.Name,
+				State: types.ToolState{
+					Status: "pending",
+					Input:  make(map[string]any),
+					Raw:    "",
+					Time:   &types.ToolTime{Start: now},
+				},
 			}
 			currentToolParts[tc.ID] = toolPart
 			accumulatedToolInputs[tc.ID] = ""
@@ -203,9 +228,10 @@ func (p *Processor) processMessageChunk(
 		// Accumulate arguments
 		if tc.Function.Arguments != "" {
 			accumulatedToolInputs[tc.ID] = tc.Function.Arguments
+			toolPart.State.Raw = tc.Function.Arguments
 			var input map[string]any
 			if err := json.Unmarshal([]byte(tc.Function.Arguments), &input); err == nil {
-				toolPart.Input = input
+				toolPart.State.Input = input
 			}
 
 			// Publish tool part update (SDK compatible: uses MessagePartUpdated)

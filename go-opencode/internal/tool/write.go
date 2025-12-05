@@ -25,8 +25,9 @@ type WriteTool struct {
 }
 
 // WriteInput represents the input for the write tool.
+// SDK compatible: uses camelCase field names to match TypeScript.
 type WriteInput struct {
-	FilePath string `json:"file_path"`
+	FilePath string `json:"filePath"`
 	Content  string `json:"content"`
 }
 
@@ -42,7 +43,7 @@ func (t *WriteTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"file_path": {
+			"filePath": {
 				"type": "string",
 				"description": "The absolute path to the file to write"
 			},
@@ -51,7 +52,7 @@ func (t *WriteTool) Parameters() json.RawMessage {
 				"description": "The content to write to the file"
 			}
 		},
-		"required": ["file_path", "content"]
+		"required": ["filePath", "content"]
 	}`)
 }
 
