@@ -35,7 +35,7 @@ func TestRegisterMCPTools_WithCalculator(t *testing.T) {
 	require.NoError(t, err, "failed to add calculator server")
 
 	// Create tool registry and register MCP tools
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Verify the sum tool is registered with prefixed name
@@ -78,7 +78,7 @@ func TestRegisterMCPTools_EinoToolExecution(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create tool registry and register MCP tools
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Get the sum tool
@@ -124,7 +124,7 @@ func TestRegisterMCPTools_ToolListContainsMCPTools(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create tool registry with built-in tools (using a temp dir for workDir)
-	registry := tool.DefaultRegistry(t.TempDir())
+	registry := tool.DefaultRegistry(t.TempDir(), nil)
 
 	// Count built-in tools before MCP registration
 	builtInCount := len(registry.List())
@@ -173,7 +173,7 @@ func TestMCPToolWrapper_ExecuteWithContext(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create tool registry and register MCP tools
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Get the sum tool
@@ -225,7 +225,7 @@ func TestMCPToolWrapper_ErrorHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create tool registry and register MCP tools
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Get the sum tool

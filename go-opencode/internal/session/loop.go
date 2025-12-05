@@ -66,13 +66,13 @@ func (p *Processor) runLoop(
 	}
 
 	// Emit initial session.updated event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionUpdated,
 		Data: event.SessionUpdatedData{Info: &session},
 	})
 
 	// Emit initial session.diff event (empty diffs at start)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionDiff,
 		Data: event.SessionDiffData{
 			SessionID: sessionID,
@@ -91,22 +91,16 @@ func (p *Processor) runLoop(
 	}
 
 	lastMsg := messages[len(messages)-1]
-	fmt.Printf("[loop] Loaded %d messages, last message role=%s id=%s\n", len(messages), lastMsg.Role, lastMsg.ID)
 	if lastMsg.Role != "user" {
 		return fmt.Errorf("expected user message, got %s", lastMsg.Role)
 	}
-	// Load and log user message parts
+	// Load user message parts
 	userParts, _ := p.loadParts(ctx, lastMsg.ID)
 	var compactionPart *types.CompactionPart
-	for i, part := range userParts {
-		switch pt := part.(type) {
-		case *types.TextPart:
-			fmt.Printf("[loop] User message part %d: type=text content=%q\n", i, truncateStr(pt.Text, 50))
-		case *types.CompactionPart:
-			fmt.Printf("[loop] User message part %d: type=compaction auto=%v\n", i, pt.Auto)
+	for _, part := range userParts {
+		if pt, ok := part.(*types.CompactionPart); ok {
 			compactionPart = pt
-		default:
-			fmt.Printf("[loop] User message part %d: type=%T\n", i, pt)
+			break
 		}
 	}
 
@@ -124,13 +118,10 @@ func (p *Processor) runLoop(
 		modelID = lastMsg.Model.ModelID
 	}
 
-	fmt.Printf("[loop] Looking up provider=%s model=%s\n", providerID, modelID)
 	prov, err := p.providerRegistry.Get(providerID)
 	if err != nil {
-		fmt.Printf("[loop] Provider lookup failed: %v\n", err)
 		return fmt.Errorf("provider not found: %w", err)
 	}
-	fmt.Printf("[loop] Found provider: %s\n", prov.ID())
 
 	model, err := p.providerRegistry.GetModel(providerID, modelID)
 	if err != nil {
@@ -173,7 +164,7 @@ func (p *Processor) runLoop(
 	callback(assistantMsg, nil)
 
 	// Publish event (SDK compatible: uses "info" field)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessageCreated,
 		Data: event.MessageCreatedData{Info: assistantMsg},
 	})
@@ -186,6 +177,15 @@ func (p *Processor) runLoop(
 	// Run loop
 	step := 0
 	retryBackoff := newRetryBackoff(ctx)
+
+	// Get user content from first message for title generation
+	userContent := ""
+	for _, part := range userParts {
+		if textPart, ok := part.(*types.TextPart); ok {
+			userContent = textPart.Text
+			break
+		}
+	}
 
 	for {
 		// Check context cancellation
@@ -218,7 +218,6 @@ func (p *Processor) runLoop(
 		if err != nil {
 			return fmt.Errorf("failed to reload messages: %w", err)
 		}
-		fmt.Printf("[loop] Reloaded %d messages for step %d\n", len(messages), step)
 
 		// Build completion request
 		req, err := p.buildCompletionRequest(ctx, sessionID, messages, assistantMsg, agent, model)
@@ -252,10 +251,8 @@ func (p *Processor) runLoop(
 		requestStart := time.Now()
 
 		// Call LLM with streaming
-		fmt.Printf("[loop] Calling CreateCompletion...\n")
 		stream, err := prov.CreateCompletion(ctx, req)
 		if err != nil {
-			fmt.Printf("[loop] CreateCompletion error: %v\n", err)
 			// Use exponential backoff with jitter for retries
 			nextInterval := retryBackoff.NextBackOff()
 			if nextInterval == backoff.Stop {
@@ -266,11 +263,9 @@ func (p *Processor) runLoop(
 			time.Sleep(nextInterval)
 			continue
 		}
-		fmt.Printf("[loop] CreateCompletion successful, processing stream...\n")
 
 		// Process stream
 		finishReason, err := p.processStream(ctx, stream, state, callback)
-		fmt.Printf("[loop] processStream returned: finishReason=%s, err=%v\n", finishReason, err)
 		stream.Close()
 
 		requestDuration := time.Since(requestStart)
@@ -335,6 +330,11 @@ func (p *Processor) runLoop(
 			state.message.Tokens = &types.TokenUsage{Input: 0, Output: 0}
 		}
 
+		// Generate title on first step completion (async, don't block)
+		if step == 0 && userContent != "" {
+			go p.ensureTitle(context.Background(), &session, userContent)
+		}
+
 		// Check finish reason
 		switch finishReason {
 		case "stop", "end_turn":
@@ -347,13 +347,10 @@ func (p *Processor) runLoop(
 		case "tool_use", "tool_calls", "tool-calls":
 			// Execute tools and continue loop
 			// Note: "tool-calls" is SDK compatible (TypeScript), "tool_use" is from some providers
-			fmt.Printf("[loop] Got tool_use/tool_calls/tool-calls, calling executeToolCalls with %d parts\n", len(state.parts))
 			if err := p.executeToolCalls(ctx, state, agent, callback); err != nil {
-				fmt.Printf("[loop] executeToolCalls returned error: %v\n", err)
 				// Tool execution errors don't stop the loop
 				// The error is captured in the tool part
 			}
-			fmt.Printf("[loop] executeToolCalls completed, step=%d\n", step)
 			step++
 			continue
 
@@ -424,7 +421,7 @@ func (p *Processor) saveMessage(ctx context.Context, sessionID string, msg *type
 	}
 
 	// Publish event (SDK compatible: uses "info" field)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessageUpdated,
 		Data: event.MessageUpdatedData{Info: msg},
 	})
@@ -470,29 +467,21 @@ func (p *Processor) buildCompletionRequest(
 		Content: systemPrompt.Build(),
 	})
 
-	fmt.Printf("[build] Processing %d messages for completion request\n", len(messages))
-
 	// Add conversation history
 	for _, msg := range messages {
-		fmt.Printf("[build] Message: role=%s, id=%s\n", msg.Role, msg.ID)
-
 		// Skip errored messages without content
 		if msg.Error != nil && !p.hasUsableContent(ctx, msg) {
-			fmt.Printf("[build] Skipping errored message without content\n")
 			continue
 		}
 
 		// Load parts for this message
 		parts, err := p.loadParts(ctx, msg.ID)
 		if err != nil {
-			fmt.Printf("[build] Failed to load parts for message %s: %v\n", msg.ID, err)
 			continue
 		}
-		fmt.Printf("[build] Loaded %d parts for message %s\n", len(parts), msg.ID)
 
 		// Skip messages with no parts (e.g., newly created empty assistant messages)
 		if len(parts) == 0 {
-			fmt.Printf("[build] Skipping message %s with no parts\n", msg.ID)
 			continue
 		}
 
@@ -503,9 +492,6 @@ func (p *Processor) buildCompletionRequest(
 		if msg.Role == "assistant" {
 			for _, part := range parts {
 				if toolPart, ok := part.(*types.ToolPart); ok {
-					fmt.Printf("[build] Found ToolPart: tool=%s, status=%s, callID=%s, output=%q\n",
-						toolPart.Tool, toolPart.State.Status, toolPart.CallID, truncateStr(toolPart.State.Output, 100))
-
 					// Only completed or errored tool parts should be added as results
 					if toolPart.State.Status == "completed" || toolPart.State.Status == "error" {
 						var toolContent string
@@ -514,9 +500,6 @@ func (p *Processor) buildCompletionRequest(
 						} else if toolPart.State.Error != "" {
 							toolContent = "Error: " + toolPart.State.Error
 						}
-
-						fmt.Printf("[build] Adding tool result message for callID=%s, content length=%d\n",
-							toolPart.CallID, len(toolContent))
 
 						toolMsg := &schema.Message{
 							Role:       schema.Tool,

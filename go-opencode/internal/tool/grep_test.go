@@ -292,8 +292,8 @@ func TestGrepTool_EinoTool(t *testing.T) {
 		t.Fatalf("Info failed: %v", err)
 	}
 
-	if info.Name != "Grep" {
-		t.Errorf("Expected name 'Grep', got %q", info.Name)
+	if info.Name != "grep" {
+		t.Errorf("Expected name 'grep', got %q", info.Name)
 	}
 }
 

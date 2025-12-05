@@ -285,7 +285,7 @@ func TestReadTool_EinoTool(t *testing.T) {
 		t.Fatalf("Info failed: %v", err)
 	}
 
-	if info.Name != "Read" {
-		t.Errorf("Expected name 'Read', got %q", info.Name)
+	if info.Name != "read" {
+		t.Errorf("Expected name 'read', got %q", info.Name)
 	}
 }

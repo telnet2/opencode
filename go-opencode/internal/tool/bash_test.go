@@ -232,8 +232,8 @@ func TestBashTool_EinoTool(t *testing.T) {
 		t.Fatalf("Info failed: %v", err)
 	}
 
-	if info.Name != "Bash" {
-		t.Errorf("Expected name 'Bash', got %q", info.Name)
+	if info.Name != "bash" {
+		t.Errorf("Expected name 'bash', got %q", info.Name)
 	}
 }
 

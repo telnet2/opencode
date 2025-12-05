@@ -34,7 +34,7 @@ func newMockTool(id, description string) *mockTool {
 }
 
 func TestRegistry_RegisterAndGet(t *testing.T) {
-	registry := NewRegistry("/tmp")
+	registry := NewRegistry("/tmp", nil)
 
 	tool := newMockTool("test_tool", "A test tool")
 	registry.Register(tool)
@@ -49,7 +49,7 @@ func TestRegistry_RegisterAndGet(t *testing.T) {
 }
 
 func TestRegistry_GetNotFound(t *testing.T) {
-	registry := NewRegistry("/tmp")
+	registry := NewRegistry("/tmp", nil)
 
 	_, ok := registry.Get("nonexistent")
 	if ok {
@@ -58,7 +58,7 @@ func TestRegistry_GetNotFound(t *testing.T) {
 }
 
 func TestRegistry_List(t *testing.T) {
-	registry := NewRegistry("/tmp")
+	registry := NewRegistry("/tmp", nil)
 
 	registry.Register(newMockTool("tool1", "Tool 1"))
 	registry.Register(newMockTool("tool2", "Tool 2"))
@@ -71,7 +71,7 @@ func TestRegistry_List(t *testing.T) {
 }
 
 func TestRegistry_IDs(t *testing.T) {
-	registry := NewRegistry("/tmp")
+	registry := NewRegistry("/tmp", nil)
 
 	registry.Register(newMockTool("alpha", "Alpha"))
 	registry.Register(newMockTool("beta", "Beta"))
@@ -91,7 +91,7 @@ func TestRegistry_IDs(t *testing.T) {
 }
 
 func TestRegistry_EinoTools(t *testing.T) {
-	registry := NewRegistry("/tmp")
+	registry := NewRegistry("/tmp", nil)
 
 	registry.Register(newMockTool("tool1", "Tool 1"))
 	registry.Register(newMockTool("tool2", "Tool 2"))
@@ -103,7 +103,7 @@ func TestRegistry_EinoTools(t *testing.T) {
 }
 
 func TestRegistry_ToolInfos(t *testing.T) {
-	registry := NewRegistry("/tmp")
+	registry := NewRegistry("/tmp", nil)
 
 	tool := &mockTool{
 		id:          "read_file",
@@ -136,10 +136,10 @@ func TestRegistry_ToolInfos(t *testing.T) {
 }
 
 func TestDefaultRegistry(t *testing.T) {
-	registry := DefaultRegistry("/tmp")
+	registry := DefaultRegistry("/tmp", nil)
 
-	// Check that core tools are registered
-	expectedTools := []string{"Read", "Write", "Edit", "Bash", "Glob", "Grep", "List"}
+	// Check that core tools are registered (lowercase to match TS-opencode)
+	expectedTools := []string{"read", "write", "edit", "bash", "glob", "grep", "list"}
 
 	for _, name := range expectedTools {
 		_, ok := registry.Get(name)
@@ -156,7 +156,7 @@ func TestDefaultRegistry(t *testing.T) {
 }
 
 func TestRegistry_ConcurrentAccess(t *testing.T) {
-	registry := NewRegistry("/tmp")
+	registry := NewRegistry("/tmp", nil)
 
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
@@ -181,7 +181,7 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 }
 
 func TestRegistry_ReplaceExisting(t *testing.T) {
-	registry := NewRegistry("/tmp")
+	registry := NewRegistry("/tmp", nil)
 
 	// Register initial tool
 	tool1 := newMockTool("mytool", "Original description")

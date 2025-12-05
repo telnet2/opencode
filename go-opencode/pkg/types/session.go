@@ -96,3 +96,12 @@ type TUIControlRequest struct {
 	Path string `json:"path"`
 	Body any    `json:"body"`
 }
+
+// TodoInfo represents a task item in a session's todo list.
+// Used by the TodoWrite and TodoRead tools to track progress.
+type TodoInfo struct {
+	ID       string `json:"id"`
+	Content  string `json:"content"`
+	Status   string `json:"status"`   // pending, in_progress, completed, cancelled
+	Priority string `json:"priority"` // high, medium, low
+}

@@ -38,7 +38,7 @@ func TestMCP_E2E_StdioTransport(t *testing.T) {
 	require.NoError(t, err)
 
 	// Register tools in registry
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Execute tool via registry
@@ -95,7 +95,7 @@ func TestMCP_E2E_SSETransport(t *testing.T) {
 	require.NoError(t, err)
 
 	// Register tools in registry
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Execute tool via registry
@@ -149,7 +149,7 @@ func TestMCP_E2E_MultipleServers(t *testing.T) {
 	assert.Equal(t, StatusConnected, status2.Status)
 
 	// Register tools in registry
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Verify both servers' tools are registered
@@ -210,7 +210,7 @@ func TestMCP_E2E_ServerFailure(t *testing.T) {
 	assert.NotNil(t, status.Error, "server should have error message")
 
 	// Create tool registry and register tools
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Registry should have no tools from the failed server
@@ -241,7 +241,7 @@ func TestMCP_E2E_ToolExecutionTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	// Register tools in registry
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Get the sum tool
@@ -295,7 +295,7 @@ func TestMCP_E2E_ServerDisconnection(t *testing.T) {
 	require.NoError(t, err)
 
 	// Register tools and verify
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	sumTool, ok := registry.Get("calc_disconnect_sum")
@@ -348,7 +348,7 @@ func TestMCP_E2E_DisabledServer(t *testing.T) {
 	assert.Equal(t, StatusDisabled, status.Status, "server should be disabled")
 
 	// Create tool registry and register tools
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Registry should have no tools from the disabled server
@@ -387,7 +387,7 @@ func TestMCP_E2E_EnvironmentVariables(t *testing.T) {
 	assert.Equal(t, StatusConnected, status.Status)
 
 	// Register and execute tool (verifies the server works with env vars)
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	sumTool, ok := registry.Get("calc_env_sum")
@@ -533,7 +533,7 @@ func TestMCP_E2E_MixedTransports(t *testing.T) {
 	require.NoError(t, err)
 
 	// Register tools
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 	RegisterMCPTools(client, registry)
 
 	// Execute tool from stdio server

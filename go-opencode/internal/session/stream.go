@@ -3,7 +3,6 @@ package session
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -32,6 +31,14 @@ func (p *Processor) processStream(
 	currentToolParts = make(map[string]*types.ToolPart)
 	accumulatedToolInputs = make(map[string]string)
 
+	// Track token usage across stream events
+	// Eino claude framework sends usage in two events:
+	// - MessageStartEvent (first): contains PromptTokens and cache info
+	// - MessageDeltaEvent (last): contains CompletionTokens only
+	// We need to merge both to get complete usage.
+	var inputTokens, completionTokens, cachedTokens int
+	var hasUsage bool
+
 	// Emit step-start part at the beginning of inference
 	stepStartPart := &types.StepStartPart{
 		ID:        generatePartID(),
@@ -41,48 +48,48 @@ func (p *Processor) processStream(
 	}
 	state.parts = append(state.parts, stepStartPart)
 	p.savePart(ctx, state.message.ID, stepStartPart)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessagePartUpdated,
 		Data: event.MessagePartUpdatedData{Part: stepStartPart},
 	})
 	callback(state.message, state.parts)
 
-	fmt.Printf("[stream] Starting to receive chunks\n")
-	chunkCount := 0
-	var lastChunkTime time.Time
-	var lastEventTime time.Time // For throttling event publishing
-
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("[stream] Context cancelled\n")
 			return "error", ctx.Err()
 		default:
 		}
 
 		msg, err := stream.Recv()
 		if err == io.EOF {
-			fmt.Printf("[stream] Received EOF after %d chunks\n", chunkCount)
 			break
 		}
 		if err != nil {
-			fmt.Printf("[stream] Error receiving chunk: %v\n", err)
 			return "error", err
 		}
-		chunkCount++
-		now := time.Now()
-		var delta time.Duration
-		if !lastChunkTime.IsZero() {
-			delta = now.Sub(lastChunkTime)
-		}
-		lastChunkTime = now
-		fmt.Printf("[stream] Chunk %d (+%v): content=%q, toolCalls=%d, responseMeta=%v\n",
-			chunkCount, delta, truncate(msg.Content, 50), len(msg.ToolCalls), msg.ResponseMeta != nil)
 
 		// Process the message chunk
 		finishReason = p.processMessageChunk(ctx, msg, state, callback,
 			&currentTextPart, &currentReasoningPart, currentToolParts,
-			&accumulatedContent, accumulatedToolInputs, &lastEventTime)
+			&accumulatedContent, accumulatedToolInputs)
+
+		// Collect token usage - merge from different stream events
+		// MessageStartEvent has PromptTokens, MessageDeltaEvent has CompletionTokens
+		if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
+			usage := msg.ResponseMeta.Usage
+			hasUsage = true
+			// Take the max of each field (first event has input, last has output)
+			if usage.PromptTokens > inputTokens {
+				inputTokens = usage.PromptTokens
+			}
+			if usage.CompletionTokens > completionTokens {
+				completionTokens = usage.CompletionTokens
+			}
+			if usage.PromptTokenDetails.CachedTokens > cachedTokens {
+				cachedTokens = usage.PromptTokenDetails.CachedTokens
+			}
+		}
 
 		if finishReason != "" {
 			break
@@ -103,10 +110,7 @@ func (p *Processor) processStream(
 	}
 
 	// Finalize tool parts
-	fmt.Printf("[stream] Finalizing %d tool parts\n", len(currentToolParts))
 	for id, toolPart := range currentToolParts {
-		fmt.Printf("[stream] Finalizing toolPart: id=%s, tool=%s, callID=%s, currentStatus=%s\n",
-			id, toolPart.Tool, toolPart.CallID, toolPart.State.Status)
 		if accInput, ok := accumulatedToolInputs[id]; ok && toolPart.State.Input == nil {
 			var input map[string]any
 			if err := json.Unmarshal([]byte(accInput), &input); err == nil {
@@ -114,7 +118,6 @@ func (p *Processor) processStream(
 			}
 		}
 		toolPart.State.Status = "running"
-		fmt.Printf("[stream] Set toolPart status to 'running': tool=%s, ptr=%p\n", toolPart.Tool, toolPart)
 		p.savePart(ctx, state.message.ID, toolPart)
 	}
 
@@ -133,6 +136,16 @@ func (p *Processor) processStream(
 		finishReason = "tool-calls"
 	}
 
+	// Apply merged token usage after stream completes
+	if hasUsage {
+		if state.message.Tokens == nil {
+			state.message.Tokens = &types.TokenUsage{}
+		}
+		state.message.Tokens.Input = inputTokens
+		state.message.Tokens.Output = completionTokens
+		state.message.Tokens.Cache.Read = cachedTokens
+	}
+
 	// Emit step-finish part at the end of inference with cost and token info
 	stepFinishPart := &types.StepFinishPart{
 		ID:        generatePartID(),
@@ -145,14 +158,11 @@ func (p *Processor) processStream(
 	}
 	state.parts = append(state.parts, stepFinishPart)
 	p.savePart(ctx, state.message.ID, stepFinishPart)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessagePartUpdated,
 		Data: event.MessagePartUpdatedData{Part: stepFinishPart},
 	})
 	callback(state.message, state.parts)
-
-	fmt.Printf("[stream] Finished with reason=%s, parts=%d, tokens=%v\n",
-		finishReason, len(state.parts), state.message.Tokens)
 
 	return finishReason, nil
 }
@@ -163,27 +173,6 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
-}
-
-// MinEventInterval is the minimum time between streaming events.
-// This ensures the TUI has time to process each event before the next arrives.
-// Set to slightly above TUI's 16ms batching window to prevent batching.
-const MinEventInterval = 20 * time.Millisecond
-
-// throttledPublish publishes an event with optional throttling to prevent TUI batching.
-func throttledPublish(e event.Event, lastEventTime *time.Time) {
-	if lastEventTime != nil && !lastEventTime.IsZero() {
-		elapsed := time.Since(*lastEventTime)
-		if elapsed < MinEventInterval {
-			sleepTime := MinEventInterval - elapsed
-			fmt.Printf("[stream] THROTTLE sleep=%v (elapsed=%v)\n", sleepTime, elapsed)
-			time.Sleep(sleepTime)
-		}
-	}
-	event.Publish(e)
-	if lastEventTime != nil {
-		*lastEventTime = time.Now()
-	}
 }
 
 // processMessageChunk handles a single message chunk from the stream.
@@ -197,7 +186,6 @@ func (p *Processor) processMessageChunk(
 	currentToolParts map[string]*types.ToolPart,
 	accumulatedContent *string,
 	accumulatedToolInputs map[string]string,
-	lastEventTime *time.Time,
 ) string {
 	var finishReason string
 
@@ -219,15 +207,13 @@ func (p *Processor) processMessageChunk(
 			*accumulatedContent = msg.Content
 
 			// Publish delta event for FIRST chunk (SDK compatible)
-			// This ensures the TUI receives and displays the first text chunk
-			// Note: Uses throttledPublish to prevent TUI batching
-			throttledPublish(event.Event{
+			event.PublishSync(event.Event{
 				Type: event.MessagePartUpdated,
 				Data: event.MessagePartUpdatedData{
 					Part:  *currentTextPart,
 					Delta: msg.Content, // First chunk IS the delta
 				},
-			}, lastEventTime)
+			})
 
 			callback(state.message, state.parts)
 		} else {
@@ -246,14 +232,13 @@ func (p *Processor) processMessageChunk(
 			}
 
 			// Publish delta event (SDK compatible: uses MessagePartUpdated)
-			// Note: Uses throttledPublish to prevent TUI batching
-			throttledPublish(event.Event{
+			event.PublishSync(event.Event{
 				Type: event.MessagePartUpdated,
 				Data: event.MessagePartUpdatedData{
 					Part:  *currentTextPart,
 					Delta: delta,
 				},
-			}, lastEventTime)
+			})
 
 			callback(state.message, state.parts)
 		}
@@ -292,14 +277,13 @@ func (p *Processor) processMessageChunk(
 			// Fallback: use ID-based tracking if Index not available
 			toolIndex = -1 // Will use ID map
 		} else {
-			fmt.Printf("[stream] Skipping tool call with no Index and no ID\n")
 			continue
 		}
 
 		// Determine lookup key - use index string or ID
 		var lookupKey string
 		if toolIndex >= 0 {
-			lookupKey = fmt.Sprintf("idx:%d", toolIndex)
+			lookupKey = "idx:" + string(rune('0'+toolIndex))
 		} else {
 			lookupKey = tc.ID
 		}
@@ -323,11 +307,9 @@ func (p *Processor) processMessageChunk(
 					Time:   &types.ToolTime{Start: now},
 				},
 			}
-			fmt.Printf("[stream] Created new ToolPart: tool=%s, callID=%s, index=%d\n", toolPart.Tool, toolPart.CallID, toolIndex)
 			currentToolParts[lookupKey] = toolPart
 			accumulatedToolInputs[lookupKey] = ""
 			state.parts = append(state.parts, toolPart)
-			fmt.Printf("[stream] Added toolPart to state.parts, total parts=%d\n", len(state.parts))
 			callback(state.message, state.parts)
 		}
 
@@ -336,18 +318,15 @@ func (p *Processor) processMessageChunk(
 			// Append arguments (eino sends deltas, not accumulated)
 			accumulatedToolInputs[lookupKey] += tc.Function.Arguments
 			toolPart.State.Raw = accumulatedToolInputs[lookupKey]
-			fmt.Printf("[stream] Tool %s accumulated args: %s\n", toolPart.Tool, truncate(accumulatedToolInputs[lookupKey], 100))
 
 			// Try to parse accumulated JSON
 			var input map[string]any
 			if err := json.Unmarshal([]byte(accumulatedToolInputs[lookupKey]), &input); err == nil {
 				toolPart.State.Input = input
-				fmt.Printf("[stream] Tool %s parsed input: %v\n", toolPart.Tool, input)
 			}
 
 			// Publish tool part update (SDK compatible: uses MessagePartUpdated)
-			// Note: Must use async Publish so SSE select loop can process events
-			event.Publish(event.Event{
+			event.PublishSync(event.Event{
 				Type: event.MessagePartUpdated,
 				Data: event.MessagePartUpdatedData{
 					Part: toolPart,
@@ -358,21 +337,10 @@ func (p *Processor) processMessageChunk(
 		}
 	}
 
-	// Check for response metadata (token usage)
-	if msg.ResponseMeta != nil {
-		if state.message.Tokens == nil {
-			state.message.Tokens = &types.TokenUsage{}
-		}
-
-		if msg.ResponseMeta.Usage != nil {
-			state.message.Tokens.Input = msg.ResponseMeta.Usage.PromptTokens
-			state.message.Tokens.Output = msg.ResponseMeta.Usage.CompletionTokens
-		}
-
-		// Check finish reason
-		if msg.ResponseMeta.FinishReason != "" {
-			finishReason = msg.ResponseMeta.FinishReason
-		}
+	// Check for finish reason in response metadata
+	// Note: Token usage is collected in processStream and applied after the stream completes
+	if msg.ResponseMeta != nil && msg.ResponseMeta.FinishReason != "" {
+		finishReason = msg.ResponseMeta.FinishReason
 	}
 
 	return finishReason

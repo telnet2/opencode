@@ -1,4 +1,26 @@
 // Package event provides a pub/sub event system for the server using watermill.
+//
+// # Subscriber Requirements
+//
+// When using PublishSync, subscribers are called synchronously in the publisher's
+// goroutine. To avoid blocking or deadlocks, subscribers MUST:
+//
+//   - Complete quickly (avoid long-running operations)
+//   - Use non-blocking channel sends (select with default case)
+//   - Never call Publish/PublishSync from within a subscriber (no re-entrant publishing)
+//   - Never acquire locks that the publisher might hold
+//
+// Example of a safe subscriber:
+//
+//	event.SubscribeAll(func(e event.Event) {
+//	    select {
+//	    case eventChan <- e:
+//	        // Event sent successfully
+//	    default:
+//	        // Channel full, drop event to avoid blocking
+//	        log.Warn("Event dropped due to full channel", "type", e.Type)
+//	    }
+//	})
 package event
 
 import (
@@ -31,6 +53,7 @@ const (
 	FileEdited         EventType = "file.edited"
 	PermissionUpdated  EventType = "permission.updated" // SDK compatible (was permission.required)
 	PermissionReplied  EventType = "permission.replied" // SDK compatible (was permission.resolved)
+	TodoUpdated        EventType = "todo.updated"
 
 	// Client Tool Events
 	ClientToolRequest      EventType = "client-tool.request"

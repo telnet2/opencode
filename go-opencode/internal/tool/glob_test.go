@@ -222,8 +222,8 @@ func TestGlobTool_EinoTool(t *testing.T) {
 		t.Fatalf("Info failed: %v", err)
 	}
 
-	if info.Name != "Glob" {
-		t.Errorf("Expected name 'Glob', got %q", info.Name)
+	if info.Name != "glob" {
+		t.Errorf("Expected name 'glob', got %q", info.Name)
 	}
 }
 
