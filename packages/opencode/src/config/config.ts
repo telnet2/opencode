@@ -627,6 +627,10 @@ export namespace Config {
           },
         ),
       instructions: z.array(z.string()).optional().describe("Additional instruction files or patterns to include"),
+      promptVariables: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe("Custom variables for prompt template interpolation (e.g., COMPANY_NAME, TEAM_NAME)"),
       layout: Layout.optional().describe("@deprecated Always uses stretch layout."),
       permission: z
         .object({

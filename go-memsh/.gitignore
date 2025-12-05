@@ -1,0 +1,9 @@
+/memsh
+/apiserver
+*.exe
+*.test
+*.out
+cmd/memsh/memsh
+cmd/webshell/webshell
+cmd/apiserver/apiserver
+cmd/apiclient/apiclient

@@ -33,6 +33,7 @@ export function DialogSessionList() {
           category = "Today"
         }
         const isDeleting = toDelete() === x.id
+
         return {
           title: isDeleting ? `Press ${deleteKeybind} again to confirm` : x.title,
           bg: isDeleting ? theme.error : undefined,

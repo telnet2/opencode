@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MemSh Web Shell</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #252526;
+            padding: 10px 20px;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #4ec9b0;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #f48771;
+        }
+
+        .status-indicator.connected {
+            background-color: #4ec9b0;
+        }
+
+        #terminal {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .prompt {
+            color: #4ec9b0;
+            margin-right: 8px;
+        }
+
+        #input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #d4d4d4;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+            caret-color: #d4d4d4;
+        }
+
+        .output {
+            color: #d4d4d4;
+        }
+
+        .error {
+            color: #f48771;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+
+        .command-history {
+            color: #858585;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🐚 MemSh Web Shell</h1>
+        <div class="status">
+            <div class="status-indicator" id="status-indicator"></div>
+            <span id="status-text">Disconnected</span>
+        </div>
+    </div>
+
+    <div id="terminal"></div>
+
+    <script>
+        let ws = null;
+        let terminal = document.getElementById('terminal');
+        let statusIndicator = document.getElementById('status-indicator');
+        let statusText = document.getElementById('status-text');
+        let inputBuffer = '';
+        let currentInput = null;
+        let commandHistory = [];
+        let historyIndex = -1;
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function() {
+                updateStatus(true);
+                createInputLine();
+            };
+
+            ws.onmessage = function(event) {
+                const data = event.data;
+
+                // Remove the current input line if it exists
+                if (currentInput) {
+                    currentInput.remove();
+                    currentInput = null;
+                }
+
+                // Append the output
+                const span = document.createElement('span');
+                span.className = 'output';
+                span.textContent = data;
+                terminal.appendChild(span);
+
+                // Create new input line if output ends with prompt
+                if (data.includes('memsh>')) {
+                    createInputLine();
+                }
+
+                scrollToBottom();
+            };
+
+            ws.onclose = function() {
+                updateStatus(false);
+                if (currentInput) {
+                    currentInput.remove();
+                    currentInput = null;
+                }
+                const span = document.createElement('span');
+                span.className = 'error';
+                span.textContent = '\r\nConnection closed. Refresh to reconnect.\r\n';
+                terminal.appendChild(span);
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function updateStatus(connected) {
+            if (connected) {
+                statusIndicator.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusIndicator.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        function createInputLine() {
+            const div = document.createElement('div');
+            div.className = 'input-line';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = 'input';
+            input.value = inputBuffer;
+            input.autocomplete = 'off';
+            input.spellcheck = false;
+
+            input.addEventListener('keydown', handleKeyDown);
+
+            div.appendChild(input);
+            terminal.appendChild(div);
+
+            currentInput = div;
+            input.focus();
+            scrollToBottom();
+        }
+
+        function handleKeyDown(event) {
+            const input = event.target;
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const command = input.value;
+
+                if (command.trim()) {
+                    commandHistory.push(command);
+                    historyIndex = commandHistory.length;
+                }
+
+                // Send command with newline
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(command + '\n');
+                }
+
+                inputBuffer = '';
+                input.value = '';
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    input.value = commandHistory[historyIndex];
+                    inputBuffer = input.value;
+                }
+            } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    input.value = commandHistory[historyIndex];
+                    inputBuffer = input.value;
+                } else {
+                    historyIndex = commandHistory.length;
+                    input.value = '';
+                    inputBuffer = '';
+                }
+            } else if (event.key === 'Tab') {
+                event.preventDefault();
+                // Tab completion could be implemented here
+            } else {
+                // Update buffer
+                setTimeout(() => {
+                    inputBuffer = input.value;
+                }, 0);
+            }
+        }
+
+        function scrollToBottom() {
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Focus input when clicking anywhere in terminal
+        terminal.addEventListener('click', function() {
+            const input = document.getElementById('input');
+            if (input) {
+                input.focus();
+            }
+        });
+
+        // Initialize connection
+        connect();
+
+        // Prevent context menu
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
