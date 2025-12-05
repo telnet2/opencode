@@ -486,6 +486,13 @@ func (p *Processor) buildCompletionRequest(
 		}
 
 		einoMsg := p.convertMessage(msg, parts)
+
+		// Skip messages that have no content and no tool calls
+		// (e.g., messages with only StepStartPart, StepFinishPart, etc.)
+		if einoMsg.Content == "" && len(einoMsg.ToolCalls) == 0 && einoMsg.ToolCallID == "" && einoMsg.ReasoningContent == "" {
+			continue
+		}
+
 		einoMessages = append(einoMessages, einoMsg)
 
 		// For assistant messages with tool parts, add separate tool result messages
@@ -499,6 +506,9 @@ func (p *Processor) buildCompletionRequest(
 							toolContent = toolPart.State.Output
 						} else if toolPart.State.Error != "" {
 							toolContent = "Error: " + toolPart.State.Error
+						} else {
+							// Anthropic API requires non-empty content for tool results
+							toolContent = "(no output)"
 						}
 
 						toolMsg := &schema.Message{
@@ -577,10 +587,13 @@ func (p *Processor) convertMessage(msg *types.Message, parts []types.Part) *sche
 	var toolCalls []schema.ToolCall
 	var toolCallID string
 
+	var reasoningContent string
 	for _, part := range parts {
 		switch pt := part.(type) {
 		case *types.TextPart:
 			content += pt.Text
+		case *types.ReasoningPart:
+			reasoningContent += pt.Text
 		case *types.ToolPart:
 			if msg.Role == "assistant" {
 				// For assistant messages, include all tool calls (even completed ones)
@@ -607,9 +620,10 @@ func (p *Processor) convertMessage(msg *types.Message, parts []types.Part) *sche
 	}
 
 	einoMsg := &schema.Message{
-		Role:      role,
-		Content:   content,
-		ToolCalls: toolCalls,
+		Role:             role,
+		Content:          content,
+		ToolCalls:        toolCalls,
+		ReasoningContent: reasoningContent,
 	}
 
 	if toolCallID != "" {
