@@ -196,7 +196,7 @@ func StartTestServer(opts ...TestServerOption) (*TestServer, error) {
 	}
 
 	// Initialize tools
-	toolReg := tool.DefaultRegistry(workDir)
+	toolReg := tool.DefaultRegistry(workDir, store)
 
 	// Configure server
 	serverConfig := server.DefaultConfig()

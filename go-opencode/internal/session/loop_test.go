@@ -56,7 +56,7 @@ func TestAgenticLoopWithRealLLM(t *testing.T) {
 	store := storage.New(tempDir)
 
 	// Create processor
-	toolReg := tool.DefaultRegistry(tempDir)
+	toolReg := tool.DefaultRegistry(tempDir, store)
 	permChecker := permission.NewChecker()
 	processor := NewProcessor(providerReg, toolReg, store, permChecker, "ark", modelID)
 

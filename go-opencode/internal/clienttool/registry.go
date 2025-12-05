@@ -105,7 +105,7 @@ func (r *Registry) Register(clientID string, tools []ToolDefinition) []string {
 	}
 
 	// Publish event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.ClientToolRegistered,
 		Data: event.ClientToolRegisteredData{
 			ClientID: clientID,
@@ -154,7 +154,7 @@ func (r *Registry) Unregister(clientID string, toolIDs []string) []string {
 	}
 
 	if len(unregistered) > 0 {
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.ClientToolUnregistered,
 			Data: event.ClientToolUnregisteredData{
 				ClientID: clientID,
@@ -231,7 +231,7 @@ func (r *Registry) Execute(ctx context.Context, clientID string, req ExecutionRe
 	r.mu.Unlock()
 
 	// Publish event for SSE clients
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.ClientToolRequest,
 		Data: event.ClientToolRequestData{
 			ClientID: clientID,
@@ -239,7 +239,7 @@ func (r *Registry) Execute(ctx context.Context, clientID string, req ExecutionRe
 		},
 	})
 
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.ClientToolExecuting,
 		Data: event.ClientToolStatusData{
 			SessionID: req.SessionID,
@@ -259,7 +259,7 @@ func (r *Registry) Execute(ctx context.Context, clientID string, req ExecutionRe
 		r.mu.Unlock()
 
 		if resp.Status == "error" {
-			event.Publish(event.Event{
+			event.PublishSync(event.Event{
 				Type: event.ClientToolFailed,
 				Data: event.ClientToolStatusData{
 					SessionID: req.SessionID,
@@ -273,7 +273,7 @@ func (r *Registry) Execute(ctx context.Context, clientID string, req ExecutionRe
 			return nil, errors.New(resp.Error)
 		}
 
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.ClientToolCompleted,
 			Data: event.ClientToolStatusData{
 				SessionID: req.SessionID,
@@ -297,7 +297,7 @@ func (r *Registry) Execute(ctx context.Context, clientID string, req ExecutionRe
 		delete(r.pending, req.RequestID)
 		r.mu.Unlock()
 
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.ClientToolFailed,
 			Data: event.ClientToolStatusData{
 				SessionID: req.SessionID,
@@ -371,7 +371,7 @@ func (r *Registry) Cleanup(clientID string) {
 		delete(r.tools, clientID)
 
 		if len(toolIDs) > 0 {
-			event.Publish(event.Event{
+			event.PublishSync(event.Event{
 				Type: event.ClientToolUnregistered,
 				Data: event.ClientToolUnregisteredData{
 					ClientID: clientID,

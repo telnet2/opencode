@@ -83,7 +83,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize tool registry
-	toolReg := tool.DefaultRegistry(workDir)
+	toolReg := tool.DefaultRegistry(workDir, store)
 
 	// Configure server
 	serverConfig := server.DefaultConfig()

@@ -164,7 +164,7 @@ func TestParseInputSchemaToParams(t *testing.T) {
 }
 
 func TestRegisterMCPTools_NilClient(t *testing.T) {
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 
 	// Should not panic with nil client
 	RegisterMCPTools(nil, registry)
@@ -184,7 +184,7 @@ func TestRegisterMCPTools_NilRegistry(t *testing.T) {
 func TestRegisterMCPTools_NoServers(t *testing.T) {
 	client := NewClient()
 	defer client.Close()
-	registry := tool.NewRegistry("")
+	registry := tool.NewRegistry("", nil)
 
 	// Register with no connected servers
 	RegisterMCPTools(client, registry)

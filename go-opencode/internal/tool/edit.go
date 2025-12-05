@@ -116,7 +116,7 @@ func (t *EditTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 
 	// Publish event (SDK compatible: just file path)
 	if toolCtx != nil && toolCtx.SessionID != "" {
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.FileEdited,
 			Data: event.FileEditedData{
 				File: params.FilePath,
@@ -150,7 +150,7 @@ func (t *EditTool) fuzzyReplace(text string, params EditInput, toolCtx *Context)
 
 		// Publish event (SDK compatible: just file path)
 		if toolCtx != nil && toolCtx.SessionID != "" {
-			event.Publish(event.Event{
+			event.PublishSync(event.Event{
 				Type: event.FileEdited,
 				Data: event.FileEditedData{
 					File: params.FilePath,
@@ -179,7 +179,7 @@ func (t *EditTool) fuzzyReplace(text string, params EditInput, toolCtx *Context)
 
 		// Publish event (SDK compatible: just file path)
 		if toolCtx != nil && toolCtx.SessionID != "" {
-			event.Publish(event.Event{
+			event.PublishSync(event.Event{
 				Type: event.FileEdited,
 				Data: event.FileEditedData{
 					File: params.FilePath,

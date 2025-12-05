@@ -139,13 +139,13 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Publish user message via SSE (SDK compatible: uses message.updated)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessageUpdated,
 		Data: event.MessageUpdatedData{Info: userMsg},
 	})
 
 	// Publish user message parts (SDK compatible: uses message.part.updated)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessagePartUpdated,
 		Data: event.MessagePartUpdatedData{
 			Part: textPart,
@@ -154,7 +154,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Publish file parts if any
 	for i := range req.Files {
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.MessagePartUpdated,
 			Data: event.MessagePartUpdatedData{
 				Part: &req.Files[i],
@@ -167,15 +167,10 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	// Updates are published via SSE, not streamed in HTTP response
 	// IMPORTANT: Use background context for LLM processing to avoid cancellation
 	// when the HTTP request completes. The LLM call can take seconds/minutes.
-	if req.Model != nil {
-		fmt.Printf("[message] Processing with provider=%s model=%s\n", req.Model.ProviderID, req.Model.ModelID)
-	} else {
-		fmt.Printf("[message] Processing with no model specified\n")
-	}
 	llmCtx := context.Background()
 	assistantMsg, parts, err := s.sessionService.ProcessMessage(llmCtx, session, content, req.Model, func(msg *types.Message, parts []types.Part) {
 		// Publish updates via SSE
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: "message.updated",
 			Data: event.MessageUpdatedData{Info: msg},
 		})
@@ -225,7 +220,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 			})
 
 			// Publish session.error event via SSE
-			event.Publish(event.Event{
+			event.PublishSync(event.Event{
 				Type: "session.error",
 				Data: event.SessionErrorData{
 					SessionID: sessionID,

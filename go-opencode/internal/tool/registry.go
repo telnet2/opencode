@@ -6,6 +6,7 @@ import (
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
+	"github.com/opencode-ai/opencode/internal/storage"
 )
 
 // Registry manages tool registration and lookup.
@@ -13,14 +14,21 @@ type Registry struct {
 	mu      sync.RWMutex
 	tools   map[string]Tool
 	workDir string
+	storage *storage.Storage
 }
 
 // NewRegistry creates a new tool registry.
-func NewRegistry(workDir string) *Registry {
+func NewRegistry(workDir string, store *storage.Storage) *Registry {
 	return &Registry{
 		tools:   make(map[string]Tool),
 		workDir: workDir,
+		storage: store,
 	}
+}
+
+// Storage returns the storage instance.
+func (r *Registry) Storage() *storage.Storage {
+	return r.storage
 }
 
 // Register adds a tool to the registry.
@@ -93,9 +101,9 @@ func (r *Registry) ToolInfos() ([]*schema.ToolInfo, error) {
 }
 
 // DefaultRegistry creates a registry with all built-in tools.
-func DefaultRegistry(workDir string) *Registry {
+func DefaultRegistry(workDir string, store *storage.Storage) *Registry {
 	fmt.Printf("[registry] Creating DefaultRegistry with workDir=%s\n", workDir)
-	r := NewRegistry(workDir)
+	r := NewRegistry(workDir, store)
 
 	// Register core tools
 	r.Register(NewReadTool(workDir))
@@ -105,6 +113,12 @@ func DefaultRegistry(workDir string) *Registry {
 	r.Register(NewGlobTool(workDir))
 	r.Register(NewGrepTool(workDir))
 	r.Register(NewListTool(workDir))
+
+	// Register todo tools
+	r.Register(NewTodoWriteTool(workDir, store))
+	r.Register(NewTodoReadTool(workDir, store))
+
+	// Note: TaskTool requires agent registry, register separately if needed
 
 	fmt.Printf("[registry] DefaultRegistry created with %d tools: %v\n", len(r.tools), r.IDs())
 	return r

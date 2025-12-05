@@ -248,7 +248,7 @@ func TestListTool_EinoTool(t *testing.T) {
 		t.Fatalf("Info failed: %v", err)
 	}
 
-	if info.Name != "List" {
-		t.Errorf("Expected name 'List', got %q", info.Name)
+	if info.Name != "list" {
+		t.Errorf("Expected name 'list', got %q", info.Name)
 	}
 }
