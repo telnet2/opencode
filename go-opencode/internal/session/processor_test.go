@@ -15,7 +15,7 @@ import (
 func TestNewProcessor(t *testing.T) {
 	store := storage.New(t.TempDir())
 
-	toolReg := tool.NewRegistry(t.TempDir())
+	toolReg := tool.NewRegistry(t.TempDir(), store)
 
 	proc := NewProcessor(nil, toolReg, store, nil, "", "")
 
@@ -27,7 +27,7 @@ func TestNewProcessor(t *testing.T) {
 func TestProcessor_IsProcessing(t *testing.T) {
 	store := storage.New(t.TempDir())
 
-	toolReg := tool.NewRegistry(t.TempDir())
+	toolReg := tool.NewRegistry(t.TempDir(), store)
 	proc := NewProcessor(nil, toolReg, store, nil, "", "")
 
 	// Initially not processing
@@ -45,7 +45,7 @@ func TestProcessor_IsProcessing(t *testing.T) {
 func TestProcessor_Abort(t *testing.T) {
 	store := storage.New(t.TempDir())
 
-	toolReg := tool.NewRegistry(t.TempDir())
+	toolReg := tool.NewRegistry(t.TempDir(), store)
 	proc := NewProcessor(nil, toolReg, store, nil, "", "")
 
 	// Try to abort non-existent session
@@ -78,7 +78,7 @@ func TestProcessor_Abort(t *testing.T) {
 func TestProcessor_GetActiveState(t *testing.T) {
 	store := storage.New(t.TempDir())
 
-	toolReg := tool.NewRegistry(t.TempDir())
+	toolReg := tool.NewRegistry(t.TempDir(), store)
 	proc := NewProcessor(nil, toolReg, store, nil, "", "")
 
 	// No active session

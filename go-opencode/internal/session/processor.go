@@ -106,7 +106,7 @@ func (p *Processor) Process(ctx context.Context, sessionID string, agent *Agent,
 	p.mu.Unlock()
 
 	// Emit session.status busy event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionStatus,
 		Data: event.SessionStatusData{
 			SessionID: sessionID,
@@ -126,7 +126,7 @@ func (p *Processor) Process(ctx context.Context, sessionID string, agent *Agent,
 		p.mu.Unlock()
 
 		// Emit session.status idle event (SDK compatible: TUI uses this to stop progress bar)
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.SessionStatus,
 			Data: event.SessionStatusData{
 				SessionID: sessionID,
@@ -135,7 +135,7 @@ func (p *Processor) Process(ctx context.Context, sessionID string, agent *Agent,
 		})
 
 		// Emit session.idle event when processing completes
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.SessionIdle,
 			Data: event.SessionIdleData{SessionID: sessionID},
 		})

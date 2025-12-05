@@ -67,7 +67,7 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Publish event (SDK compatible: uses "info" field)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionCreated,
 		Data: event.SessionCreatedData{Info: session},
 	})
@@ -105,7 +105,7 @@ func (s *Server) updateSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Publish event (SDK compatible: uses "info" field)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionUpdated,
 		Data: event.SessionUpdatedData{Info: session},
 	})
@@ -126,7 +126,7 @@ func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Publish event (SDK compatible: uses "info" field with full session)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionDeleted,
 		Data: event.SessionDeletedData{Info: session},
 	})
@@ -190,7 +190,7 @@ func (s *Server) forkSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Publish event (SDK compatible: uses "info" field)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionCreated,
 		Data: event.SessionCreatedData{Info: newSession},
 	})
@@ -428,7 +428,7 @@ func (s *Server) respondPermission(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Publish event (SDK compatible: uses PermissionReplied)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.PermissionReplied,
 		Data: event.PermissionRepliedData{
 			PermissionID: permissionID,

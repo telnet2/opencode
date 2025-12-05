@@ -204,8 +204,6 @@ func (p *Processor) processCompaction(
 	compactionPart *types.CompactionPart,
 	callback ProcessCallback,
 ) error {
-	fmt.Printf("[compact] Processing compaction for session %s\n", sessionID)
-
 	// Find session
 	session, err := p.findSession(ctx, sessionID)
 	if err != nil {
@@ -276,7 +274,7 @@ func (p *Processor) processCompaction(
 	callback(assistantMsg, nil)
 
 	// Publish message created event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessageCreated,
 		Data: event.MessageCreatedData{Info: assistantMsg},
 	})
@@ -296,7 +294,7 @@ func (p *Processor) processCompaction(
 	}
 
 	// Publish part created event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessagePartUpdated,
 		Data: event.MessagePartUpdatedData{Part: textPart},
 	})
@@ -340,7 +338,7 @@ func (p *Processor) processCompaction(
 		p.storage.Put(ctx, []string{"part", assistantMsg.ID, textPart.ID}, textPart)
 
 		// Publish streaming update with delta
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.MessagePartUpdated,
 			Data: event.MessagePartUpdatedData{
 				Part:  textPart,
@@ -358,18 +356,16 @@ func (p *Processor) processCompaction(
 	p.storage.Put(ctx, []string{"message", sessionID, assistantMsg.ID}, assistantMsg)
 
 	// Publish message updated event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessageUpdated,
 		Data: event.MessageUpdatedData{Info: assistantMsg},
 	})
 
 	// Publish session.compacted event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionCompacted,
 		Data: event.SessionCompactedData{SessionID: sessionID},
 	})
-
-	fmt.Printf("[compact] Compaction complete for session %s\n", sessionID)
 
 	// If auto-compaction, add a "Continue if you have next steps" message
 	if compactionPart.Auto {
@@ -394,11 +390,11 @@ func (p *Processor) processCompaction(
 		}
 		p.storage.Put(ctx, []string{"part", continueMsg.ID, continuePart.ID}, continuePart)
 
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.MessageCreated,
 			Data: event.MessageCreatedData{Info: continueMsg},
 		})
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.MessagePartUpdated,
 			Data: event.MessagePartUpdatedData{Part: continuePart},
 		})

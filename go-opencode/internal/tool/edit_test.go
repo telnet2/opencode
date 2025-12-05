@@ -317,8 +317,8 @@ func TestEditTool_EinoTool(t *testing.T) {
 		t.Fatalf("Info failed: %v", err)
 	}
 
-	if info.Name != "Edit" {
-		t.Errorf("Expected name 'Edit', got %q", info.Name)
+	if info.Name != "edit" {
+		t.Errorf("Expected name 'edit', got %q", info.Name)
 	}
 }
 

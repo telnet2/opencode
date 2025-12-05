@@ -75,7 +75,7 @@ func (t *WriteTool) Execute(ctx context.Context, input json.RawMessage, toolCtx 
 
 	// Publish file edited event (SDK compatible: just file path)
 	if toolCtx != nil && toolCtx.SessionID != "" {
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.FileEdited,
 			Data: event.FileEditedData{
 				File: params.FilePath,

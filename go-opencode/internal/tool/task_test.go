@@ -13,7 +13,7 @@ import (
 func TestNewTaskTool(t *testing.T) {
 	tool := NewTaskTool("/tmp", nil)
 	assert.NotNil(t, tool)
-	assert.Equal(t, "Task", tool.ID())
+	assert.Equal(t, "task", tool.ID())
 	assert.NotEmpty(t, tool.Description())
 }
 

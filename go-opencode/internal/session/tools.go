@@ -23,23 +23,6 @@ func (p *Processor) executeToolCalls(
 	agent *Agent,
 	callback ProcessCallback,
 ) error {
-	fmt.Printf("[tools] executeToolCalls called, state.parts=%d\n", len(state.parts))
-
-	// Log each part's type and status for debugging
-	for i, part := range state.parts {
-		switch tp := part.(type) {
-		case *types.ToolPart:
-			fmt.Printf("[tools] Part %d: ToolPart tool=%s status=%s callID=%s\n",
-				i, tp.Tool, tp.State.Status, tp.CallID)
-		case *types.TextPart:
-			fmt.Printf("[tools] Part %d: TextPart len=%d\n", i, len(tp.Text))
-		case *types.ReasoningPart:
-			fmt.Printf("[tools] Part %d: ReasoningPart len=%d\n", i, len(tp.Text))
-		default:
-			fmt.Printf("[tools] Part %d: %T\n", i, part)
-		}
-	}
-
 	// Find all running tool parts
 	var pendingTools []*types.ToolPart
 	for _, part := range state.parts {
@@ -50,18 +33,13 @@ func (p *Processor) executeToolCalls(
 		}
 	}
 
-	fmt.Printf("[tools] Found %d pending tools with status='running'\n", len(pendingTools))
-
 	// Execute each tool
 	for _, toolPart := range pendingTools {
-		fmt.Printf("[tools] About to execute tool: %s (callID=%s)\n", toolPart.Tool, toolPart.CallID)
 		err := p.executeSingleTool(ctx, state, agent, toolPart, callback)
 		if err != nil {
-			fmt.Printf("[tools] Tool execution error: %v\n", err)
 			// Error is captured in tool part, don't stop processing
 			continue
 		}
-		fmt.Printf("[tools] Tool execution completed: %s\n", toolPart.Tool)
 	}
 
 	return nil
@@ -75,20 +53,12 @@ func (p *Processor) executeSingleTool(
 	toolPart *types.ToolPart,
 	callback ProcessCallback,
 ) error {
-	fmt.Printf("[tools] executeSingleTool: tool=%s, callID=%s\n", toolPart.Tool, toolPart.CallID)
-
 	// Get the tool from registry
 	t, ok := p.toolRegistry.Get(toolPart.Tool)
 	if !ok {
-		fmt.Printf("[tools] Tool NOT FOUND in registry: %s\n", toolPart.Tool)
-		// List available tools for debugging
-		if p.toolRegistry != nil {
-			fmt.Printf("[tools] Available tools: %v\n", p.toolRegistry.List())
-		}
 		return p.failTool(ctx, state, toolPart, callback,
 			fmt.Sprintf("Tool not found: %s", toolPart.Tool))
 	}
-	fmt.Printf("[tools] Tool found in registry: %s\n", t.ID())
 
 	// Check permissions
 	if err := p.checkToolPermission(ctx, state, agent, toolPart); err != nil {
@@ -142,7 +112,7 @@ func (p *Processor) executeSingleTool(
 		}
 
 		// Publish event (SDK compatible: uses MessagePartUpdated)
-		event.Publish(event.Event{
+		event.PublishSync(event.Event{
 			Type: event.MessagePartUpdated,
 			Data: event.MessagePartUpdatedData{
 				Part: toolPart,
@@ -191,15 +161,13 @@ func (p *Processor) executeSingleTool(
 	}
 
 	// Record diff for edit-like tools when metadata contains before/after
-	if err := p.recordDiff(state, toolPart); err != nil {
-		fmt.Printf("[tools] failed to record diff: %v\n", err)
-	}
+	p.recordDiff(state, toolPart)
 
 	// Save updated part
 	p.savePart(ctx, state.message.ID, toolPart)
 
 	// Publish event (SDK compatible: uses MessagePartUpdated)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessagePartUpdated,
 		Data: event.MessagePartUpdatedData{
 			Part: toolPart,
@@ -226,7 +194,7 @@ func (p *Processor) failTool(
 	p.savePart(ctx, state.message.ID, toolPart)
 
 	// Publish event (SDK compatible: uses MessagePartUpdated)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessagePartUpdated,
 		Data: event.MessagePartUpdatedData{
 			Part: toolPart,
@@ -371,7 +339,7 @@ func (p *Processor) recordDiff(state *sessionState, toolPart *types.ToolPart) er
 	}
 
 	// Publish updated session diff
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.SessionDiff,
 		Data: event.SessionDiffData{SessionID: session.ID, Diff: session.Summary.Diffs},
 	})

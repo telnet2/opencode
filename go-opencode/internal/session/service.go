@@ -370,7 +370,7 @@ func (s *Service) Summarize(ctx context.Context, sessionID, providerID, modelID 
 	}
 
 	// Publish message created event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessageCreated,
 		Data: event.MessageCreatedData{Info: userMsg},
 	})
@@ -390,7 +390,7 @@ func (s *Service) Summarize(ctx context.Context, sessionID, providerID, modelID 
 	}
 
 	// Publish part updated event
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.MessagePartUpdated,
 		Data: event.MessagePartUpdatedData{Part: compactionPart},
 	})

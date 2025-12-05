@@ -200,7 +200,7 @@ func TestWriteTool_EinoTool(t *testing.T) {
 		t.Fatalf("Info failed: %v", err)
 	}
 
-	if info.Name != "Write" {
-		t.Errorf("Expected name 'Write', got %q", info.Name)
+	if info.Name != "write" {
+		t.Errorf("Expected name 'write', got %q", info.Name)
 	}
 }

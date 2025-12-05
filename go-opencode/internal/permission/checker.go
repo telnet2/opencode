@@ -100,7 +100,7 @@ func (c *Checker) Ask(ctx context.Context, req Request) error {
 	}()
 
 	// Publish permission request event (SDK compatible: uses PermissionUpdated)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.PermissionUpdated,
 		Data: event.PermissionUpdatedData{
 			ID:             req.ID,
@@ -151,7 +151,7 @@ func (c *Checker) Respond(requestID string, action string) {
 	}
 
 	// Publish resolved event (SDK compatible: uses PermissionReplied with sessionID)
-	event.Publish(event.Event{
+	event.PublishSync(event.Event{
 		Type: event.PermissionReplied,
 		Data: event.PermissionRepliedData{
 			PermissionID: requestID,
