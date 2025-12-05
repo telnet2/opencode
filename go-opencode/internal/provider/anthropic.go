@@ -116,6 +116,9 @@ func (p *AnthropicProvider) ChatModel() model.ToolCallingChatModel {
 
 // CreateCompletion creates a streaming completion.
 func (p *AnthropicProvider) CreateCompletion(ctx context.Context, req *CompletionRequest) (*CompletionStream, error) {
+	fmt.Printf("[anthropic] CreateCompletion: messages=%d, tools=%d, maxTokens=%d\n",
+		len(req.Messages), len(req.Tools), req.MaxTokens)
+
 	// Bind tools if provided
 	chatModel := p.chatModel
 	if len(req.Tools) > 0 {
@@ -124,16 +127,20 @@ func (p *AnthropicProvider) CreateCompletion(ctx context.Context, req *Completio
 		if err != nil {
 			return nil, fmt.Errorf("failed to bind tools: %w", err)
 		}
+		fmt.Printf("[anthropic] Bound %d tools\n", len(req.Tools))
 	}
 
 	// Create streaming request
+	fmt.Printf("[anthropic] Creating stream...\n")
 	stream, err := chatModel.Stream(ctx, req.Messages,
 		model.WithMaxTokens(req.MaxTokens),
 		model.WithTemperature(float32(req.Temperature)),
 	)
 	if err != nil {
+		fmt.Printf("[anthropic] Stream creation failed: %v\n", err)
 		return nil, fmt.Errorf("failed to create stream: %w", err)
 	}
+	fmt.Printf("[anthropic] Stream created successfully\n")
 
 	return NewCompletionStream(stream), nil
 }

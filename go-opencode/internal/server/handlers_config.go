@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 
@@ -35,49 +36,229 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.appConfig)
 }
 
-// ProviderInfo represents provider information for JSON serialization
+// ProviderModel represents a model in models.dev format for TUI compatibility.
+type ProviderModel struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	ReleaseDate string            `json:"release_date"`
+	Attachment  bool              `json:"attachment"`
+	Reasoning   bool              `json:"reasoning"`
+	Temperature bool              `json:"temperature"`
+	ToolCall    bool              `json:"tool_call"`
+	Cost        ModelCost         `json:"cost"`
+	Limit       ModelLimit        `json:"limit"`
+	Options     map[string]any    `json:"options"`
+	Modalities  *ModelModalities  `json:"modalities,omitempty"`
+	Status      string            `json:"status,omitempty"`
+}
+
+// ModelCost represents model pricing.
+type ModelCost struct {
+	Input      float64 `json:"input"`
+	Output     float64 `json:"output"`
+	CacheRead  float64 `json:"cache_read,omitempty"`
+	CacheWrite float64 `json:"cache_write,omitempty"`
+}
+
+// ModelLimit represents model limits.
+type ModelLimit struct {
+	Context int `json:"context"`
+	Output  int `json:"output"`
+}
+
+// ModelModalities represents model input/output modalities.
+type ModelModalities struct {
+	Input  []string `json:"input"`
+	Output []string `json:"output"`
+}
+
+// ProviderInfo represents provider information in models.dev format for TUI compatibility.
 type ProviderInfo struct {
-	ID     string        `json:"id"`
-	Name   string        `json:"name"`
-	Models []types.Model `json:"models"`
+	ID     string                   `json:"id"`
+	Name   string                   `json:"name"`
+	API    string                   `json:"api,omitempty"`
+	Env    []string                 `json:"env"`
+	Npm    string                   `json:"npm,omitempty"`
+	Models map[string]ProviderModel `json:"models"` // Map, not array!
+}
+
+// ProvidersResponse is the response format for /config/providers.
+type ProvidersResponse struct {
+	Providers []ProviderInfo    `json:"providers"`
+	Default   map[string]string `json:"default"`
+}
+
+// getDefaultProviders returns mock providers for TUI compatibility.
+// TODO: Replace with actual provider registration from models.dev.
+func getDefaultProviders() []ProviderInfo {
+	return []ProviderInfo{
+		{
+			ID:   "anthropic",
+			Name: "Anthropic",
+			Env:  []string{"ANTHROPIC_API_KEY"},
+			Npm:  "@ai-sdk/anthropic",
+			Models: map[string]ProviderModel{
+				"claude-sonnet-4-20250514": {
+					ID:          "claude-sonnet-4-20250514",
+					Name:        "Claude Sonnet 4",
+					ReleaseDate: "2025-05-14",
+					Attachment:  true,
+					Reasoning:   false,
+					Temperature: true,
+					ToolCall:    true,
+					Cost:        ModelCost{Input: 3.0, Output: 15.0, CacheRead: 0.3, CacheWrite: 3.75},
+					Limit:       ModelLimit{Context: 200000, Output: 64000},
+					Options:     map[string]any{},
+					Modalities:  &ModelModalities{Input: []string{"text", "image", "pdf"}, Output: []string{"text"}},
+				},
+				"claude-opus-4-20250514": {
+					ID:          "claude-opus-4-20250514",
+					Name:        "Claude Opus 4",
+					ReleaseDate: "2025-05-14",
+					Attachment:  true,
+					Reasoning:   false,
+					Temperature: true,
+					ToolCall:    true,
+					Cost:        ModelCost{Input: 15.0, Output: 75.0, CacheRead: 1.5, CacheWrite: 18.75},
+					Limit:       ModelLimit{Context: 200000, Output: 32000},
+					Options:     map[string]any{},
+					Modalities:  &ModelModalities{Input: []string{"text", "image", "pdf"}, Output: []string{"text"}},
+				},
+				"claude-3-5-haiku-20241022": {
+					ID:          "claude-3-5-haiku-20241022",
+					Name:        "Claude 3.5 Haiku",
+					ReleaseDate: "2024-10-22",
+					Attachment:  true,
+					Reasoning:   false,
+					Temperature: true,
+					ToolCall:    true,
+					Cost:        ModelCost{Input: 0.8, Output: 4.0, CacheRead: 0.08, CacheWrite: 1.0},
+					Limit:       ModelLimit{Context: 200000, Output: 8192},
+					Options:     map[string]any{},
+					Modalities:  &ModelModalities{Input: []string{"text", "image", "pdf"}, Output: []string{"text"}},
+				},
+			},
+		},
+		{
+			ID:   "openai",
+			Name: "OpenAI",
+			Env:  []string{"OPENAI_API_KEY"},
+			Npm:  "@ai-sdk/openai",
+			Models: map[string]ProviderModel{
+				"gpt-4o": {
+					ID:          "gpt-4o",
+					Name:        "GPT-4o",
+					ReleaseDate: "2024-05-13",
+					Attachment:  true,
+					Reasoning:   false,
+					Temperature: true,
+					ToolCall:    true,
+					Cost:        ModelCost{Input: 2.5, Output: 10.0},
+					Limit:       ModelLimit{Context: 128000, Output: 16384},
+					Options:     map[string]any{},
+					Modalities:  &ModelModalities{Input: []string{"text", "image"}, Output: []string{"text"}},
+				},
+				"gpt-4o-mini": {
+					ID:          "gpt-4o-mini",
+					Name:        "GPT-4o Mini",
+					ReleaseDate: "2024-07-18",
+					Attachment:  true,
+					Reasoning:   false,
+					Temperature: true,
+					ToolCall:    true,
+					Cost:        ModelCost{Input: 0.15, Output: 0.6},
+					Limit:       ModelLimit{Context: 128000, Output: 16384},
+					Options:     map[string]any{},
+					Modalities:  &ModelModalities{Input: []string{"text", "image"}, Output: []string{"text"}},
+				},
+			},
+		},
+	}
 }
 
 // listProviders handles GET /config/providers
 func (s *Server) listProviders(w http.ResponseWriter, r *http.Request) {
-	providers := s.providerReg.List()
-	result := make([]ProviderInfo, len(providers))
-	for i, p := range providers {
-		result[i] = ProviderInfo{
-			ID:     p.ID(),
-			Name:   p.Name(),
-			Models: p.Models(),
+	providers := getDefaultProviders()
+
+	// Build default model map (first model for each provider)
+	defaultModels := make(map[string]string)
+	for _, p := range providers {
+		for modelID := range p.Models {
+			defaultModels[p.ID] = modelID
+			break // Just get the first one
 		}
 	}
-	writeJSON(w, http.StatusOK, result)
+
+	response := ProvidersResponse{
+		Providers: providers,
+		Default:   defaultModels,
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+// ProviderListResponse is the response format for /provider.
+type ProviderListResponse struct {
+	All       []ProviderInfo    `json:"all"`
+	Default   map[string]string `json:"default"`
+	Connected []string          `json:"connected"`
 }
 
 // listAllProviders handles GET /provider
 func (s *Server) listAllProviders(w http.ResponseWriter, r *http.Request) {
-	providers := s.providerReg.List()
-	result := make([]ProviderInfo, len(providers))
-	for i, p := range providers {
-		result[i] = ProviderInfo{
-			ID:     p.ID(),
-			Name:   p.Name(),
-			Models: p.Models(),
+	providers := getDefaultProviders()
+
+	// Build default model map
+	defaultModels := make(map[string]string)
+	for _, p := range providers {
+		for modelID := range p.Models {
+			defaultModels[p.ID] = modelID
+			break
 		}
 	}
-	writeJSON(w, http.StatusOK, result)
+
+	// Get connected providers (those with API keys configured)
+	connected := []string{}
+	for _, p := range providers {
+		// Check if provider has API key in environment
+		for _, envVar := range p.Env {
+			if val := getEnvValue(envVar); val != "" {
+				connected = append(connected, p.ID)
+				break
+			}
+		}
+	}
+
+	response := ProviderListResponse{
+		All:       providers,
+		Default:   defaultModels,
+		Connected: connected,
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+// getEnvValue gets an environment variable value.
+func getEnvValue(key string) string {
+	return os.Getenv(key)
+}
+
+// AuthMethod represents an authentication method for a provider.
+type AuthMethod struct {
+	Type  string `json:"type"`  // "oauth" or "api"
+	Label string `json:"label"` // Display label
 }
 
 // getAuthMethods handles GET /provider/auth
+// Returns Record<string, AuthMethod[]> - map from provider ID to auth methods.
 func (s *Server) getAuthMethods(w http.ResponseWriter, r *http.Request) {
 	// Return available auth methods for providers
-	authMethods := []map[string]any{
-		{"provider": "anthropic", "type": "api_key", "envVar": "ANTHROPIC_API_KEY"},
-		{"provider": "openai", "type": "api_key", "envVar": "OPENAI_API_KEY"},
-		{"provider": "google", "type": "api_key", "envVar": "GOOGLE_API_KEY"},
-		{"provider": "bedrock", "type": "aws_credentials"},
+	// Format: { "providerId": [{"type": "api", "label": "..."}], ... }
+	authMethods := map[string][]AuthMethod{
+		"anthropic": {
+			{Type: "api", Label: "Manually enter API Key"},
+		},
+		"openai": {
+			{Type: "api", Label: "Manually enter API Key"},
+		},
 	}
 	writeJSON(w, http.StatusOK, authMethods)
 }
@@ -125,27 +306,33 @@ func (s *Server) getLSPStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, status)
 }
 
+// MCPServerStatus represents the status of an MCP server for TUI.
+// Status can be "connected", "disabled", or "failed".
+type MCPServerStatus struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"` // Only for failed status
+}
+
 // getMCPStatus handles GET /mcp
+// Returns Record<string, MCPServerStatus> - a map from server name to status.
 func (s *Server) getMCPStatus(w http.ResponseWriter, r *http.Request) {
-	if s.mcpClient == nil {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"enabled": false,
-			"servers": []any{},
-		})
-		return
+	// Return map of serverName -> status
+	statuses := make(map[string]MCPServerStatus)
+
+	if s.mcpClient != nil {
+		// Get status from actual MCP client (returns []ServerStatus)
+		for _, server := range s.mcpClient.Status() {
+			status := MCPServerStatus{
+				Status: string(server.Status),
+			}
+			if server.Error != nil {
+				status.Error = *server.Error
+			}
+			statuses[server.Name] = status
+		}
 	}
 
-	servers := s.mcpClient.Status()
-	tools := s.mcpClient.Tools()
-
-	status := map[string]any{
-		"enabled":        true,
-		"serverCount":    s.mcpClient.ServerCount(),
-		"connectedCount": s.mcpClient.ConnectedCount(),
-		"servers":        servers,
-		"tools":          tools,
-	}
-	writeJSON(w, http.StatusOK, status)
+	writeJSON(w, http.StatusOK, statuses)
 }
 
 // addMCPServer handles POST /mcp

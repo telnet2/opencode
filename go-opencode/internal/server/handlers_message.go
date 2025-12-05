@@ -1,11 +1,14 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/opencode-ai/opencode/internal/event"
 	"github.com/opencode-ai/opencode/pkg/types"
 )
 
@@ -127,42 +130,95 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Stream user message
-	encoder := json.NewEncoder(w)
-	encoder.Encode(MessageResponse{
-		Info:  userMsg,
-		Parts: userParts,
+	// Publish user message via SSE (not in HTTP response)
+	event.Publish(event.Event{
+		Type: "message.created",
+		Data: event.MessageCreatedData{Info: userMsg},
 	})
-	flusher.Flush()
 
 	// Process message and generate response
 	// This is where the LLM provider is called
-	assistantMsg, parts, err := s.sessionService.ProcessMessage(r.Context(), session, content, req.Model, func(msg *types.Message, parts []types.Part) {
-		// Stream each update
-		encoder.Encode(MessageResponse{
-			Info:  msg,
-			Parts: parts,
+	// Updates are published via SSE, not streamed in HTTP response
+	// IMPORTANT: Use background context for LLM processing to avoid cancellation
+	// when the HTTP request completes. The LLM call can take seconds/minutes.
+	if req.Model != nil {
+		fmt.Printf("[message] Processing with provider=%s model=%s\n", req.Model.ProviderID, req.Model.ModelID)
+	} else {
+		fmt.Printf("[message] Processing with no model specified\n")
+	}
+	llmCtx := context.Background()
+	assistantMsg, parts, err := s.sessionService.ProcessMessage(llmCtx, session, content, req.Model, func(msg *types.Message, parts []types.Part) {
+		// Publish updates via SSE
+		event.Publish(event.Event{
+			Type: "message.updated",
+			Data: event.MessageUpdatedData{Info: msg},
 		})
-		flusher.Flush()
 	})
 
+	// Create JSON encoder for response
+	encoder := json.NewEncoder(w)
+
 	if err != nil {
-		// Send final message with error - still include collected parts
-		errResp := MessageResponse{
-			Info:  assistantMsg,
-			Parts: parts,
+		// Create error object
+		msgError := types.NewUnknownError(err.Error())
+
+		// Send error response as an assistant message
+		if assistantMsg != nil {
+			// We have a partial assistant message - add error info
+			assistantMsg.Error = msgError
+			encoder.Encode(MessageResponse{
+				Info:  assistantMsg,
+				Parts: parts,
+			})
+		} else {
+			// No assistant message yet - create error message
+			errorMsg := &types.Message{
+				ID:        generateID(),
+				SessionID: sessionID,
+				Role:      "assistant",
+				Time: types.MessageTime{
+					Created: nowMillis(),
+				},
+				Error:  msgError,
+				Tokens: &types.TokenUsage{Input: 0, Output: 0}, // TUI expects tokens to be present
+			}
+			if req.Model != nil {
+				errorMsg.ProviderID = req.Model.ProviderID
+				errorMsg.ModelID = req.Model.ModelID
+			}
+			errorParts := []types.Part{
+				&types.TextPart{
+					ID:   generateID(),
+					Type: "text",
+					Text: fmt.Sprintf("Error: %s", err.Error()),
+				},
+			}
+			encoder.Encode(MessageResponse{
+				Info:  errorMsg,
+				Parts: errorParts,
+			})
+
+			// Publish session.error event via SSE
+			event.Publish(event.Event{
+				Type: "session.error",
+				Data: event.SessionErrorData{
+					SessionID: sessionID,
+					Error:     msgError,
+				},
+			})
 		}
-		encoder.Encode(errResp)
 		flusher.Flush()
 		return
 	}
 
-	// Final message
-	encoder.Encode(MessageResponse{
-		Info:  assistantMsg,
-		Parts: parts,
-	})
-	flusher.Flush()
+	// Final message - only send if we have a valid assistant message
+	if assistantMsg != nil {
+		encoder.Encode(MessageResponse{
+			Info:  assistantMsg,
+			Parts: parts,
+		})
+		flusher.Flush()
+	}
 }
 
 // getMessages handles GET /session/{sessionID}/message
@@ -176,9 +232,14 @@ func (s *Server) getMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Include parts for each message
-	var result []MessageResponse
+	// Initialize as empty slice to ensure we return [] not null
+	result := make([]MessageResponse, 0, len(messages))
 	for _, msg := range messages {
 		parts, _ := s.sessionService.GetParts(r.Context(), msg.ID)
+		// Ensure parts is not null
+		if parts == nil {
+			parts = []types.Part{}
+		}
 		result = append(result, MessageResponse{
 			Info:  msg,
 			Parts: parts,
@@ -200,6 +261,10 @@ func (s *Server) getMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	parts, _ := s.sessionService.GetParts(r.Context(), messageID)
+	// Ensure parts is not null
+	if parts == nil {
+		parts = []types.Part{}
+	}
 
 	writeJSON(w, http.StatusOK, MessageResponse{
 		Info:  msg,

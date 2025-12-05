@@ -28,8 +28,9 @@ type ReadTool struct {
 }
 
 // ReadInput represents the input for the read tool.
+// SDK compatible: uses camelCase field names to match TypeScript.
 type ReadInput struct {
-	FilePath string `json:"file_path"`
+	FilePath string `json:"filePath"`
 	Offset   int    `json:"offset,omitempty"`
 	Limit    int    `json:"limit,omitempty"`
 }
@@ -46,7 +47,7 @@ func (t *ReadTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"file_path": {
+			"filePath": {
 				"type": "string",
 				"description": "The absolute path to the file to read"
 			},
@@ -59,7 +60,7 @@ func (t *ReadTool) Parameters() json.RawMessage {
 				"description": "Number of lines to read (default: 2000)"
 			}
 		},
-		"required": ["file_path"]
+		"required": ["filePath"]
 	}`)
 }
 
