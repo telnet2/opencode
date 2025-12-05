@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/schema"
@@ -86,7 +87,10 @@ func (p *Processor) processStream(
 	}
 
 	// Finalize tool parts
+	fmt.Printf("[stream] Finalizing %d tool parts\n", len(currentToolParts))
 	for id, toolPart := range currentToolParts {
+		fmt.Printf("[stream] Finalizing toolPart: id=%s, tool=%s, callID=%s, currentStatus=%s\n",
+			id, toolPart.Tool, toolPart.CallID, toolPart.State.Status)
 		if accInput, ok := accumulatedToolInputs[id]; ok && toolPart.State.Input == nil {
 			var input map[string]any
 			if err := json.Unmarshal([]byte(accInput), &input); err == nil {
@@ -94,6 +98,7 @@ func (p *Processor) processStream(
 			}
 		}
 		toolPart.State.Status = "running"
+		fmt.Printf("[stream] Set toolPart status to 'running': tool=%s, ptr=%p\n", toolPart.Tool, toolPart)
 		p.savePart(ctx, state.message.ID, toolPart)
 	}
 
@@ -150,17 +155,28 @@ func (p *Processor) processMessageChunk(
 			}
 			state.parts = append(state.parts, *currentTextPart)
 			*accumulatedContent = msg.Content
+
+			// Publish delta event for FIRST chunk (SDK compatible)
+			// This ensures the TUI receives and displays the first text chunk
+			event.Publish(event.Event{
+				Type: event.MessagePartUpdated,
+				Data: event.MessagePartUpdatedData{
+					Part:  *currentTextPart,
+					Delta: msg.Content, // First chunk IS the delta
+				},
+			})
+
 			callback(state.message, state.parts)
 		} else {
-			// Check if this is accumulated content (longer than previous) or delta content (shorter)
+			// Check if this is accumulated content (starts with previous) or delta content (new chunk only)
 			var delta string
-			if len(msg.Content) > len(*accumulatedContent) {
-				// Accumulated mode: extract delta from difference
+			if strings.HasPrefix(msg.Content, *accumulatedContent) {
+				// Accumulated mode: new content STARTS WITH all previous content
 				delta = msg.Content[len(*accumulatedContent):]
 				(*currentTextPart).Text = msg.Content
 				*accumulatedContent = msg.Content
 			} else {
-				// Delta mode: append delta directly
+				// Delta mode: new content is just the new part
 				delta = msg.Content
 				*accumulatedContent += msg.Content
 				(*currentTextPart).Text = *accumulatedContent
@@ -200,10 +216,34 @@ func (p *Processor) processMessageChunk(
 	}
 
 	// Handle tool calls
+	// The eino streaming model uses Index to track tool calls:
+	// - Start event: Index=N, ID="toolu_xxx", Name="Read"
+	// - Delta events: Index=N, ID="", Name="", Arguments='{"partial...'
 	for _, tc := range msg.ToolCalls {
-		toolPart, exists := currentToolParts[tc.ID]
-		if !exists {
-			// New tool call
+		// Use Index to track tool calls (eino streaming model)
+		var toolIndex int
+		if tc.Index != nil {
+			toolIndex = *tc.Index
+		} else if tc.ID != "" {
+			// Fallback: use ID-based tracking if Index not available
+			toolIndex = -1 // Will use ID map
+		} else {
+			fmt.Printf("[stream] Skipping tool call with no Index and no ID\n")
+			continue
+		}
+
+		// Determine lookup key - use index string or ID
+		var lookupKey string
+		if toolIndex >= 0 {
+			lookupKey = fmt.Sprintf("idx:%d", toolIndex)
+		} else {
+			lookupKey = tc.ID
+		}
+
+		toolPart, exists := currentToolParts[lookupKey]
+
+		// New tool call (has ID and Name)
+		if !exists && tc.ID != "" && tc.Function.Name != "" {
 			now := time.Now().UnixMilli()
 			toolPart = &types.ToolPart{
 				ID:        generatePartID(),
@@ -219,19 +259,26 @@ func (p *Processor) processMessageChunk(
 					Time:   &types.ToolTime{Start: now},
 				},
 			}
-			currentToolParts[tc.ID] = toolPart
-			accumulatedToolInputs[tc.ID] = ""
+			fmt.Printf("[stream] Created new ToolPart: tool=%s, callID=%s, index=%d\n", toolPart.Tool, toolPart.CallID, toolIndex)
+			currentToolParts[lookupKey] = toolPart
+			accumulatedToolInputs[lookupKey] = ""
 			state.parts = append(state.parts, toolPart)
+			fmt.Printf("[stream] Added toolPart to state.parts, total parts=%d\n", len(state.parts))
 			callback(state.message, state.parts)
 		}
 
-		// Accumulate arguments
-		if tc.Function.Arguments != "" {
-			accumulatedToolInputs[tc.ID] = tc.Function.Arguments
-			toolPart.State.Raw = tc.Function.Arguments
+		// Accumulate arguments (delta chunks have arguments but no ID/Name)
+		if tc.Function.Arguments != "" && toolPart != nil {
+			// Append arguments (eino sends deltas, not accumulated)
+			accumulatedToolInputs[lookupKey] += tc.Function.Arguments
+			toolPart.State.Raw = accumulatedToolInputs[lookupKey]
+			fmt.Printf("[stream] Tool %s accumulated args: %s\n", toolPart.Tool, truncate(accumulatedToolInputs[lookupKey], 100))
+
+			// Try to parse accumulated JSON
 			var input map[string]any
-			if err := json.Unmarshal([]byte(tc.Function.Arguments), &input); err == nil {
+			if err := json.Unmarshal([]byte(accumulatedToolInputs[lookupKey]), &input); err == nil {
 				toolPart.State.Input = input
+				fmt.Printf("[stream] Tool %s parsed input: %v\n", toolPart.Tool, input)
 			}
 
 			// Publish tool part update (SDK compatible: uses MessagePartUpdated)
