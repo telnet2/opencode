@@ -16,6 +16,9 @@ type Config struct {
 	// Theme (TUI only, for compatibility)
 	Theme string `json:"theme,omitempty"`
 
+	// Keybinds (TUI shortcut configuration)
+	Keybinds Keybinds `json:"keybinds"`
+
 	// Sharing behavior
 	Share string `json:"share,omitempty"` // "manual"|"auto"|"disabled"
 
@@ -178,6 +181,243 @@ type WatcherConfig struct {
 // ExperimentalConfig holds experimental feature flags.
 type ExperimentalConfig struct {
 	BatchTool bool `json:"batch_tool,omitempty"`
+}
+
+// Keybinds defines TUI keyboard shortcuts. Keep field order and names aligned
+// with the TypeScript config schema for compatibility.
+type Keybinds struct {
+	Leader                   string `json:"leader"`
+	AppExit                  string `json:"app_exit"`
+	EditorOpen               string `json:"editor_open"`
+	ThemeList                string `json:"theme_list"`
+	SidebarToggle            string `json:"sidebar_toggle"`
+	UsernameToggle           string `json:"username_toggle"`
+	StatusView               string `json:"status_view"`
+	SessionExport            string `json:"session_export"`
+	SessionNew               string `json:"session_new"`
+	SessionList              string `json:"session_list"`
+	SessionTimeline          string `json:"session_timeline"`
+	SessionShare             string `json:"session_share"`
+	SessionUnshare           string `json:"session_unshare"`
+	SessionInterrupt         string `json:"session_interrupt"`
+	SessionCompact           string `json:"session_compact"`
+	MessagesPageUp           string `json:"messages_page_up"`
+	MessagesPageDown         string `json:"messages_page_down"`
+	MessagesHalfPageUp       string `json:"messages_half_page_up"`
+	MessagesHalfPageDown     string `json:"messages_half_page_down"`
+	MessagesFirst            string `json:"messages_first"`
+	MessagesLast             string `json:"messages_last"`
+	MessagesLastUser         string `json:"messages_last_user"`
+	MessagesCopy             string `json:"messages_copy"`
+	MessagesUndo             string `json:"messages_undo"`
+	MessagesRedo             string `json:"messages_redo"`
+	MessagesToggleConceal    string `json:"messages_toggle_conceal"`
+	ToolDetails              string `json:"tool_details"`
+	ModelList                string `json:"model_list"`
+	ModelCycleRecent         string `json:"model_cycle_recent"`
+	ModelCycleRecentReverse  string `json:"model_cycle_recent_reverse"`
+	CommandList              string `json:"command_list"`
+	AgentList                string `json:"agent_list"`
+	AgentCycle               string `json:"agent_cycle"`
+	AgentCycleReverse        string `json:"agent_cycle_reverse"`
+	InputClear               string `json:"input_clear"`
+	InputForwardDelete       string `json:"input_forward_delete"`
+	InputPaste               string `json:"input_paste"`
+	InputSubmit              string `json:"input_submit"`
+	InputNewline             string `json:"input_newline"`
+	HistoryPrevious          string `json:"history_previous"`
+	HistoryNext              string `json:"history_next"`
+	SessionChildCycle        string `json:"session_child_cycle"`
+	SessionChildCycleReverse string `json:"session_child_cycle_reverse"`
+	TerminalSuspend          string `json:"terminal_suspend"`
+}
+
+// DefaultKeybinds returns the default TUI keybindings, matching the TypeScript implementation.
+func DefaultKeybinds() Keybinds {
+	return Keybinds{
+		Leader:                   "ctrl+x",
+		AppExit:                  "ctrl+c,ctrl+d,<leader>q",
+		EditorOpen:               "<leader>e",
+		ThemeList:                "<leader>t",
+		SidebarToggle:            "<leader>b",
+		UsernameToggle:           "none",
+		StatusView:               "<leader>s",
+		SessionExport:            "<leader>x",
+		SessionNew:               "<leader>n",
+		SessionList:              "<leader>l",
+		SessionTimeline:          "<leader>g",
+		SessionShare:             "none",
+		SessionUnshare:           "none",
+		SessionInterrupt:         "escape",
+		SessionCompact:           "<leader>c",
+		MessagesPageUp:           "pageup",
+		MessagesPageDown:         "pagedown",
+		MessagesHalfPageUp:       "ctrl+alt+u",
+		MessagesHalfPageDown:     "ctrl+alt+d",
+		MessagesFirst:            "ctrl+g,home",
+		MessagesLast:             "ctrl+alt+g,end",
+		MessagesLastUser:         "none",
+		MessagesCopy:             "<leader>y",
+		MessagesUndo:             "<leader>u",
+		MessagesRedo:             "<leader>r",
+		MessagesToggleConceal:    "<leader>h",
+		ToolDetails:              "none",
+		ModelList:                "<leader>m",
+		ModelCycleRecent:         "f2",
+		ModelCycleRecentReverse:  "shift+f2",
+		CommandList:              "ctrl+p",
+		AgentList:                "<leader>a",
+		AgentCycle:               "tab",
+		AgentCycleReverse:        "shift+tab",
+		InputClear:               "ctrl+c",
+		InputForwardDelete:       "ctrl+d",
+		InputPaste:               "ctrl+v",
+		InputSubmit:              "return",
+		InputNewline:             "shift+return,ctrl+j",
+		HistoryPrevious:          "up",
+		HistoryNext:              "down",
+		SessionChildCycle:        "<leader>right",
+		SessionChildCycleReverse: "<leader>left",
+		TerminalSuspend:          "ctrl+z",
+	}
+}
+
+// MergeKeybinds overlays overrides on top of base defaults, skipping empty values.
+func MergeKeybinds(base, overrides Keybinds) Keybinds {
+	if overrides.Leader != "" {
+		base.Leader = overrides.Leader
+	}
+	if overrides.AppExit != "" {
+		base.AppExit = overrides.AppExit
+	}
+	if overrides.EditorOpen != "" {
+		base.EditorOpen = overrides.EditorOpen
+	}
+	if overrides.ThemeList != "" {
+		base.ThemeList = overrides.ThemeList
+	}
+	if overrides.SidebarToggle != "" {
+		base.SidebarToggle = overrides.SidebarToggle
+	}
+	if overrides.UsernameToggle != "" {
+		base.UsernameToggle = overrides.UsernameToggle
+	}
+	if overrides.StatusView != "" {
+		base.StatusView = overrides.StatusView
+	}
+	if overrides.SessionExport != "" {
+		base.SessionExport = overrides.SessionExport
+	}
+	if overrides.SessionNew != "" {
+		base.SessionNew = overrides.SessionNew
+	}
+	if overrides.SessionList != "" {
+		base.SessionList = overrides.SessionList
+	}
+	if overrides.SessionTimeline != "" {
+		base.SessionTimeline = overrides.SessionTimeline
+	}
+	if overrides.SessionShare != "" {
+		base.SessionShare = overrides.SessionShare
+	}
+	if overrides.SessionUnshare != "" {
+		base.SessionUnshare = overrides.SessionUnshare
+	}
+	if overrides.SessionInterrupt != "" {
+		base.SessionInterrupt = overrides.SessionInterrupt
+	}
+	if overrides.SessionCompact != "" {
+		base.SessionCompact = overrides.SessionCompact
+	}
+	if overrides.MessagesPageUp != "" {
+		base.MessagesPageUp = overrides.MessagesPageUp
+	}
+	if overrides.MessagesPageDown != "" {
+		base.MessagesPageDown = overrides.MessagesPageDown
+	}
+	if overrides.MessagesHalfPageUp != "" {
+		base.MessagesHalfPageUp = overrides.MessagesHalfPageUp
+	}
+	if overrides.MessagesHalfPageDown != "" {
+		base.MessagesHalfPageDown = overrides.MessagesHalfPageDown
+	}
+	if overrides.MessagesFirst != "" {
+		base.MessagesFirst = overrides.MessagesFirst
+	}
+	if overrides.MessagesLast != "" {
+		base.MessagesLast = overrides.MessagesLast
+	}
+	if overrides.MessagesLastUser != "" {
+		base.MessagesLastUser = overrides.MessagesLastUser
+	}
+	if overrides.MessagesCopy != "" {
+		base.MessagesCopy = overrides.MessagesCopy
+	}
+	if overrides.MessagesUndo != "" {
+		base.MessagesUndo = overrides.MessagesUndo
+	}
+	if overrides.MessagesRedo != "" {
+		base.MessagesRedo = overrides.MessagesRedo
+	}
+	if overrides.MessagesToggleConceal != "" {
+		base.MessagesToggleConceal = overrides.MessagesToggleConceal
+	}
+	if overrides.ToolDetails != "" {
+		base.ToolDetails = overrides.ToolDetails
+	}
+	if overrides.ModelList != "" {
+		base.ModelList = overrides.ModelList
+	}
+	if overrides.ModelCycleRecent != "" {
+		base.ModelCycleRecent = overrides.ModelCycleRecent
+	}
+	if overrides.ModelCycleRecentReverse != "" {
+		base.ModelCycleRecentReverse = overrides.ModelCycleRecentReverse
+	}
+	if overrides.CommandList != "" {
+		base.CommandList = overrides.CommandList
+	}
+	if overrides.AgentList != "" {
+		base.AgentList = overrides.AgentList
+	}
+	if overrides.AgentCycle != "" {
+		base.AgentCycle = overrides.AgentCycle
+	}
+	if overrides.AgentCycleReverse != "" {
+		base.AgentCycleReverse = overrides.AgentCycleReverse
+	}
+	if overrides.InputClear != "" {
+		base.InputClear = overrides.InputClear
+	}
+	if overrides.InputForwardDelete != "" {
+		base.InputForwardDelete = overrides.InputForwardDelete
+	}
+	if overrides.InputPaste != "" {
+		base.InputPaste = overrides.InputPaste
+	}
+	if overrides.InputSubmit != "" {
+		base.InputSubmit = overrides.InputSubmit
+	}
+	if overrides.InputNewline != "" {
+		base.InputNewline = overrides.InputNewline
+	}
+	if overrides.HistoryPrevious != "" {
+		base.HistoryPrevious = overrides.HistoryPrevious
+	}
+	if overrides.HistoryNext != "" {
+		base.HistoryNext = overrides.HistoryNext
+	}
+	if overrides.SessionChildCycle != "" {
+		base.SessionChildCycle = overrides.SessionChildCycle
+	}
+	if overrides.SessionChildCycleReverse != "" {
+		base.SessionChildCycleReverse = overrides.SessionChildCycleReverse
+	}
+	if overrides.TerminalSuspend != "" {
+		base.TerminalSuspend = overrides.TerminalSuspend
+	}
+
+	return base
 }
 
 // Model represents an LLM model available from a provider.

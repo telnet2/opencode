@@ -19,6 +19,8 @@ const (
 	SessionUpdated     EventType = "session.updated"
 	SessionDeleted     EventType = "session.deleted"
 	SessionIdle        EventType = "session.idle"
+	SessionStatus      EventType = "session.status"
+	SessionDiff        EventType = "session.diff"
 	SessionError       EventType = "session.error"
 	MessageCreated     EventType = "message.created"
 	MessageUpdated     EventType = "message.updated"

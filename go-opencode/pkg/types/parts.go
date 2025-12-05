@@ -108,6 +108,39 @@ func (p *FilePart) PartID() string        { return p.ID }
 func (p *FilePart) PartSessionID() string { return p.SessionID }
 func (p *FilePart) PartMessageID() string { return p.MessageID }
 
+// StepStartPart marks the beginning of an inference step.
+// SDK compatible: includes sessionID and messageID fields.
+type StepStartPart struct {
+	ID        string `json:"id"`
+	SessionID string `json:"sessionID"` // SDK compatible
+	MessageID string `json:"messageID"` // SDK compatible
+	Type      string `json:"type"`      // always "step-start"
+	Snapshot  string `json:"snapshot,omitempty"`
+}
+
+func (p *StepStartPart) PartType() string      { return "step-start" }
+func (p *StepStartPart) PartID() string        { return p.ID }
+func (p *StepStartPart) PartSessionID() string { return p.SessionID }
+func (p *StepStartPart) PartMessageID() string { return p.MessageID }
+
+// StepFinishPart marks the end of an inference step with cost and token info.
+// SDK compatible: includes sessionID and messageID fields.
+type StepFinishPart struct {
+	ID        string      `json:"id"`
+	SessionID string      `json:"sessionID"` // SDK compatible
+	MessageID string      `json:"messageID"` // SDK compatible
+	Type      string      `json:"type"`      // always "step-finish"
+	Reason    string      `json:"reason"`    // e.g., "stop", "tool-calls"
+	Snapshot  string      `json:"snapshot,omitempty"`
+	Cost      float64     `json:"cost"`
+	Tokens    *TokenUsage `json:"tokens,omitempty"`
+}
+
+func (p *StepFinishPart) PartType() string      { return "step-finish" }
+func (p *StepFinishPart) PartID() string        { return p.ID }
+func (p *StepFinishPart) PartSessionID() string { return p.SessionID }
+func (p *StepFinishPart) PartMessageID() string { return p.MessageID }
+
 // RawPart is used for JSON unmarshaling of parts.
 type RawPart struct {
 	ID   string          `json:"id"`
@@ -143,6 +176,18 @@ func UnmarshalPart(data []byte) (Part, error) {
 		return &p, nil
 	case "file":
 		var p FilePart
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "step-start":
+		var p StepStartPart
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "step-finish":
+		var p StepFinishPart
 		if err := json.Unmarshal(data, &p); err != nil {
 			return nil, err
 		}

@@ -83,6 +83,32 @@ func TestLoadTypeScriptConfig(t *testing.T) {
 	assert.True(t, coder.Tools["edit"])
 }
 
+func TestDefaultKeybindsApplied(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "opencode-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Isolate config paths to avoid picking up user configs
+	oldHome := os.Getenv("HOME")
+	oldXdgConfig := os.Getenv("XDG_CONFIG_HOME")
+	os.Setenv("HOME", tmpDir)
+	os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
+	defer func() {
+		os.Setenv("HOME", oldHome)
+		if oldXdgConfig == "" {
+			os.Unsetenv("XDG_CONFIG_HOME")
+		} else {
+			os.Setenv("XDG_CONFIG_HOME", oldXdgConfig)
+		}
+	}()
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+
+	assert.Equal(t, "ctrl+x", cfg.Keybinds.Leader)
+	assert.Equal(t, "escape", cfg.Keybinds.SessionInterrupt)
+}
+
 func TestJSONCComments(t *testing.T) {
 	// Create a temporary directory
 	tmpDir, err := os.MkdirTemp("", "opencode-test-*")
@@ -260,6 +286,54 @@ func TestConfigMerge(t *testing.T) {
 
 	// Agent tools should be merged (project overrides coder)
 	assert.True(t, cfg.Agent["coder"].Tools["edit"])
+}
+
+func TestLoadConfigFromParentDirectory(t *testing.T) {
+	root := t.TempDir()
+
+	// Isolate HOME/XDG to avoid picking up user config
+	oldHome := os.Getenv("HOME")
+	oldXdg := os.Getenv("XDG_CONFIG_HOME")
+	os.Setenv("HOME", root)
+	os.Setenv("XDG_CONFIG_HOME", filepath.Join(root, ".config"))
+	defer func() {
+		os.Setenv("HOME", oldHome)
+		if oldXdg == "" {
+			os.Unsetenv("XDG_CONFIG_HOME")
+		} else {
+			os.Setenv("XDG_CONFIG_HOME", oldXdg)
+		}
+	}()
+
+	// Parent-level configs
+	require.NoError(t, os.WriteFile(filepath.Join(root, "opencode.json"), []byte(`{"small_model":"parent-small"}`), 0644))
+
+	parentConfigDir := filepath.Join(root, ".opencode")
+	require.NoError(t, os.MkdirAll(parentConfigDir, 0755))
+	parentConfig := `{
+		"model": "parent-model",
+		"mcp": {
+			"parent-server": {
+				"type": "remote",
+				"url": "https://parent.example.com/mcp"
+			}
+		}
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(parentConfigDir, "opencode.json"), []byte(parentConfig), 0644))
+
+	workDir := filepath.Join(root, "nested", "project")
+	require.NoError(t, os.MkdirAll(workDir, 0755))
+
+	cfg, err := Load(workDir)
+	require.NoError(t, err)
+
+	assert.Equal(t, "parent-model", cfg.Model)
+	assert.Equal(t, "parent-small", cfg.SmallModel)
+	require.NotNil(t, cfg.MCP)
+	remote, ok := cfg.MCP["parent-server"]
+	require.True(t, ok)
+	assert.Equal(t, "remote", remote.Type)
+	assert.Equal(t, "https://parent.example.com/mcp", remote.URL)
 }
 
 func TestEnvVarOverride(t *testing.T) {

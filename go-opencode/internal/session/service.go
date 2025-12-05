@@ -273,6 +273,12 @@ func (s *Service) Fork(ctx context.Context, sessionID, messageID string) (*types
 
 // Abort aborts an active session.
 func (s *Service) Abort(ctx context.Context, sessionID string) error {
+	// Use the processor's abort mechanism which cancels the context
+	if s.processor != nil {
+		return s.processor.Abort(sessionID)
+	}
+
+	// Fallback to channel-based abort (legacy)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -79,12 +79,12 @@ func TestSession_OptionalFields(t *testing.T) {
 
 func TestMessage_JSON(t *testing.T) {
 	msg := Message{
-		ID:        "msg-123",
-		SessionID: "session-456",
-		Role:      "assistant",
-		ModelID:   "claude-3-opus",
+		ID:         "msg-123",
+		SessionID:  "session-456",
+		Role:       "assistant",
+		ModelID:    "claude-3-opus",
 		ProviderID: "anthropic",
-		Cost:      0.05,
+		Cost:       0.05,
 		Tokens: &TokenUsage{
 			Input:  1000,
 			Output: 500,
@@ -162,7 +162,7 @@ func TestMessage_UserFields(t *testing.T) {
 
 func TestFileDiff_JSON(t *testing.T) {
 	diff := FileDiff{
-		Path:      "/src/main.go",
+		File:      "/src/main.go",
 		Additions: 10,
 		Deletions: 5,
 		Before:    "func old() {}",
@@ -179,8 +179,8 @@ func TestFileDiff_JSON(t *testing.T) {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	if decoded.Path != diff.Path {
-		t.Errorf("Path mismatch: got %s, want %s", decoded.Path, diff.Path)
+	if decoded.File != diff.File {
+		t.Errorf("File mismatch: got %s, want %s", decoded.File, diff.File)
 	}
 }
 
