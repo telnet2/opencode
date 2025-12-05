@@ -4,6 +4,16 @@ import { Global } from "../global"
 import z from "zod"
 
 export namespace Log {
+  // Store original console methods for restoration
+  const originalConsole = {
+    log: console.log.bind(console),
+    error: console.error.bind(console),
+    warn: console.warn.bind(console),
+    debug: console.debug.bind(console),
+    info: console.info.bind(console),
+  }
+
+  let consoleIntercepted = false
   export const Level = z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).meta({ ref: "LogLevel", description: "Log level" })
   export type Level = z.infer<typeof Level>
 
@@ -44,6 +54,8 @@ export namespace Log {
     print: boolean
     dev?: boolean
     level?: Level
+    /** When true, intercept console.log/error/warn/debug and write them to the log file */
+    captureConsole?: boolean
   }
 
   let logpath = ""
@@ -68,6 +80,82 @@ export namespace Log {
       writer.flush()
       return num
     }
+
+    // Set up console interception if requested
+    if (options.captureConsole) {
+      captureConsole()
+    }
+  }
+
+  /**
+   * Format console arguments to a string for logging
+   */
+  function formatConsoleArgs(args: any[]): string {
+    return args
+      .map((arg) => {
+        if (arg === undefined) return "undefined"
+        if (arg === null) return "null"
+        if (arg instanceof Error) return formatError(arg)
+        if (typeof arg === "object") {
+          try {
+            return JSON.stringify(arg)
+          } catch {
+            return String(arg)
+          }
+        }
+        return String(arg)
+      })
+      .join(" ")
+  }
+
+  /**
+   * Intercept console.log/error/warn/debug and write them to the log file.
+   * This is useful for capturing all console output in TUI mode where
+   * stdout/stderr are not visible.
+   */
+  export function captureConsole() {
+    if (consoleIntercepted) return
+    consoleIntercepted = true
+
+    const consoleLogger = create({ service: "console" })
+
+    console.log = (...args: any[]) => {
+      const message = formatConsoleArgs(args)
+      consoleLogger.info(message)
+    }
+
+    console.error = (...args: any[]) => {
+      const message = formatConsoleArgs(args)
+      consoleLogger.error(message)
+    }
+
+    console.warn = (...args: any[]) => {
+      const message = formatConsoleArgs(args)
+      consoleLogger.warn(message)
+    }
+
+    console.debug = (...args: any[]) => {
+      const message = formatConsoleArgs(args)
+      consoleLogger.debug(message)
+    }
+
+    console.info = (...args: any[]) => {
+      const message = formatConsoleArgs(args)
+      consoleLogger.info(message)
+    }
+  }
+
+  /**
+   * Restore original console methods
+   */
+  export function restoreConsole() {
+    if (!consoleIntercepted) return
+    consoleIntercepted = false
+    console.log = originalConsole.log
+    console.error = originalConsole.error
+    console.warn = originalConsole.warn
+    console.debug = originalConsole.debug
+    console.info = originalConsole.info
   }
 
   async function cleanup(dir: string) {

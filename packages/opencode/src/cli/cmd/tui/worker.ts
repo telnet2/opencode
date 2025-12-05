@@ -13,6 +13,8 @@ await Log.init({
     if (Installation.isLocal()) return "DEBUG"
     return "INFO"
   })(),
+  // Capture console.log/error/warn/debug to log file in TUI mode
+  captureConsole: true,
 })
 
 process.on("unhandledRejection", (e) => {

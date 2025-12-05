@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"fmt"
 	"sync"
 
 	einotool "github.com/cloudwego/eino/components/tool"
@@ -26,6 +27,7 @@ func NewRegistry(workDir string) *Registry {
 func (r *Registry) Register(tool Tool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	fmt.Printf("[registry] Registering tool: %s\n", tool.ID())
 	r.tools[tool.ID()] = tool
 }
 
@@ -92,6 +94,7 @@ func (r *Registry) ToolInfos() ([]*schema.ToolInfo, error) {
 
 // DefaultRegistry creates a registry with all built-in tools.
 func DefaultRegistry(workDir string) *Registry {
+	fmt.Printf("[registry] Creating DefaultRegistry with workDir=%s\n", workDir)
 	r := NewRegistry(workDir)
 
 	// Register core tools
@@ -103,5 +106,6 @@ func DefaultRegistry(workDir string) *Registry {
 	r.Register(NewGrepTool(workDir))
 	r.Register(NewListTool(workDir))
 
+	fmt.Printf("[registry] DefaultRegistry created with %d tools: %v\n", len(r.tools), r.IDs())
 	return r
 }
