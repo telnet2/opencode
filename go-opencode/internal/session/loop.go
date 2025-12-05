@@ -76,8 +76,19 @@ func (p *Processor) runLoop(
 	}
 
 	lastMsg := messages[len(messages)-1]
+	fmt.Printf("[loop] Loaded %d messages, last message role=%s id=%s\n", len(messages), lastMsg.Role, lastMsg.ID)
 	if lastMsg.Role != "user" {
 		return fmt.Errorf("expected user message, got %s", lastMsg.Role)
+	}
+	// Load and log user message parts
+	userParts, _ := p.loadParts(ctx, lastMsg.ID)
+	for i, part := range userParts {
+		switch pt := part.(type) {
+		case *types.TextPart:
+			fmt.Printf("[loop] User message part %d: type=text content=%q\n", i, truncateStr(pt.Text, 50))
+		default:
+			fmt.Printf("[loop] User message part %d: type=%T\n", i, pt)
+		}
 	}
 
 	// Get provider and model
@@ -89,17 +100,26 @@ func (p *Processor) runLoop(
 		modelID = lastMsg.Model.ModelID
 	}
 
+	fmt.Printf("[loop] Looking up provider=%s model=%s\n", providerID, modelID)
 	prov, err := p.providerRegistry.Get(providerID)
 	if err != nil {
+		fmt.Printf("[loop] Provider lookup failed: %v\n", err)
 		return fmt.Errorf("provider not found: %w", err)
 	}
+	fmt.Printf("[loop] Found provider: %s\n", prov.ID())
 
 	model, err := p.providerRegistry.GetModel(providerID, modelID)
 	if err != nil {
 		return fmt.Errorf("model not found: %w", err)
 	}
 
+	// Get agent config
+	if agent == nil {
+		agent = DefaultAgent()
+	}
+
 	// Create assistant message
+	// IMPORTANT: Always include Tokens field (even with zeroes) because TUI expects it
 	now := time.Now().UnixMilli()
 	assistantMsg := &types.Message{
 		ID:         generatePartID(),
@@ -107,9 +127,11 @@ func (p *Processor) runLoop(
 		Role:       "assistant",
 		ProviderID: providerID,
 		ModelID:    modelID,
+		Mode:       agent.Name, // Agent name (e.g., "Coder", "Build") - required by TUI
 		Time: types.MessageTime{
 			Created: now,
 		},
+		Tokens: &types.TokenUsage{Input: 0, Output: 0},
 	}
 	state.message = assistantMsg
 
@@ -127,11 +149,6 @@ func (p *Processor) runLoop(
 		Data: event.MessageCreatedData{Info: assistantMsg},
 	})
 
-	// Get agent config
-	if agent == nil {
-		agent = DefaultAgent()
-	}
-
 	maxSteps := agent.MaxSteps
 	if maxSteps <= 0 {
 		maxSteps = MaxSteps
@@ -145,10 +162,7 @@ func (p *Processor) runLoop(
 		// Check context cancellation
 		select {
 		case <-ctx.Done():
-			assistantMsg.Error = &types.MessageError{
-				Type:    "abort",
-				Message: "Processing aborted",
-			}
+			assistantMsg.Error = types.NewUnknownError("Processing aborted")
 			p.saveMessage(ctx, sessionID, assistantMsg)
 			return ctx.Err()
 		default:
@@ -156,10 +170,7 @@ func (p *Processor) runLoop(
 
 		// Check step limit
 		if step >= maxSteps {
-			assistantMsg.Error = &types.MessageError{
-				Type:    "max_steps",
-				Message: "Maximum steps reached",
-			}
+			assistantMsg.Error = types.NewUnknownError("Maximum steps reached")
 			p.saveMessage(ctx, sessionID, assistantMsg)
 			return fmt.Errorf("max steps exceeded")
 		}
@@ -205,24 +216,25 @@ func (p *Processor) runLoop(
 		requestStart := time.Now()
 
 		// Call LLM with streaming
+		fmt.Printf("[loop] Calling CreateCompletion...\n")
 		stream, err := prov.CreateCompletion(ctx, req)
 		if err != nil {
+			fmt.Printf("[loop] CreateCompletion error: %v\n", err)
 			// Use exponential backoff with jitter for retries
 			nextInterval := retryBackoff.NextBackOff()
 			if nextInterval == backoff.Stop {
-				assistantMsg.Error = &types.MessageError{
-					Type:    "api",
-					Message: err.Error(),
-				}
+				assistantMsg.Error = types.NewUnknownError(err.Error())
 				p.saveMessage(ctx, sessionID, assistantMsg)
 				return err
 			}
 			time.Sleep(nextInterval)
 			continue
 		}
+		fmt.Printf("[loop] CreateCompletion successful, processing stream...\n")
 
 		// Process stream
 		finishReason, err := p.processStream(ctx, stream, state, callback)
+		fmt.Printf("[loop] processStream returned: finishReason=%s, err=%v\n", finishReason, err)
 		stream.Close()
 
 		requestDuration := time.Since(requestStart)
@@ -260,8 +272,8 @@ func (p *Processor) runLoop(
 				case *types.ToolPart:
 					logging.Debug().
 						Str("sessionID", sessionID).
-						Str("toolName", pt.ToolName).
-						Str("toolCallID", pt.ToolCallID).
+						Str("toolName", pt.Tool).
+						Str("toolCallID", pt.CallID).
 						Msg("Assistant tool call")
 				}
 			}
@@ -271,10 +283,7 @@ func (p *Processor) runLoop(
 			// Use exponential backoff with jitter for retries
 			nextInterval := retryBackoff.NextBackOff()
 			if nextInterval == backoff.Stop {
-				assistantMsg.Error = &types.MessageError{
-					Type:    "api",
-					Message: err.Error(),
-				}
+				assistantMsg.Error = types.NewUnknownError(err.Error())
 				p.saveMessage(ctx, sessionID, assistantMsg)
 				return err
 			}
@@ -284,6 +293,11 @@ func (p *Processor) runLoop(
 
 		// Reset backoff on success
 		retryBackoff.Reset()
+
+		// Ensure tokens field is always populated (TUI expects it)
+		if state.message.Tokens == nil {
+			state.message.Tokens = &types.TokenUsage{Input: 0, Output: 0}
+		}
 
 		// Check finish reason
 		switch finishReason {
@@ -307,10 +321,7 @@ func (p *Processor) runLoop(
 			// Output limit reached
 			finish := "max_tokens"
 			assistantMsg.Finish = &finish
-			assistantMsg.Error = &types.MessageError{
-				Type:    "output_length",
-				Message: "Output length limit reached",
-			}
+			assistantMsg.Error = types.NewUnknownError("Output length limit reached")
 			p.saveMessage(ctx, sessionID, assistantMsg)
 			return nil
 
@@ -440,18 +451,18 @@ func (p *Processor) buildCompletionRequest(
 			for _, part := range parts {
 				if toolPart, ok := part.(*types.ToolPart); ok {
 					// Only completed or errored tool parts should be added as results
-					if toolPart.State == "completed" || toolPart.State == "error" {
+					if toolPart.State.Status == "completed" || toolPart.State.Status == "error" {
 						var toolContent string
-						if toolPart.Output != nil {
-							toolContent = *toolPart.Output
-						} else if toolPart.Error != nil {
-							toolContent = "Error: " + *toolPart.Error
+						if toolPart.State.Output != "" {
+							toolContent = toolPart.State.Output
+						} else if toolPart.State.Error != "" {
+							toolContent = "Error: " + toolPart.State.Error
 						}
 
 						toolMsg := &schema.Message{
 							Role:       schema.Tool,
 							Content:    toolContent,
-							ToolCallID: toolPart.ToolCallID,
+							ToolCallID: toolPart.CallID,
 						}
 						einoMessages = append(einoMessages, toolMsg)
 					}
@@ -533,21 +544,21 @@ func (p *Processor) convertMessage(msg *types.Message, parts []types.Part) *sche
 				// For assistant messages, include all tool calls (even completed ones)
 				// because the LLM needs to know what tools were called.
 				// Tool results are added as separate tool messages in buildCompletionRequest.
-				inputJSON, _ := json.Marshal(pt.Input)
+				inputJSON, _ := json.Marshal(pt.State.Input)
 				toolCalls = append(toolCalls, schema.ToolCall{
-					ID: pt.ToolCallID,
+					ID: pt.CallID,
 					Function: schema.FunctionCall{
-						Name:      pt.ToolName,
+						Name:      pt.Tool,
 						Arguments: string(inputJSON),
 					},
 				})
 			} else {
 				// Tool result (for messages with role: tool)
-				toolCallID = pt.ToolCallID
-				if pt.Output != nil {
-					content = *pt.Output
-				} else if pt.Error != nil {
-					content = "Error: " + *pt.Error
+				toolCallID = pt.CallID
+				if pt.State.Output != "" {
+					content = pt.State.Output
+				} else if pt.State.Error != "" {
+					content = "Error: " + pt.State.Error
 				}
 			}
 		}
@@ -640,6 +651,14 @@ func parseJSONSchemaToParams(schemaJSON json.RawMessage) map[string]*schema.Para
 // generatePartID generates a new ULID for parts.
 func generatePartID() string {
 	return ulid.Make().String()
+}
+
+// truncateStr truncates a string to the specified length.
+func truncateStr(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }
 
 // ptr returns a pointer to the given value.

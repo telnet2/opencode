@@ -233,8 +233,8 @@ func TestCustomPrompt_JSON(t *testing.T) {
 
 func TestMessageError_JSON(t *testing.T) {
 	msgErr := MessageError{
-		Type:    "api",
-		Message: "Rate limit exceeded",
+		Name: "UnknownError",
+		Data: MessageErrorData{Message: "Rate limit exceeded"},
 	}
 
 	data, err := json.Marshal(msgErr)
@@ -247,7 +247,7 @@ func TestMessageError_JSON(t *testing.T) {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	if decoded.Type != "api" {
-		t.Errorf("Type mismatch: got %s, want api", decoded.Type)
+	if decoded.Name != "UnknownError" {
+		t.Errorf("Name mismatch: got %s, want UnknownError", decoded.Name)
 	}
 }

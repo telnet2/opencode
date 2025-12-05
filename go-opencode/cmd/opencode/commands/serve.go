@@ -130,8 +130,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		logging.Warn().Err(err).Msg("Error closing MCP servers")
 	}
 
-	// Graceful shutdown with timeout
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Graceful shutdown with timeout (5 seconds for dev server)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {

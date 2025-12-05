@@ -63,6 +63,71 @@ func (s *sseWriter) writeHeartbeat() {
 	s.flusher.Flush()
 }
 
+// allEvents handles SSE for all events (used by /event endpoint).
+// This is the main event endpoint that the TUI connects to.
+func (srv *Server) allEvents(w http.ResponseWriter, r *http.Request) {
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
+
+	sse, err := newSSEWriter(w)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
+		return
+	}
+
+	// Explicitly write status and flush headers immediately
+	w.WriteHeader(http.StatusOK)
+	sse.flusher.Flush()
+
+	// Send server.connected event first (SDK compatible)
+	connectedEvent := map[string]any{
+		"type":       "server.connected",
+		"properties": map[string]any{},
+	}
+	if err := sse.writeEvent("message", connectedEvent); err != nil {
+		return
+	}
+
+	// Channel for events
+	events := make(chan event.Event, 100)
+
+	// Subscribe to all events
+	unsub := event.SubscribeAll(func(e event.Event) {
+		select {
+		case events <- e:
+		default:
+			// Drop event if channel is full
+		}
+	})
+	defer unsub()
+
+	// Heartbeat ticker
+	ticker := time.NewTicker(SSEHeartbeatInterval)
+	defer ticker.Stop()
+
+	// Wait for client disconnect or context cancellation
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case e := <-events:
+			// SDK compatible format: use "properties" instead of "data"
+			data := map[string]any{
+				"type":       e.Type,
+				"properties": e.Data,
+			}
+			if err := sse.writeEvent("message", data); err != nil {
+				return
+			}
+		case <-ticker.C:
+			sse.writeHeartbeat()
+		}
+	}
+}
+
 // globalEvents handles SSE for all events.
 func (srv *Server) globalEvents(w http.ResponseWriter, r *http.Request) {
 	// Set SSE headers

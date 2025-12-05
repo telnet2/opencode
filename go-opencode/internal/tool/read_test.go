@@ -21,7 +21,7 @@ func TestReadTool_Execute(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -41,7 +41,7 @@ func TestReadTool_FileNotFound(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "/nonexistent/file.txt"}`)
+	input := json.RawMessage(`{"filePath": "/nonexistent/file.txt"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
 		t.Error("Expected error for nonexistent file")
@@ -64,7 +64,7 @@ func TestReadTool_WithOffsetAndLimit(t *testing.T) {
 	toolCtx := testContext()
 
 	// Read lines 3-5 (offset=3, limit=3)
-	input := json.RawMessage(`{"file_path": "` + testFile + `", "offset": 3, "limit": 3}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `", "offset": 3, "limit": 3}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -103,8 +103,8 @@ func TestReadTool_Properties(t *testing.T) {
 	if !ok {
 		t.Error("Schema should have properties")
 	}
-	if _, ok := props["file_path"]; !ok {
-		t.Error("Schema should have file_path property")
+	if _, ok := props["filePath"]; !ok {
+		t.Error("Schema should have filePath property")
 	}
 }
 
@@ -119,7 +119,7 @@ func TestReadTool_EnvFileBlocked(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + envFile + `"}`)
+	input := json.RawMessage(`{"filePath": "` + envFile + `"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
 		t.Error("Expected error when reading .env file")
@@ -136,7 +136,7 @@ func TestReadTool_DirectoryError(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + tmpDir + `"}`)
+	input := json.RawMessage(`{"filePath": "` + tmpDir + `"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
 		t.Error("Expected error when reading a directory")
@@ -160,7 +160,7 @@ func TestReadTool_ImageFile(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + imgFile + `"}`)
+	input := json.RawMessage(`{"filePath": "` + imgFile + `"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -196,7 +196,7 @@ func TestReadTool_BinaryFile(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + binFile + `"}`)
+	input := json.RawMessage(`{"filePath": "` + binFile + `"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	if err == nil {
 		t.Error("Expected error when reading binary file")
@@ -220,7 +220,7 @@ func TestReadTool_LongLineTruncation(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + testFile + `"}`)
+	input := json.RawMessage(`{"filePath": "` + testFile + `"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
@@ -260,7 +260,7 @@ func TestReadTool_EmptyFile(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := testContext()
 
-	input := json.RawMessage(`{"file_path": "` + emptyFile + `"}`)
+	input := json.RawMessage(`{"filePath": "` + emptyFile + `"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)

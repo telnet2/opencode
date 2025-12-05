@@ -16,9 +16,9 @@ type Message struct {
 	// Assistant-specific fields
 	ModelID    string        `json:"modelID,omitempty"`
 	ProviderID string        `json:"providerID,omitempty"`
-	Mode       string        `json:"mode,omitempty"`
+	Mode       string        `json:"mode,omitempty"`       // Agent name (e.g., "Coder", "Build")
 	Finish     *string       `json:"finish,omitempty"`
-	Cost       float64       `json:"cost,omitempty"`
+	Cost       float64       `json:"cost"`                 // Required by TUI
 	Tokens     *TokenUsage   `json:"tokens,omitempty"`
 	Error      *MessageError `json:"error,omitempty"`
 }
@@ -36,11 +36,12 @@ type ModelRef struct {
 }
 
 // TokenUsage contains token usage statistics for a message.
+// Note: All fields are required by TUI, do not use omitempty.
 type TokenUsage struct {
 	Input     int        `json:"input"`
 	Output    int        `json:"output"`
-	Reasoning int        `json:"reasoning,omitempty"`
-	Cache     CacheUsage `json:"cache,omitempty"`
+	Reasoning int        `json:"reasoning"`
+	Cache     CacheUsage `json:"cache"`
 }
 
 // CacheUsage contains cache hit/write statistics.
@@ -50,7 +51,30 @@ type CacheUsage struct {
 }
 
 // MessageError represents an error that occurred during message processing.
+// Format: {"name": "UnknownError", "data": {"message": "..."}}
 type MessageError struct {
-	Type    string `json:"type"` // "api" | "auth" | "output_length"
-	Message string `json:"message"`
+	Name string           `json:"name"` // "UnknownError" | "ProviderAuthError" | "MessageOutputLengthError"
+	Data MessageErrorData `json:"data"`
+}
+
+// MessageErrorData contains the error details.
+type MessageErrorData struct {
+	Message    string `json:"message"`
+	ProviderID string `json:"providerID,omitempty"` // For ProviderAuthError
+}
+
+// NewUnknownError creates a new UnknownError.
+func NewUnknownError(message string) *MessageError {
+	return &MessageError{
+		Name: "UnknownError",
+		Data: MessageErrorData{Message: message},
+	}
+}
+
+// NewProviderAuthError creates a new ProviderAuthError.
+func NewProviderAuthError(providerID, message string) *MessageError {
+	return &MessageError{
+		Name: "ProviderAuthError",
+		Data: MessageErrorData{Message: message, ProviderID: providerID},
+	}
 }

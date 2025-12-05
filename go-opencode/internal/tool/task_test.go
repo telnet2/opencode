@@ -37,7 +37,7 @@ func TestTaskTool_Parameters(t *testing.T) {
 	properties := schema["properties"].(map[string]any)
 	assert.Contains(t, properties, "description")
 	assert.Contains(t, properties, "prompt")
-	assert.Contains(t, properties, "subagent_type")
+	assert.Contains(t, properties, "subagentType")
 	assert.Contains(t, properties, "model")
 	assert.Contains(t, properties, "resume")
 }
@@ -47,7 +47,7 @@ func TestTaskTool_Execute_MissingDescription(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := &Context{WorkDir: "/tmp"}
 
-	input := json.RawMessage(`{"prompt": "test", "subagent_type": "general"}`)
+	input := json.RawMessage(`{"prompt": "test", "subagentType": "general"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "description is required")
@@ -58,7 +58,7 @@ func TestTaskTool_Execute_MissingPrompt(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := &Context{WorkDir: "/tmp"}
 
-	input := json.RawMessage(`{"description": "test", "subagent_type": "general"}`)
+	input := json.RawMessage(`{"description": "test", "subagentType": "general"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "prompt is required")
@@ -72,7 +72,7 @@ func TestTaskTool_Execute_MissingSubagentType(t *testing.T) {
 	input := json.RawMessage(`{"description": "test", "prompt": "test prompt"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "subagent_type is required")
+	assert.Contains(t, err.Error(), "subagentType is required")
 }
 
 func TestTaskTool_Execute_UnknownSubagent(t *testing.T) {
@@ -80,7 +80,7 @@ func TestTaskTool_Execute_UnknownSubagent(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := &Context{WorkDir: "/tmp"}
 
-	input := json.RawMessage(`{"description": "test", "prompt": "test prompt", "subagent_type": "nonexistent"}`)
+	input := json.RawMessage(`{"description": "test", "prompt": "test prompt", "subagentType": "nonexistent"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown subagent type")
@@ -92,7 +92,7 @@ func TestTaskTool_Execute_NonSubagentMode(t *testing.T) {
 	toolCtx := &Context{WorkDir: "/tmp"}
 
 	// "build" is a primary agent, not a subagent
-	input := json.RawMessage(`{"description": "test", "prompt": "test prompt", "subagent_type": "build"}`)
+	input := json.RawMessage(`{"description": "test", "prompt": "test prompt", "subagentType": "build"}`)
 	_, err := tool.Execute(ctx, input, toolCtx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot be used as subagent")
@@ -103,7 +103,7 @@ func TestTaskTool_Execute_WithoutExecutor(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := &Context{WorkDir: "/tmp"}
 
-	input := json.RawMessage(`{"description": "test task", "prompt": "test prompt", "subagent_type": "general"}`)
+	input := json.RawMessage(`{"description": "test task", "prompt": "test prompt", "subagentType": "general"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -146,7 +146,7 @@ func TestTaskTool_Execute_WithExecutor(t *testing.T) {
 		SessionID: "parent-session",
 	}
 
-	input := json.RawMessage(`{"description": "test task", "prompt": "test prompt", "subagent_type": "general"}`)
+	input := json.RawMessage(`{"description": "test task", "prompt": "test prompt", "subagentType": "general"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -170,7 +170,7 @@ func TestTaskTool_Execute_ExecutorError(t *testing.T) {
 	ctx := context.Background()
 	toolCtx := &Context{WorkDir: "/tmp"}
 
-	input := json.RawMessage(`{"description": "test task", "prompt": "test prompt", "subagent_type": "general"}`)
+	input := json.RawMessage(`{"description": "test task", "prompt": "test prompt", "subagentType": "general"}`)
 	result, err := tool.Execute(ctx, input, toolCtx)
 	require.NoError(t, err) // Execute itself doesn't error
 	assert.Contains(t, result.Title, "Subtask failed")
@@ -217,7 +217,7 @@ func TestTaskTool_MetadataCallback(t *testing.T) {
 		},
 	}
 
-	input := json.RawMessage(`{"description": "test task", "prompt": "test prompt", "subagent_type": "general"}`)
+	input := json.RawMessage(`{"description": "test task", "prompt": "test prompt", "subagentType": "general"}`)
 	_, _ = tool.Execute(ctx, input, toolCtx)
 	assert.True(t, metadataCalled)
 }
