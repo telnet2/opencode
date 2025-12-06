@@ -4,21 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/opencode-ai/opencode/internal/agent"
 )
 
-const taskDescription = `Launch a new agent to handle complex, multi-step tasks autonomously.
+const taskDescriptionPrefix = `Launch a new agent to handle complex, multi-step tasks autonomously.
 
 The Task tool launches specialized agents (subprocesses) that autonomously handle complex tasks.
 Each agent type has specific capabilities and tools available to it.
 
-Available agent types:
-- general: General-purpose agent for researching and exploration
-- explore: Fast agent specialized for codebase exploration
-- plan: Planning agent for analysis without making changes
+Available agent types:`
 
+const taskDescriptionSuffix = `
 Usage notes:
 - Launch multiple agents concurrently when possible
 - Each agent invocation is stateless
@@ -80,8 +79,23 @@ func (t *TaskTool) SetExecutor(executor TaskExecutor) {
 	t.executor = executor
 }
 
-func (t *TaskTool) ID() string          { return "task" }
-func (t *TaskTool) Description() string { return taskDescription }
+func (t *TaskTool) ID() string { return "task" }
+
+// Description returns a dynamic description including available agents.
+func (t *TaskTool) Description() string {
+	var builder strings.Builder
+	builder.WriteString(taskDescriptionPrefix)
+	builder.WriteString("\n")
+
+	// List available subagents with their descriptions
+	subagents := t.agentRegistry.ListSubagents()
+	for _, ag := range subagents {
+		builder.WriteString(fmt.Sprintf("- %s: %s\n", ag.Name, ag.Description))
+	}
+
+	builder.WriteString(taskDescriptionSuffix)
+	return builder.String()
+}
 
 func (t *TaskTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{
@@ -134,9 +148,10 @@ func (t *TaskTool) Execute(ctx context.Context, input json.RawMessage, toolCtx *
 	subagent, err := t.agentRegistry.Get(params.SubagentType)
 	if err != nil {
 		// Try with lowercase
-		subagent, err = t.agentRegistry.Get(params.SubagentType)
+		subagent, err = t.agentRegistry.Get(strings.ToLower(params.SubagentType))
 		if err != nil {
-			return nil, fmt.Errorf("unknown subagent type: %s. Available types: general, explore, plan", params.SubagentType)
+			availableAgents := t.GetAvailableAgents()
+			return nil, fmt.Errorf("unknown subagent type: %s. Available types: %s", params.SubagentType, strings.Join(availableAgents, ", "))
 		}
 	}
 
