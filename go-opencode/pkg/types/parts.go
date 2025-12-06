@@ -156,6 +156,112 @@ func (p *CompactionPart) PartID() string        { return p.ID }
 func (p *CompactionPart) PartSessionID() string { return p.SessionID }
 func (p *CompactionPart) PartMessageID() string { return p.MessageID }
 
+// SnapshotPart marks a git snapshot point.
+// SDK compatible: includes sessionID and messageID fields.
+type SnapshotPart struct {
+	ID        string `json:"id"`
+	SessionID string `json:"sessionID"` // SDK compatible
+	MessageID string `json:"messageID"` // SDK compatible
+	Type      string `json:"type"`      // always "snapshot"
+	Snapshot  string `json:"snapshot"`  // Git commit hash
+}
+
+func (p *SnapshotPart) PartType() string      { return "snapshot" }
+func (p *SnapshotPart) PartID() string        { return p.ID }
+func (p *SnapshotPart) PartSessionID() string { return p.SessionID }
+func (p *SnapshotPart) PartMessageID() string { return p.MessageID }
+
+// PatchPart represents a code patch.
+// SDK compatible: includes sessionID and messageID fields.
+type PatchPart struct {
+	ID        string   `json:"id"`
+	SessionID string   `json:"sessionID"` // SDK compatible
+	MessageID string   `json:"messageID"` // SDK compatible
+	Type      string   `json:"type"`      // always "patch"
+	Hash      string   `json:"hash"`      // Patch hash
+	Files     []string `json:"files"`     // Affected files
+}
+
+func (p *PatchPart) PartType() string      { return "patch" }
+func (p *PatchPart) PartID() string        { return p.ID }
+func (p *PatchPart) PartSessionID() string { return p.SessionID }
+func (p *PatchPart) PartMessageID() string { return p.MessageID }
+
+// AgentPart represents an agent invocation.
+// SDK compatible: includes sessionID and messageID fields.
+type AgentPart struct {
+	ID        string          `json:"id"`
+	SessionID string          `json:"sessionID"` // SDK compatible
+	MessageID string          `json:"messageID"` // SDK compatible
+	Type      string          `json:"type"`      // always "agent"
+	Name      string          `json:"name"`      // Agent name
+	Source    *AgentPartSource `json:"source,omitempty"`
+}
+
+// AgentPartSource contains the source text reference.
+type AgentPartSource struct {
+	Value string `json:"value"`
+	Start int    `json:"start"`
+	End   int    `json:"end"`
+}
+
+func (p *AgentPart) PartType() string      { return "agent" }
+func (p *AgentPart) PartID() string        { return p.ID }
+func (p *AgentPart) PartSessionID() string { return p.SessionID }
+func (p *AgentPart) PartMessageID() string { return p.MessageID }
+
+// SubtaskPart represents a subtask delegation.
+// SDK compatible: includes sessionID and messageID fields.
+type SubtaskPart struct {
+	ID          string `json:"id"`
+	SessionID   string `json:"sessionID"`   // SDK compatible
+	MessageID   string `json:"messageID"`   // SDK compatible
+	Type        string `json:"type"`        // always "subtask"
+	Prompt      string `json:"prompt"`      // Task prompt
+	Description string `json:"description"` // Task description
+	Agent       string `json:"agent"`       // Agent to use
+}
+
+func (p *SubtaskPart) PartType() string      { return "subtask" }
+func (p *SubtaskPart) PartID() string        { return p.ID }
+func (p *SubtaskPart) PartSessionID() string { return p.SessionID }
+func (p *SubtaskPart) PartMessageID() string { return p.MessageID }
+
+// RetryPart represents a retry attempt after an error.
+// SDK compatible: includes sessionID and messageID fields.
+type RetryPart struct {
+	ID        string         `json:"id"`
+	SessionID string         `json:"sessionID"` // SDK compatible
+	MessageID string         `json:"messageID"` // SDK compatible
+	Type      string         `json:"type"`      // always "retry"
+	Attempt   int            `json:"attempt"`   // Retry attempt number
+	Error     *APIError      `json:"error"`     // Error that caused the retry
+	Time      RetryPartTime  `json:"time"`
+}
+
+// RetryPartTime contains the time of the retry.
+type RetryPartTime struct {
+	Created int64 `json:"created"`
+}
+
+// APIError represents an API error (used by RetryPart).
+type APIError struct {
+	Name string         `json:"name"` // Always "APIError"
+	Data APIErrorData   `json:"data"`
+}
+
+// APIErrorData contains API error details.
+type APIErrorData struct {
+	Status    int    `json:"status,omitempty"`
+	Message   string `json:"message"`
+	Retryable bool   `json:"retryable,omitempty"`
+}
+
+func (p *RetryPart) PartType() string      { return "retry" }
+func (p *RetryPart) PartID() string        { return p.ID }
+func (p *RetryPart) PartSessionID() string { return p.SessionID }
+func (p *RetryPart) PartMessageID() string { return p.MessageID }
+
 // RawPart is used for JSON unmarshaling of parts.
 type RawPart struct {
 	ID   string          `json:"id"`
@@ -209,6 +315,36 @@ func UnmarshalPart(data []byte) (Part, error) {
 		return &p, nil
 	case "compaction":
 		var p CompactionPart
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "snapshot":
+		var p SnapshotPart
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "patch":
+		var p PatchPart
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "agent":
+		var p AgentPart
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "subtask":
+		var p SubtaskPart
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "retry":
+		var p RetryPart
 		if err := json.Unmarshal(data, &p); err != nil {
 			return nil, err
 		}

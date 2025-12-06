@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/lsp"
+	"github.com/opencode-ai/opencode/internal/vcs"
 )
 
 // FileInfo represents file information.
@@ -263,13 +264,17 @@ var symbolKindsFilter = map[lsp.SymbolKind]bool{
 func (s *Server) getVCSInfo(w http.ResponseWriter, r *http.Request) {
 	directory := getDirectory(r.Context())
 
-	// Get current branch
-	cmd := exec.Command("git", "branch", "--show-current")
-	cmd.Dir = directory
-	branch, _ := cmd.Output()
+	// Use cached branch from watcher if available for the same directory
+	var branch string
+	if s.vcsWatcher != nil && directory == s.config.Directory {
+		branch = s.vcsWatcher.CurrentBranch()
+	} else {
+		// Fallback to direct git command
+		branch = vcs.GetBranch(directory)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"branch": strings.TrimSpace(string(branch)),
+		"branch": branch,
 	})
 }
 

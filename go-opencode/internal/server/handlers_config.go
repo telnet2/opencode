@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/opencode-ai/opencode/internal/event"
 
 	"github.com/opencode-ai/opencode/internal/command"
 	"github.com/opencode-ai/opencode/internal/mcp"
@@ -74,12 +75,18 @@ type ModalityCapabilities struct {
 	PDF   bool `json:"pdf"`
 }
 
+// ModelCostCache represents cache pricing (nested structure for TS compatibility).
+type ModelCostCache struct {
+	Read  float64 `json:"read"`
+	Write float64 `json:"write"`
+}
+
 // ModelCost represents model pricing.
+// SDK compatible: uses nested cache object to match TypeScript structure.
 type ModelCost struct {
-	Input      float64 `json:"input"`
-	Output     float64 `json:"output"`
-	CacheRead  float64 `json:"cache_read,omitempty"`
-	CacheWrite float64 `json:"cache_write,omitempty"`
+	Input  float64        `json:"input"`
+	Output float64        `json:"output"`
+	Cache  ModelCostCache `json:"cache"` // Nested object, not flat fields
 }
 
 // ModelLimit represents model limits.
@@ -126,7 +133,7 @@ func getDefaultProviders() []ProviderInfo {
 						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: true},
 						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
 					},
-					Cost:    ModelCost{Input: 3.0, Output: 15.0, CacheRead: 0.3, CacheWrite: 3.75},
+					Cost:    ModelCost{Input: 3.0, Output: 15.0, Cache: ModelCostCache{Read: 0.3, Write: 3.75}},
 					Limit:   ModelLimit{Context: 200000, Output: 64000},
 					Options: map[string]any{},
 				},
@@ -142,7 +149,7 @@ func getDefaultProviders() []ProviderInfo {
 						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: true},
 						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
 					},
-					Cost:    ModelCost{Input: 15.0, Output: 75.0, CacheRead: 1.5, CacheWrite: 18.75},
+					Cost:    ModelCost{Input: 15.0, Output: 75.0, Cache: ModelCostCache{Read: 1.5, Write: 18.75}},
 					Limit:   ModelLimit{Context: 200000, Output: 32000},
 					Options: map[string]any{},
 				},
@@ -158,7 +165,7 @@ func getDefaultProviders() []ProviderInfo {
 						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: true},
 						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
 					},
-					Cost:    ModelCost{Input: 0.8, Output: 4.0, CacheRead: 0.08, CacheWrite: 1.0},
+					Cost:    ModelCost{Input: 0.8, Output: 4.0, Cache: ModelCostCache{Read: 0.08, Write: 1.0}},
 					Limit:   ModelLimit{Context: 200000, Output: 8192},
 					Options: map[string]any{},
 				},
@@ -182,7 +189,7 @@ func getDefaultProviders() []ProviderInfo {
 						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: false},
 						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
 					},
-					Cost:    ModelCost{Input: 2.5, Output: 10.0},
+					Cost:    ModelCost{Input: 2.5, Output: 10.0, Cache: ModelCostCache{Read: 0, Write: 0}},
 					Limit:   ModelLimit{Context: 128000, Output: 16384},
 					Options: map[string]any{},
 				},
@@ -198,7 +205,7 @@ func getDefaultProviders() []ProviderInfo {
 						Input:       ModalityCapabilities{Text: true, Audio: false, Image: true, Video: false, PDF: false},
 						Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
 					},
-					Cost:    ModelCost{Input: 0.15, Output: 0.6},
+					Cost:    ModelCost{Input: 0.15, Output: 0.6, Cache: ModelCostCache{Read: 0, Write: 0}},
 					Limit:   ModelLimit{Context: 128000, Output: 16384},
 					Options: map[string]any{},
 				},
@@ -937,7 +944,9 @@ func (s *Server) executeCommand(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Args string `json:"args"`
+		Args      string `json:"args"`
+		SessionID string `json:"sessionID,omitempty"`
+		MessageID string `json:"messageID,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		// Empty body is ok
@@ -949,6 +958,17 @@ func (s *Server) executeCommand(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, ErrCodeNotFound, err.Error())
 		return
 	}
+
+	// Publish command.executed event
+	event.PublishSync(event.Event{
+		Type: event.CommandExecuted,
+		Data: event.CommandExecutedData{
+			Name:      name,
+			SessionID: req.SessionID,
+			Arguments: req.Args,
+			MessageID: req.MessageID,
+		},
+	})
 
 	writeJSON(w, http.StatusOK, result)
 }
