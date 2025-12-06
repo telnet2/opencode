@@ -55,6 +55,23 @@ const (
 	PermissionReplied  EventType = "permission.replied" // SDK compatible (was permission.resolved)
 	TodoUpdated        EventType = "todo.updated"
 
+	// TUI Events
+	TuiPromptAppend   EventType = "tui.prompt.append"
+	TuiCommandExecute EventType = "tui.command.execute"
+	TuiToastShow      EventType = "tui.toast.show"
+
+	// VCS Events
+	VcsBranchUpdated EventType = "vcs.branch.updated"
+
+	// PTY Events
+	PtyCreated EventType = "pty.created"
+	PtyUpdated EventType = "pty.updated"
+	PtyExited  EventType = "pty.exited"
+	PtyDeleted EventType = "pty.deleted"
+
+	// Command Events
+	CommandExecuted EventType = "command.executed"
+
 	// Client Tool Events
 	ClientToolRequest      EventType = "client-tool.request"
 	ClientToolRegistered   EventType = "client-tool.registered"
