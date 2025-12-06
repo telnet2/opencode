@@ -6,6 +6,7 @@ import (
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
+	"github.com/opencode-ai/opencode/internal/agent"
 	"github.com/opencode-ai/opencode/internal/storage"
 )
 
@@ -118,8 +119,30 @@ func DefaultRegistry(workDir string, store *storage.Storage) *Registry {
 	r.Register(NewTodoWriteTool(workDir, store))
 	r.Register(NewTodoReadTool(workDir, store))
 
-	// Note: TaskTool requires agent registry, register separately if needed
+	// Note: TaskTool requires agent registry, register separately using RegisterTaskTool
 
 	fmt.Printf("[registry] DefaultRegistry created with %d tools: %v\n", len(r.tools), r.IDs())
 	return r
+}
+
+// RegisterTaskTool registers the task tool with the given agent registry.
+// This must be called separately after the agent registry is available.
+func (r *Registry) RegisterTaskTool(agentReg *agent.Registry) {
+	taskTool := NewTaskTool(r.workDir, agentReg)
+	r.Register(taskTool)
+	fmt.Printf("[registry] Registered task tool with agent registry\n")
+}
+
+// SetTaskExecutor sets the executor for the task tool.
+// This enables actual subagent execution instead of placeholder responses.
+func (r *Registry) SetTaskExecutor(executor TaskExecutor) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if tool, ok := r.tools["task"]; ok {
+		if taskTool, ok := tool.(*TaskTool); ok {
+			taskTool.SetExecutor(executor)
+			fmt.Printf("[registry] Task executor configured\n")
+		}
+	}
 }
