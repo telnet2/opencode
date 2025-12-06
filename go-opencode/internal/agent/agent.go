@@ -203,6 +203,26 @@ func matchWildcard(pattern, s string) bool {
 	return pattern == s
 }
 
+// ExploreAgentPrompt is the system prompt for the explore agent.
+const ExploreAgentPrompt = `You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
+
+Your strengths:
+- Rapidly finding files using glob patterns
+- Searching code and text with powerful regex patterns
+- Reading and analyzing file contents
+
+Guidelines:
+- Use Glob for broad file pattern matching
+- Use Grep for searching file contents with regex
+- Use Read when you know the specific file path you need to read
+- Use Bash for file operations like copying, moving, or listing directory contents
+- Adapt your search approach based on the thoroughness level specified by the caller
+- Return file paths as absolute paths in your final response
+- For clear communication, avoid using emojis
+- Do not create any files, or run bash commands that modify the user's system state in any way
+
+Complete the user's search request efficiently and report your findings clearly.`
+
 // BuiltInAgents returns the default agent configurations.
 func BuiltInAgents() map[string]*Agent {
 	return map[string]*Agent{
@@ -230,70 +250,94 @@ func BuiltInAgents() map[string]*Agent {
 			Permission: AgentPermission{
 				Edit: permission.ActionDeny,
 				Bash: map[string]permission.PermissionAction{
-					"grep*":       permission.ActionAllow,
-					"find*":       permission.ActionAllow,
-					"ls*":         permission.ActionAllow,
-					"cat*":        permission.ActionAllow,
-					"git status":  permission.ActionAllow,
-					"git diff*":   permission.ActionAllow,
-					"git log*":    permission.ActionAllow,
-					"*":           permission.ActionDeny,
+					"cut*":           permission.ActionAllow,
+					"diff*":          permission.ActionAllow,
+					"du*":            permission.ActionAllow,
+					"file *":         permission.ActionAllow,
+					"find * -delete*":  permission.ActionAsk,
+					"find * -exec*":    permission.ActionAsk,
+					"find * -fprint*":  permission.ActionAsk,
+					"find * -fls*":     permission.ActionAsk,
+					"find * -fprintf*": permission.ActionAsk,
+					"find * -ok*":      permission.ActionAsk,
+					"find *":         permission.ActionAllow,
+					"git diff*":      permission.ActionAllow,
+					"git log*":       permission.ActionAllow,
+					"git show*":      permission.ActionAllow,
+					"git status*":    permission.ActionAllow,
+					"git branch":     permission.ActionAllow,
+					"git branch -v":  permission.ActionAllow,
+					"grep*":          permission.ActionAllow,
+					"head*":          permission.ActionAllow,
+					"less*":          permission.ActionAllow,
+					"ls*":            permission.ActionAllow,
+					"more*":          permission.ActionAllow,
+					"pwd*":           permission.ActionAllow,
+					"rg*":            permission.ActionAllow,
+					"sort --output=*": permission.ActionAsk,
+					"sort -o *":      permission.ActionAsk,
+					"sort*":          permission.ActionAllow,
+					"stat*":          permission.ActionAllow,
+					"tail*":          permission.ActionAllow,
+					"tree -o *":      permission.ActionAsk,
+					"tree*":          permission.ActionAllow,
+					"uniq*":          permission.ActionAllow,
+					"wc*":            permission.ActionAllow,
+					"whereis*":       permission.ActionAllow,
+					"which*":         permission.ActionAllow,
+					"*":              permission.ActionAsk,
 				},
 				WebFetch:    permission.ActionAllow,
 				ExternalDir: permission.ActionDeny,
 				DoomLoop:    permission.ActionDeny,
 			},
 			Tools: map[string]bool{
-				"read":  true,
-				"glob":  true,
-				"grep":  true,
-				"ls":    true,
-				"bash":  true,
-				"edit":  false,
-				"write": false,
+				"*":         true,
+				"edit":      false,
+				"write":     false,
+				"todoread":  false,
+				"todowrite": false,
 			},
 		},
 		"general": {
 			Name:        "general",
-			Description: "General-purpose subagent for searches and exploration",
+			Description: "General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.",
 			Mode:        ModeSubagent,
 			BuiltIn:     true,
 			Permission: AgentPermission{
-				Edit:        permission.ActionDeny,
-				Bash:        map[string]permission.PermissionAction{"*": permission.ActionDeny},
+				Edit:        permission.ActionAllow,
+				Bash:        map[string]permission.PermissionAction{"*": permission.ActionAllow},
 				WebFetch:    permission.ActionAllow,
-				ExternalDir: permission.ActionDeny,
-				DoomLoop:    permission.ActionDeny,
+				ExternalDir: permission.ActionAsk,
+				DoomLoop:    permission.ActionAsk,
 			},
 			Tools: map[string]bool{
-				"read":     true,
-				"glob":     true,
-				"grep":     true,
-				"webfetch": true,
-				"bash":     false,
-				"edit":     false,
-				"write":    false,
+				"*":         true,
+				"todoread":  false,
+				"todowrite": false,
+				"task":      false, // Prevent recursive task calls
 			},
 		},
 		"explore": {
 			Name:        "explore",
-			Description: "Fast agent specialized for codebase exploration",
+			Description: `Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.`,
 			Mode:        ModeSubagent,
 			BuiltIn:     true,
+			Prompt:      ExploreAgentPrompt,
 			Permission: AgentPermission{
-				Edit:        permission.ActionDeny,
-				Bash:        map[string]permission.PermissionAction{"*": permission.ActionDeny},
-				WebFetch:    permission.ActionDeny,
-				ExternalDir: permission.ActionDeny,
-				DoomLoop:    permission.ActionDeny,
+				Edit:        permission.ActionAllow,
+				Bash:        map[string]permission.PermissionAction{"*": permission.ActionAllow},
+				WebFetch:    permission.ActionAllow,
+				ExternalDir: permission.ActionAsk,
+				DoomLoop:    permission.ActionAsk,
 			},
 			Tools: map[string]bool{
-				"read": true,
-				"glob": true,
-				"grep": true,
-				"ls":   true,
-				"bash": false,
-				"edit": false,
+				"*":         true,
+				"todoread":  false,
+				"todowrite": false,
+				"edit":      false,
+				"write":     false,
+				"task":      false, // Prevent recursive task calls
 			},
 		},
 	}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/opencode-ai/opencode/internal/agent"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/mcp"
 	"github.com/opencode-ai/opencode/internal/permission"
@@ -99,6 +100,10 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 	// Initialize tool registry
 	toolReg := tool.DefaultRegistry(workDir, store)
 
+	// Initialize agent registry and task tool
+	agentReg := agent.NewRegistry()
+	toolReg.RegisterTaskTool(agentReg)
+
 	// Initialize MCP client and servers from config
 	var mcpClient *mcp.Client
 	if appConfig.MCP != nil && len(appConfig.MCP) > 0 {
@@ -191,6 +196,19 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 			defaultModelID = parts[1]
 		}
 	}
+
+	// Create and configure SubagentExecutor for task tool
+	subagentExecutor := tool.NewSubagentExecutor(tool.SubagentExecutorConfig{
+		Storage:           store,
+		ProviderRegistry:  providerReg,
+		ToolRegistry:      toolReg,
+		PermissionChecker: permChecker,
+		AgentRegistry:     agentReg,
+		WorkDir:           workDir,
+		DefaultProviderID: defaultProviderID,
+		DefaultModelID:    defaultModelID,
+	})
+	toolReg.SetTaskExecutor(subagentExecutor)
 
 	// Create processor
 	processor := session.NewProcessor(providerReg, toolReg, store, permChecker, defaultProviderID, defaultModelID)

@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/opencode-ai/opencode/internal/agent"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/mcp"
@@ -84,6 +86,40 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Initialize tool registry
 	toolReg := tool.DefaultRegistry(workDir, store)
+
+	// Initialize agent registry
+	agentReg := agent.NewRegistry()
+	logging.Info().
+		Int("agentCount", agentReg.Count()).
+		Strs("agents", agentReg.Names()).
+		Msg("Agent registry initialized")
+
+	// Register task tool with agent registry
+	toolReg.RegisterTaskTool(agentReg)
+
+	// Parse default provider and model from config
+	var defaultProviderID, defaultModelID string
+	if appConfig != nil && appConfig.Model != "" {
+		parts := strings.SplitN(appConfig.Model, "/", 2)
+		if len(parts) == 2 {
+			defaultProviderID = parts[0]
+			defaultModelID = parts[1]
+		}
+	}
+
+	// Create and configure SubagentExecutor for task tool
+	subagentExecutor := tool.NewSubagentExecutor(tool.SubagentExecutorConfig{
+		Storage:           store,
+		ProviderRegistry:  providerReg,
+		ToolRegistry:      toolReg,
+		PermissionChecker: nil, // No permission checker for subagents
+		AgentRegistry:     agentReg,
+		WorkDir:           workDir,
+		DefaultProviderID: defaultProviderID,
+		DefaultModelID:    defaultModelID,
+	})
+	toolReg.SetTaskExecutor(subagentExecutor)
+	logging.Info().Msg("Subagent executor configured for task tool")
 
 	// Configure server
 	serverConfig := server.DefaultConfig()
