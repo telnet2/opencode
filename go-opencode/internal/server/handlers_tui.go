@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/clienttool"
+	"github.com/opencode-ai/opencode/internal/event"
 )
 
 // TUI control handlers for the TUI client.
@@ -19,7 +20,13 @@ func (s *Server) tuiAppendPrompt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON body")
 		return
 	}
-	// TUI would receive this via SSE
+
+	// Publish event for TUI clients via SSE
+	event.PublishSync(event.Event{
+		Type: event.TuiPromptAppend,
+		Data: event.TuiPromptAppendData{Text: req.Text},
+	})
+
 	writeSuccess(w)
 }
 
@@ -32,32 +39,84 @@ func (s *Server) tuiExecuteCommand(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON body")
 		return
 	}
+
+	// Publish event for TUI clients via SSE
+	event.PublishSync(event.Event{
+		Type: event.TuiCommandExecute,
+		Data: event.TuiCommandExecuteData{Command: req.Command},
+	})
+
 	writeSuccess(w)
 }
 
 // tuiShowToast handles POST /tui/show-toast
 func (s *Server) tuiShowToast(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Message string `json:"message"`
-		Type    string `json:"type"` // "info" | "error" | "success"
+		Title    string `json:"title,omitempty"`
+		Message  string `json:"message"`
+		Variant  string `json:"variant"` // "info" | "error" | "success" | "warning"
+		Duration int    `json:"duration,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON body")
 		return
 	}
+
+	// Publish event for TUI clients via SSE
+	event.PublishSync(event.Event{
+		Type: event.TuiToastShow,
+		Data: event.TuiToastShowData{
+			Title:    req.Title,
+			Message:  req.Message,
+			Variant:  req.Variant,
+			Duration: req.Duration,
+		},
+	})
+
 	writeSuccess(w)
 }
 
-// tuiPublish handles POST /tui/publish
+// tuiPublish handles POST /tui/publish (generic event publisher)
 func (s *Server) tuiPublish(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Event string `json:"event"`
-		Data  any    `json:"data"`
+		Type       string          `json:"type"`
+		Properties json.RawMessage `json:"properties"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON body")
 		return
 	}
+
+	switch req.Type {
+	case "tui.prompt.append":
+		var data event.TuiPromptAppendData
+		if err := json.Unmarshal(req.Properties, &data); err != nil {
+			writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid properties")
+			return
+		}
+		event.PublishSync(event.Event{Type: event.TuiPromptAppend, Data: data})
+
+	case "tui.command.execute":
+		var data event.TuiCommandExecuteData
+		if err := json.Unmarshal(req.Properties, &data); err != nil {
+			writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid properties")
+			return
+		}
+		event.PublishSync(event.Event{Type: event.TuiCommandExecute, Data: data})
+
+	case "tui.toast.show":
+		var data event.TuiToastShowData
+		if err := json.Unmarshal(req.Properties, &data); err != nil {
+			writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid properties")
+			return
+		}
+		event.PublishSync(event.Event{Type: event.TuiToastShow, Data: data})
+
+	default:
+		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "unknown event type: "+req.Type)
+		return
+	}
+
 	writeSuccess(w)
 }
 

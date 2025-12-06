@@ -21,6 +21,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/storage"
 	"github.com/opencode-ai/opencode/internal/tool"
+	"github.com/opencode-ai/opencode/internal/vcs"
 	"github.com/opencode-ai/opencode/pkg/types"
 )
 
@@ -59,6 +60,7 @@ type Server struct {
 	commandExecutor  *command.Executor
 	formatterManager *formatter.Manager
 	lspClient        *lsp.Client
+	vcsWatcher       *vcs.Watcher
 }
 
 // New creates a new Server instance.
@@ -89,6 +91,9 @@ func New(cfg *Config, appConfig *types.Config, store *storage.Storage, providerR
 	lspDisabled := appConfig != nil && appConfig.LSP != nil && appConfig.LSP.Disabled
 	lspClient := lsp.NewClient(cfg.Directory, lspDisabled)
 
+	// Initialize VCS watcher (watches for git branch changes)
+	vcsWatcher, _ := vcs.NewWatcher(cfg.Directory)
+
 	s := &Server{
 		config:           cfg,
 		router:           r,
@@ -102,6 +107,7 @@ func New(cfg *Config, appConfig *types.Config, store *storage.Storage, providerR
 		commandExecutor:  cmdExecutor,
 		formatterManager: fmtManager,
 		lspClient:        lspClient,
+		vcsWatcher:       vcsWatcher,
 	}
 
 	s.setupMiddleware()
@@ -198,6 +204,11 @@ func (s *Server) instanceContext(next http.Handler) http.Handler {
 
 // Start starts the HTTP server.
 func (s *Server) Start() error {
+	// Start VCS watcher if available
+	if s.vcsWatcher != nil {
+		s.vcsWatcher.Start()
+	}
+
 	s.httpSrv = &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.config.Port),
 		Handler:      s.router,
@@ -210,6 +221,10 @@ func (s *Server) Start() error {
 
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
+	// Stop VCS watcher if available
+	if s.vcsWatcher != nil {
+		_ = s.vcsWatcher.Stop()
+	}
 	return s.httpSrv.Shutdown(ctx)
 }
 

@@ -150,3 +150,74 @@ type ClientToolStatusData struct {
 	Error     string `json:"error,omitempty"`
 	Success   bool   `json:"success,omitempty"`
 }
+
+// TUI Events
+
+// TuiPromptAppendData is the data for tui.prompt.append events.
+type TuiPromptAppendData struct {
+	Text string `json:"text"`
+}
+
+// TuiCommandExecuteData is the data for tui.command.execute events.
+type TuiCommandExecuteData struct {
+	Command string `json:"command"`
+}
+
+// TuiToastShowData is the data for tui.toast.show events.
+type TuiToastShowData struct {
+	Title    string `json:"title,omitempty"`
+	Message  string `json:"message"`
+	Variant  string `json:"variant"` // "info" | "success" | "warning" | "error"
+	Duration int    `json:"duration,omitempty"`
+}
+
+// VCS Events
+
+// VcsBranchUpdatedData is the data for vcs.branch.updated events.
+type VcsBranchUpdatedData struct {
+	Branch string `json:"branch,omitempty"`
+}
+
+// PTY Events
+
+// PtyInfo represents a PTY session.
+type PtyInfo struct {
+	ID      string   `json:"id"`
+	Title   string   `json:"title"`
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+	Cwd     string   `json:"cwd"`
+	Status  string   `json:"status"` // "running" | "exited"
+	Pid     int      `json:"pid"`
+}
+
+// PtyCreatedData is the data for pty.created events.
+type PtyCreatedData struct {
+	Info PtyInfo `json:"info"`
+}
+
+// PtyUpdatedData is the data for pty.updated events.
+type PtyUpdatedData struct {
+	Info PtyInfo `json:"info"`
+}
+
+// PtyExitedData is the data for pty.exited events.
+type PtyExitedData struct {
+	ID       string `json:"id"`
+	ExitCode int    `json:"exitCode"`
+}
+
+// PtyDeletedData is the data for pty.deleted events.
+type PtyDeletedData struct {
+	ID string `json:"id"`
+}
+
+// Command Events
+
+// CommandExecutedData is the data for command.executed events.
+type CommandExecutedData struct {
+	Name      string `json:"name"`
+	SessionID string `json:"sessionID"`
+	Arguments string `json:"arguments"`
+	MessageID string `json:"messageID"`
+}

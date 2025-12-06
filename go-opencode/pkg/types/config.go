@@ -10,8 +10,8 @@ type Config struct {
 	Username string `json:"username,omitempty"`
 
 	// Model selection
-	Model      string `json:"model,omitempty"`       // "anthropic/claude-sonnet-4"
-	SmallModel string `json:"small_model,omitempty"` // For fast tasks
+	Model      string `json:"model,omitempty"`      // "anthropic/claude-sonnet-4"
+	SmallModel string `json:"smallModel,omitempty"` // For fast tasks (camelCase for TS compatibility)
 
 	// Theme (TUI only, for compatibility)
 	Theme string `json:"theme,omitempty"`
@@ -87,7 +87,7 @@ type ProviderConfig struct {
 type ModelConfig struct {
 	ID        string `json:"id,omitempty"`
 	Reasoning bool   `json:"reasoning,omitempty"`
-	ToolCall  bool   `json:"tool_call,omitempty"`
+	ToolCall  bool   `json:"toolcall,omitempty"` // No underscore - matches TS capabilities.toolcall
 }
 
 // ProviderOptions holds nested provider options (TypeScript style).
@@ -106,7 +106,7 @@ type AgentConfig struct {
 
 	// Generation parameters
 	Temperature *float64 `json:"temperature,omitempty"`
-	TopP        *float64 `json:"top_p,omitempty"` // Changed to match TS (was topP)
+	TopP        *float64 `json:"topP,omitempty"` // camelCase for TS compatibility
 
 	// Custom system prompt
 	Prompt string `json:"prompt,omitempty"`
