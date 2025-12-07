@@ -12,6 +12,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/agent"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/executor"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/mcp"
 	"github.com/opencode-ai/opencode/internal/provider"
@@ -108,7 +109,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create and configure SubagentExecutor for task tool
-	subagentExecutor := tool.NewSubagentExecutor(tool.SubagentExecutorConfig{
+	subagentExecutor := executor.NewSubagentExecutor(executor.SubagentExecutorConfig{
 		Storage:           store,
 		ProviderRegistry:  providerReg,
 		ToolRegistry:      toolReg,
