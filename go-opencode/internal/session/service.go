@@ -3,8 +3,6 @@ package session
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -14,6 +12,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/event"
 	"github.com/opencode-ai/opencode/internal/permission"
+	"github.com/opencode-ai/opencode/internal/project"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/storage"
 	"github.com/opencode-ai/opencode/internal/tool"
@@ -75,7 +74,21 @@ func (s *Service) GetProcessor() *Processor {
 // Create creates a new session.
 func (s *Service) Create(ctx context.Context, directory string, title string) (*types.Session, error) {
 	now := time.Now().UnixMilli()
-	projectID := hashDirectory(directory)
+	projectID, err := project.GetProjectID(directory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project ID: %w", err)
+	}
+
+	// Migrate any existing sessions from the old hash-based project ID
+	if err := s.migrateFromHashBasedID(ctx, directory, projectID); err != nil {
+		// Log but don't fail - migration is best-effort
+		_ = err
+	}
+
+	// Also migrate from "global" if applicable
+	if err := s.migrateFromGlobal(ctx, directory, projectID); err != nil {
+		_ = err
+	}
 
 	// Use default title if not provided
 	if title == "" {
@@ -196,8 +209,23 @@ func (s *Service) List(ctx context.Context, directory string) ([]*types.Session,
 	}
 
 	// List sessions for a specific directory/project
-	projectID := hashDirectory(directory)
-	err := s.storage.Scan(ctx, []string{"session", projectID}, func(key string, data json.RawMessage) error {
+	projectID, err := project.GetProjectID(directory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project ID: %w", err)
+	}
+
+	// Also check for sessions under the old hash-based project ID and migrate them
+	if err := s.migrateFromHashBasedID(ctx, directory, projectID); err != nil {
+		// Log but don't fail - migration is best-effort
+		_ = err
+	}
+
+	// Also migrate from "global" if applicable
+	if err := s.migrateFromGlobal(ctx, directory, projectID); err != nil {
+		_ = err
+	}
+
+	err = s.storage.Scan(ctx, []string{"session", projectID}, func(key string, data json.RawMessage) error {
 		var session types.Session
 		if err := json.Unmarshal(data, &session); err != nil {
 			return err
@@ -592,18 +620,17 @@ func (s *Service) GetCurrentProject(ctx context.Context, directory string) (*typ
 		return nil, fmt.Errorf("directory is required")
 	}
 
-	projectID := hashDirectory(directory)
+	info, err := project.FromDirectory(directory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project info: %w", err)
+	}
+
 	now := time.Now().UnixMilli()
 
-	// Check if directory is a git repository
-	var vcs *string
-	gitVCS := "git"
-	vcs = &gitVCS // Assume git for now
-
 	return &types.Project{
-		ID:       projectID,
-		Worktree: directory,
-		VCS:      vcs,
+		ID:       info.ID,
+		Worktree: info.Worktree,
+		VCS:      info.VCS,
 		Time: types.ProjectTime{
 			Created: now,
 		},
@@ -682,9 +709,81 @@ func generateID() string {
 	return ulid.Make().String()
 }
 
-// hashDirectory creates a project ID from a directory path.
-func hashDirectory(directory string) string {
-	h := sha256.New()
-	h.Write([]byte(directory))
-	return hex.EncodeToString(h.Sum(nil))[:16]
+// migrateFromHashBasedID migrates sessions from the old hash-based project ID
+// to the new git-based project ID. This ensures compatibility with TypeScript OpenCode.
+func (s *Service) migrateFromHashBasedID(ctx context.Context, directory, newProjectID string) error {
+	// Calculate the old hash-based project ID
+	oldProjectID := project.HashDirectory(directory)
+
+	// If they're the same (e.g., "global"), no migration needed
+	if oldProjectID == newProjectID {
+		return nil
+	}
+
+	// Check if there are any sessions under the old project ID
+	oldSessions, err := s.storage.List(ctx, []string{"session", oldProjectID})
+	if err != nil || len(oldSessions) == 0 {
+		return nil // No sessions to migrate
+	}
+
+	// Migrate each session
+	for _, sessionID := range oldSessions {
+		var session types.Session
+		if err := s.storage.Get(ctx, []string{"session", oldProjectID, sessionID}, &session); err != nil {
+			continue // Skip sessions that can't be read
+		}
+
+		// Only migrate sessions that belong to this directory
+		if session.Directory != directory {
+			continue
+		}
+
+		// Update project ID and save to new location
+		session.ProjectID = newProjectID
+		if err := s.storage.Put(ctx, []string{"session", newProjectID, session.ID}, &session); err != nil {
+			continue // Skip on error
+		}
+
+		// Delete from old location
+		_ = s.storage.Delete(ctx, []string{"session", oldProjectID, sessionID})
+	}
+
+	return nil
+}
+
+// migrateFromGlobal migrates sessions from the "global" project to a specific project.
+// This handles cases where sessions were created before git detection was implemented.
+func (s *Service) migrateFromGlobal(ctx context.Context, directory, newProjectID string) error {
+	if newProjectID == "global" {
+		return nil // Can't migrate to global
+	}
+
+	// Check for sessions in "global" that belong to this directory
+	globalSessions, err := s.storage.List(ctx, []string{"session", "global"})
+	if err != nil || len(globalSessions) == 0 {
+		return nil
+	}
+
+	for _, sessionID := range globalSessions {
+		var session types.Session
+		if err := s.storage.Get(ctx, []string{"session", "global", sessionID}, &session); err != nil {
+			continue
+		}
+
+		// Only migrate sessions that belong to this directory
+		if session.Directory != directory {
+			continue
+		}
+
+		// Update project ID and save to new location
+		session.ProjectID = newProjectID
+		if err := s.storage.Put(ctx, []string{"session", newProjectID, session.ID}, &session); err != nil {
+			continue
+		}
+
+		// Delete from global
+		_ = s.storage.Delete(ctx, []string{"session", "global", sessionID})
+	}
+
+	return nil
 }
