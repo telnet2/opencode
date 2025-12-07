@@ -114,6 +114,7 @@ func DefaultRegistry(workDir string, store *storage.Storage) *Registry {
 	r.Register(NewGlobTool(workDir))
 	r.Register(NewGrepTool(workDir))
 	r.Register(NewListTool(workDir))
+	r.Register(NewWebFetchTool(workDir))
 
 	// Register todo tools
 	r.Register(NewTodoWriteTool(workDir, store))
