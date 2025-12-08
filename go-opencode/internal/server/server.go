@@ -17,6 +17,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/formatter"
 	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/mcp"
+	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/storage"
@@ -47,20 +48,21 @@ func DefaultConfig() *Config {
 
 // Server is the HTTP server.
 type Server struct {
-	config           *Config
-	router           *chi.Mux
-	httpSrv          *http.Server
-	appConfig        *types.Config
-	storage          *storage.Storage
-	sessionService   *session.Service
-	providerReg      *provider.Registry
-	toolReg          *tool.Registry
-	bus              *event.Bus
-	mcpClient        *mcp.Client
-	commandExecutor  *command.Executor
-	formatterManager *formatter.Manager
-	lspClient        *lsp.Client
-	vcsWatcher       *vcs.Watcher
+	config            *Config
+	router            *chi.Mux
+	httpSrv           *http.Server
+	appConfig         *types.Config
+	storage           *storage.Storage
+	sessionService    *session.Service
+	providerReg       *provider.Registry
+	toolReg           *tool.Registry
+	bus               *event.Bus
+	mcpClient         *mcp.Client
+	commandExecutor   *command.Executor
+	formatterManager  *formatter.Manager
+	lspClient         *lsp.Client
+	vcsWatcher        *vcs.Watcher
+	permissionChecker *permission.Checker
 }
 
 // New creates a new Server instance.
@@ -94,20 +96,24 @@ func New(cfg *Config, appConfig *types.Config, store *storage.Storage, providerR
 	// Initialize VCS watcher (watches for git branch changes)
 	vcsWatcher, _ := vcs.NewWatcher(cfg.Directory)
 
+	// Create permission checker for tool execution permissions
+	permChecker := permission.NewChecker()
+
 	s := &Server{
-		config:           cfg,
-		router:           r,
-		appConfig:        appConfig,
-		storage:          store,
-		sessionService:   session.NewServiceWithProcessor(store, providerReg, toolReg, nil, defaultProviderID, defaultModelID),
-		providerReg:      providerReg,
-		toolReg:          toolReg,
-		bus:              event.NewBus(),
-		mcpClient:        mcpClient,
-		commandExecutor:  cmdExecutor,
-		formatterManager: fmtManager,
-		lspClient:        lspClient,
-		vcsWatcher:       vcsWatcher,
+		config:            cfg,
+		router:            r,
+		appConfig:         appConfig,
+		storage:           store,
+		sessionService:    session.NewServiceWithProcessor(store, providerReg, toolReg, permChecker, defaultProviderID, defaultModelID),
+		providerReg:       providerReg,
+		toolReg:           toolReg,
+		bus:               event.NewBus(),
+		mcpClient:         mcpClient,
+		commandExecutor:   cmdExecutor,
+		formatterManager:  fmtManager,
+		lspClient:         lspClient,
+		vcsWatcher:        vcsWatcher,
+		permissionChecker: permChecker,
 	}
 
 	s.setupMiddleware()

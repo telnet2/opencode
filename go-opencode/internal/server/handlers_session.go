@@ -407,17 +407,11 @@ type PermissionResponse struct {
 
 // respondPermission handles POST /session/{sessionID}/permissions/{permissionID}
 func (s *Server) respondPermission(w http.ResponseWriter, r *http.Request) {
-	sessionID := chi.URLParam(r, "sessionID")
 	permissionID := chi.URLParam(r, "permissionID")
 
 	var req PermissionResponse
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid JSON body")
-		return
-	}
-
-	if err := s.sessionService.RespondPermission(r.Context(), sessionID, permissionID, req.Granted); err != nil {
-		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 		return
 	}
 
@@ -427,15 +421,11 @@ func (s *Server) respondPermission(w http.ResponseWriter, r *http.Request) {
 		response = "once"
 	}
 
-	// Publish event (SDK compatible: uses PermissionReplied)
-	event.PublishSync(event.Event{
-		Type: event.PermissionReplied,
-		Data: event.PermissionRepliedData{
-			PermissionID: permissionID,
-			SessionID:    sessionID,
-			Response:     response,
-		},
-	})
+	// Call the permission checker to unblock the waiting Ask() call
+	// This also publishes the PermissionReplied event
+	if s.permissionChecker != nil {
+		s.permissionChecker.Respond(permissionID, response)
+	}
 
 	writeSuccess(w)
 }
