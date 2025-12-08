@@ -1,6 +1,6 @@
 module github.com/opencode-ai/opencode
 
-go 1.25
+go 1.24
 
 require (
 	// Eino LLM Framework
@@ -21,11 +21,14 @@ require (
 )
 
 require (
+	github.com/JohannesKaufmann/html-to-markdown v1.6.0
+	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/agnivade/levenshtein v1.2.1
 	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.50
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mark3labs/mcp-go v0.43.1
 	github.com/modelcontextprotocol/go-sdk v1.1.0
@@ -41,6 +44,7 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/anthropics/anthropic-sdk-go v1.19.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.33.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.3 // indirect
@@ -67,7 +71,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.2 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -122,4 +125,4 @@ require (
 
 replace github.com/sst/opencode-sdk-go => ../packages/sdk/go
 
-replace github.com/cloudwego/eino-ext/components/model/claude => /Users/joohwi.lee/repos/cloudwego/eino-ext/components/model/claude
+// replace github.com/cloudwego/eino-ext/components/model/claude => /Users/joohwi.lee/repos/cloudwego/eino-ext/components/model/claude

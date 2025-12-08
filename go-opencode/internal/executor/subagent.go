@@ -1,5 +1,5 @@
-// Package tool provides tool implementations for the agentic loop.
-package tool
+// Package executor provides task execution implementations.
+package executor
 
 import (
 	"context"
@@ -17,17 +17,18 @@ import (
 	"github.com/opencode-ai/opencode/internal/provider"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/storage"
+	"github.com/opencode-ai/opencode/internal/tool"
 	"github.com/opencode-ai/opencode/pkg/types"
 )
 
-// SubagentExecutor implements TaskExecutor to run subagent tasks.
+// SubagentExecutor implements tool.TaskExecutor to run subagent tasks.
 type SubagentExecutor struct {
-	storage          *storage.Storage
-	providerRegistry *provider.Registry
-	toolRegistry     *Registry
+	storage           *storage.Storage
+	providerRegistry  *provider.Registry
+	toolRegistry      *tool.Registry
 	permissionChecker *permission.Checker
-	agentRegistry    *agent.Registry
-	workDir          string
+	agentRegistry     *agent.Registry
+	workDir           string
 
 	// Default provider and model settings
 	defaultProviderID string
@@ -38,7 +39,7 @@ type SubagentExecutor struct {
 type SubagentExecutorConfig struct {
 	Storage           *storage.Storage
 	ProviderRegistry  *provider.Registry
-	ToolRegistry      *Registry
+	ToolRegistry      *tool.Registry
 	PermissionChecker *permission.Checker
 	AgentRegistry     *agent.Registry
 	WorkDir           string
@@ -60,15 +61,15 @@ func NewSubagentExecutor(cfg SubagentExecutorConfig) *SubagentExecutor {
 	}
 }
 
-// ExecuteSubtask implements TaskExecutor.ExecuteSubtask.
+// ExecuteSubtask implements tool.TaskExecutor.ExecuteSubtask.
 // It creates a child session, runs the subagent, and returns the result.
 func (e *SubagentExecutor) ExecuteSubtask(
 	ctx context.Context,
 	parentSessionID string,
 	agentName string,
 	prompt string,
-	opts TaskOptions,
-) (*TaskResult, error) {
+	opts tool.TaskOptions,
+) (*tool.TaskResult, error) {
 	// Get the agent configuration
 	agentConfig, err := e.agentRegistry.Get(agentName)
 	if err != nil {
@@ -119,7 +120,7 @@ func (e *SubagentExecutor) ExecuteSubtask(
 	})
 
 	if err != nil {
-		return &TaskResult{
+		return &tool.TaskResult{
 			Output:    fmt.Sprintf("Error executing subtask: %s", err.Error()),
 			SessionID: childSession.ID,
 			Error:     err.Error(),
@@ -133,7 +134,7 @@ func (e *SubagentExecutor) ExecuteSubtask(
 	// Extract text content from response
 	output := extractTextContent(responseParts)
 
-	return &TaskResult{
+	return &tool.TaskResult{
 		Output:    output,
 		SessionID: childSession.ID,
 		AgentID:   agentName,
@@ -173,7 +174,7 @@ func (e *SubagentExecutor) createChildSession(ctx context.Context, parentSession
 	// Create project ID from directory
 	projectID := hashDirectory(directory)
 
-	session := &types.Session{
+	sess := &types.Session{
 		ID:        sessionID,
 		ProjectID: projectID,
 		Directory: directory,
@@ -191,17 +192,17 @@ func (e *SubagentExecutor) createChildSession(ctx context.Context, parentSession
 		},
 	}
 
-	if err := e.storage.Put(ctx, []string{"session", projectID, session.ID}, session); err != nil {
+	if err := e.storage.Put(ctx, []string{"session", projectID, sess.ID}, sess); err != nil {
 		return nil, fmt.Errorf("failed to save child session: %w", err)
 	}
 
 	// Publish session created event
 	event.PublishSync(event.Event{
 		Type: event.SessionCreated,
-		Data: event.SessionCreatedData{Info: session},
+		Data: event.SessionCreatedData{Info: sess},
 	})
 
-	return session, nil
+	return sess, nil
 }
 
 // createUserMessage creates a user message with the prompt.
@@ -216,9 +217,9 @@ func (e *SubagentExecutor) createUserMessage(
 	msgID := ulid.Make().String()
 
 	msg := &types.Message{
-		ID:        msgID,
-		SessionID: sess.ID,
-		Role:      "user",
+		ID:         msgID,
+		SessionID:  sess.ID,
+		Role:       "user",
 		ProviderID: providerID,
 		ModelID:    modelID,
 		Model: &types.ModelRef{
@@ -368,7 +369,6 @@ func extractTextContent(parts []types.Part) string {
 }
 
 // hashDirectory creates a project ID from a directory path.
-// This is duplicated from session package to avoid circular imports.
 func hashDirectory(directory string) string {
 	h := sha256.New()
 	h.Write([]byte(directory))
