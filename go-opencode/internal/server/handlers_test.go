@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/storage"
 	"github.com/opencode-ai/opencode/pkg/types"
@@ -286,5 +289,169 @@ func TestReadFile_MissingPath(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400, got %d", w.Code)
+	}
+}
+
+func TestRespondPermission_Granted(t *testing.T) {
+	srv := setupTestServer(t)
+	checker := permission.NewChecker()
+	srv.permissionChecker = checker
+
+	sessionID := "test-session"
+	permissionID := "test-permission-id"
+
+	// Start Ask in background - it will block waiting for response
+	var wg sync.WaitGroup
+	wg.Add(1)
+	errChan := make(chan error, 1)
+	go func() {
+		defer wg.Done()
+		errChan <- checker.Ask(context.Background(), permission.Request{
+			ID:        permissionID,
+			SessionID: sessionID,
+			Type:      permission.PermBash,
+			Title:     "Run git status",
+			Pattern:   []string{"git status"},
+		})
+	}()
+
+	// Give Ask time to register the pending request
+	time.Sleep(10 * time.Millisecond)
+
+	// Set up chi context with URL parameters
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("sessionID", sessionID)
+	rctx.URLParams.Add("permissionID", permissionID)
+
+	body := PermissionResponse{Granted: true}
+	jsonBody, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("POST", "/session/"+sessionID+"/permissions/"+permissionID, bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	// Call the handler - this should unblock Ask
+	srv.respondPermission(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Wait for Ask to complete
+	wg.Wait()
+
+	// Check that Ask returned without error (permission granted)
+	select {
+	case err := <-errChan:
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+	default:
+		t.Error("Expected Ask to complete")
+	}
+}
+
+func TestRespondPermission_Rejected(t *testing.T) {
+	srv := setupTestServer(t)
+	checker := permission.NewChecker()
+	srv.permissionChecker = checker
+
+	sessionID := "test-session"
+	permissionID := "test-permission-reject"
+
+	// Start Ask in background
+	var wg sync.WaitGroup
+	wg.Add(1)
+	errChan := make(chan error, 1)
+	go func() {
+		defer wg.Done()
+		errChan <- checker.Ask(context.Background(), permission.Request{
+			ID:        permissionID,
+			SessionID: sessionID,
+			Type:      permission.PermBash,
+			Title:     "Run rm -rf",
+			Pattern:   []string{"rm -rf"},
+		})
+	}()
+
+	// Give Ask time to register
+	time.Sleep(10 * time.Millisecond)
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("sessionID", sessionID)
+	rctx.URLParams.Add("permissionID", permissionID)
+
+	body := PermissionResponse{Granted: false}
+	jsonBody, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("POST", "/session/"+sessionID+"/permissions/"+permissionID, bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	srv.respondPermission(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200, got %d", w.Code)
+	}
+
+	wg.Wait()
+
+	// Check that Ask returned with RejectedError
+	select {
+	case err := <-errChan:
+		if err == nil {
+			t.Error("Expected RejectedError, got nil")
+		}
+		if _, ok := err.(*permission.RejectedError); !ok {
+			t.Errorf("Expected RejectedError, got %T: %v", err, err)
+		}
+	default:
+		t.Error("Expected Ask to complete")
+	}
+}
+
+func TestRespondPermission_InvalidJSON(t *testing.T) {
+	srv := setupTestServer(t)
+	srv.permissionChecker = permission.NewChecker()
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("sessionID", "test-session")
+	rctx.URLParams.Add("permissionID", "test-permission")
+
+	req := httptest.NewRequest("POST", "/session/test-session/permissions/test-permission", bytes.NewReader([]byte("invalid json")))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	srv.respondPermission(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400, got %d", w.Code)
+	}
+}
+
+func TestRespondPermission_NilChecker(t *testing.T) {
+	srv := setupTestServer(t)
+	// permissionChecker is nil
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("sessionID", "test-session")
+	rctx.URLParams.Add("permissionID", "test-permission")
+
+	body := PermissionResponse{Granted: true}
+	jsonBody, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("POST", "/session/test-session/permissions/test-permission", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	// Should not panic with nil checker
+	srv.respondPermission(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200, got %d", w.Code)
 	}
 }
