@@ -104,6 +104,7 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(headlessCmd)
 	rootCmd.AddCommand(modelsCmd)
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(agentCmd)
