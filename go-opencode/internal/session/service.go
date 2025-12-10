@@ -72,7 +72,7 @@ func (s *Service) GetProcessor() *Processor {
 }
 
 // Create creates a new session.
-func (s *Service) Create(ctx context.Context, directory string, title string) (*types.Session, error) {
+func (s *Service) Create(ctx context.Context, directory string, title string, customPrompt *types.CustomPrompt) (*types.Session, error) {
 	now := time.Now().UnixMilli()
 	projectID, err := project.GetProjectID(directory)
 	if err != nil {
@@ -110,6 +110,15 @@ func (s *Service) Create(ctx context.Context, directory string, title string) (*
 			Created: now,
 			Updated: now,
 		},
+	}
+
+	// Set custom prompt if provided
+	if customPrompt != nil {
+		// Set loadedAt timestamp if not already set
+		if customPrompt.LoadedAt == nil {
+			customPrompt.LoadedAt = &now
+		}
+		session.CustomPrompt = customPrompt
 	}
 
 	if err := s.storage.Put(ctx, []string{"session", projectID, session.ID}, session); err != nil {
@@ -266,8 +275,8 @@ func (s *Service) Fork(ctx context.Context, sessionID, messageID string) (*types
 		return nil, err
 	}
 
-	// Create new session with fork title
-	newSession, err := s.Create(ctx, session.Directory, session.Title+" (fork)")
+	// Create new session with fork title (inherit custom prompt from parent)
+	newSession, err := s.Create(ctx, session.Directory, session.Title+" (fork)", session.CustomPrompt)
 	if err != nil {
 		return nil, err
 	}

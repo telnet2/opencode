@@ -14,8 +14,9 @@ import (
 
 // CreateSessionRequest represents the request body for creating a session.
 type CreateSessionRequest struct {
-	Directory string `json:"directory"`
-	Title     string `json:"title,omitempty"`
+	Directory    string              `json:"directory"`
+	Title        string              `json:"title,omitempty"`
+	CustomPrompt *types.CustomPrompt `json:"customPrompt,omitempty"`
 }
 
 // listSessions handles GET /session
@@ -60,7 +61,7 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := s.sessionService.Create(r.Context(), directory, req.Title)
+	session, err := s.sessionService.Create(r.Context(), directory, req.Title, req.CustomPrompt)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 		return

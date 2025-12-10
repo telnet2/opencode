@@ -239,6 +239,25 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 	// Run the agentic loop
 	fmt.Printf("Starting session %s...\n", sessionID)
 	fmt.Printf("Model: %s\n", appConfig.Model)
+
+	// Display custom prompt info if one is active
+	if systemPrompt != "" {
+		var promptLabel string
+		if runPromptFile != "" {
+			promptLabel = fmt.Sprintf("file: %s", runPromptFile)
+		} else if runPromptInline != "" {
+			promptLabel = "inline prompt"
+		} else if runPrompt != "" {
+			// Check if it was loaded as file or used inline
+			if _, err := os.Stat(runPrompt); err == nil {
+				promptLabel = fmt.Sprintf("file: %s", runPrompt)
+			} else {
+				promptLabel = truncate(runPrompt, 50)
+			}
+		}
+		fmt.Printf("✓ Custom prompt: %s\n", promptLabel)
+	}
+
 	fmt.Printf("Message: %s\n\n", truncate(message, 100))
 
 	if err := processor.Process(ctx, sessionID, agent, callback); err != nil {
