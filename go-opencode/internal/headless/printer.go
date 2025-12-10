@@ -246,6 +246,7 @@ func (p *Printer) handleToolPartText(part *types.ToolPart) {
 }
 
 // handleJSONLEvent outputs events in JSONL format.
+// Aligned with TS format: {"type": "...", "timestamp": <unix_ms>, "sessionID": "...", ...data}
 func (p *Printer) handleJSONLEvent(e event.Event) {
 	// Track event for result
 	p.trackEvent(e)
@@ -255,11 +256,8 @@ func (p *Printer) handleJSONLEvent(e event.Event) {
 		return
 	}
 
-	evt := &Event{
-		Type:      string(e.Type),
-		Timestamp: time.Now(),
-		Data:      e.Data,
-	}
+	// Create event with TS-compatible format
+	evt := NewEvent(string(e.Type), p.sessionID, e.Data)
 
 	data, err := json.Marshal(evt)
 	if err != nil {

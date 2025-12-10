@@ -12,11 +12,11 @@ import (
 
 var (
 	// Headless mode flags
-	headlessPrompt       string
-	headlessWorkDir      string
-	headlessAutoApprove  bool
-	headlessOutputFormat string
-	headlessTimeout      string
+	headlessPrompt      string
+	headlessWorkDir     string
+	headlessAutoApprove bool
+	headlessFormat      string
+	headlessTimeout     string
 	headlessMaxSteps     int
 	headlessStdin        bool
 	headlessNoSave       bool
@@ -36,7 +36,7 @@ var headlessCmd = &cobra.Command{
 	Long: `Run OpenCode in headless mode without interactive TUI.
 
 Headless mode executes a prompt and outputs results to stdout. All events are
-streamed in the specified format (text, json, or jsonl).
+streamed in the specified format (default, json, or jsonl).
 
 Examples:
   # Simple prompt
@@ -45,8 +45,8 @@ Examples:
   # Auto-approve all tool executions
   opencode headless --yolo "Refactor the authentication module"
 
-  # With timeout and JSON output
-  opencode headless -o json -t 5m "Run tests and fix failures"
+  # With timeout and JSON output (aligned with TS opencode run --format=json)
+  opencode headless --format json -t 5m "Run tests and fix failures"
 
   # Read prompt from stdin
   echo "Fix linting errors" | opencode headless --stdin
@@ -58,7 +58,7 @@ Examples:
   opencode headless -f spec.md -f api.yaml "Implement the API from spec"
 
   # Stream JSONL events for programmatic consumption
-  opencode headless -o jsonl "Implement feature X" | jq -r '.type'`,
+  opencode headless --format jsonl "Implement feature X" | jq -r '.type'`,
 	RunE: runHeadless,
 }
 
@@ -79,8 +79,8 @@ func init() {
 	headlessCmd.Flags().BoolVar(&headlessAutoApprove, "auto-approve", false, "Auto-approve all tool executions")
 	headlessCmd.Flags().BoolVar(&headlessAutoApprove, "yolo", false, "Alias for --auto-approve")
 
-	// Output format
-	headlessCmd.Flags().StringVarP(&headlessOutputFormat, "output-format", "o", "text", "Output format: text, json, jsonl")
+	// Output format (aligned with TS: --format [default|json], we add jsonl)
+	headlessCmd.Flags().StringVar(&headlessFormat, "format", "default", "Output format: default (text), json, jsonl")
 	headlessCmd.Flags().BoolVarP(&headlessQuiet, "quiet", "q", false, "Suppress progress output, only show result")
 	headlessCmd.Flags().BoolVarP(&headlessVerbose, "verbose", "v", false, "Show all events (with jsonl format)")
 
@@ -106,17 +106,17 @@ func runHeadless(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid timeout: %w", err)
 	}
 
-	// Parse output format
+	// Parse output format (aligned with TS: default|json, we add jsonl)
 	var outputFormat headless.OutputFormat
-	switch strings.ToLower(headlessOutputFormat) {
-	case "text":
+	switch strings.ToLower(headlessFormat) {
+	case "default", "text":
 		outputFormat = headless.OutputText
 	case "json":
 		outputFormat = headless.OutputJSON
 	case "jsonl":
 		outputFormat = headless.OutputJSONL
 	default:
-		return fmt.Errorf("invalid output format: %s (must be text, json, or jsonl)", headlessOutputFormat)
+		return fmt.Errorf("invalid format: %s (must be default, json, or jsonl)", headlessFormat)
 	}
 
 	// Build prompt from args if not provided via flag

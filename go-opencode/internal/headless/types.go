@@ -122,17 +122,20 @@ type Result struct {
 }
 
 // Event represents a JSONL event for streaming output.
+// Aligned with TS format: {"type": "...", "timestamp": <unix_ms>, "sessionID": "...", ...data}
 type Event struct {
-	Type      string    `json:"type"`
-	Timestamp time.Time `json:"ts"`
-	Data      any       `json:"data"`
+	Type      string `json:"type"`
+	Timestamp int64  `json:"timestamp"` // Unix milliseconds (aligned with TS)
+	SessionID string `json:"sessionID,omitempty"`
+	Data      any    `json:"data,omitempty"`
 }
 
 // NewEvent creates a new event with the current timestamp.
-func NewEvent(eventType string, data any) *Event {
+func NewEvent(eventType string, sessionID string, data any) *Event {
 	return &Event{
 		Type:      eventType,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UnixMilli(),
+		SessionID: sessionID,
 		Data:      data,
 	}
 }
