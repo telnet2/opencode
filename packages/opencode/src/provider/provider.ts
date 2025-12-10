@@ -287,13 +287,21 @@ export namespace Provider {
     },
     "sap-ai-core": async () => {
       const auth = await Auth.get("sap-ai-core")
-      const serviceKey = Env.get("SAP_AI_SERVICE_KEY") || (auth?.type === "api" ? auth.key : undefined)
-      const deploymentId = Env.get("SAP_AI_DEPLOYMENT_ID") || "d65d81e7c077e583"
-      const resourceGroup = Env.get("SAP_AI_RESOURCE_GROUP") || "default"
+      const envServiceKey = iife(() => {
+        const envAICoreServiceKey = Env.get("AICORE_SERVICE_KEY")
+        if (envAICoreServiceKey) return envAICoreServiceKey
+        if (auth?.type === "api") {
+          Env.set("AICORE_SERVICE_KEY", auth.key)
+          return auth.key
+        }
+        return undefined
+      })
+      const deploymentId = Env.get("AICORE_DEPLOYMENT_ID")
+      const resourceGroup = Env.get("AICORE_RESOURCE_GROUP")
 
       return {
-        autoload: !!serviceKey,
-        options: serviceKey ? { serviceKey, deploymentId, resourceGroup } : {},
+        autoload: !!envServiceKey,
+        options: envServiceKey ? { deploymentId, resourceGroup } : {},
         async getModel(sdk: any, modelID: string) {
           return sdk(modelID)
         },
@@ -341,6 +349,12 @@ export namespace Provider {
           video: z.boolean(),
           pdf: z.boolean(),
         }),
+        interleaved: z.union([
+          z.boolean(),
+          z.object({
+            field: z.enum(["reasoning_content", "reasoning_details"]),
+          }),
+        ]),
       }),
       cost: z.object({
         input: z.number(),
@@ -442,6 +456,7 @@ export namespace Provider {
           video: model.modalities?.output?.includes("video") ?? false,
           pdf: model.modalities?.output?.includes("pdf") ?? false,
         },
+        interleaved: model.interleaved ?? false,
       },
     }
   }
@@ -535,7 +550,7 @@ export namespace Provider {
             id: model.id ?? existingModel?.api.id ?? modelID,
             npm:
               model.provider?.npm ?? provider.npm ?? existingModel?.api.npm ?? modelsDev[providerID]?.npm ?? providerID,
-            url: provider?.api ?? existingModel?.api.url,
+            url: provider?.api ?? existingModel?.api.url ?? modelsDev[providerID]?.api,
           },
           status: model.status ?? existingModel?.status ?? "active",
           name,
@@ -559,6 +574,7 @@ export namespace Provider {
               video: model.modalities?.output?.includes("video") ?? existingModel?.capabilities.output.video ?? false,
               pdf: model.modalities?.output?.includes("pdf") ?? existingModel?.capabilities.output.pdf ?? false,
             },
+            interleaved: model.interleaved ?? false,
           },
           cost: {
             input: model?.cost?.input ?? existingModel?.cost?.input ?? 0,
@@ -693,8 +709,7 @@ export namespace Provider {
         model.api.id = model.api.id ?? model.id ?? modelID
         if (modelID === "gpt-5-chat-latest" || (providerID === "openrouter" && modelID === "openai/gpt-5-chat"))
           delete provider.models[modelID]
-        if ((model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) || model.status === "deprecated")
-          delete provider.models[modelID]
+        if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) delete provider.models[modelID]
         if (
           (configProvider?.blacklist && configProvider.blacklist.includes(modelID)) ||
           (configProvider?.whitelist && !configProvider.whitelist.includes(modelID))
@@ -796,7 +811,7 @@ export namespace Provider {
       const mod = await import(installedPath)
 
       const fn = mod[Object.keys(mod).find((key) => key.startsWith("create"))!]
-      const loaded = await fn({
+      const loaded = fn({
         name: model.providerID,
         ...options,
       })

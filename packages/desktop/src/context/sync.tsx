@@ -13,7 +13,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     const [store, setStore] = globalSync.child(sdk.directory)
 
     const load = {
-      project: () => sdk.client.project.current().then((x) => setStore("project", x.data!)),
+      project: () => sdk.client.project.current().then((x) => setStore("project", x.data!.id)),
       provider: () => sdk.client.config.providers().then((x) => setStore("provider", x.data!.providers)),
       path: () => sdk.client.path.get().then((x) => setStore("path", x.data!)),
       agent: () => sdk.client.app.agents().then((x) => setStore("agent", x.data ?? [])),
@@ -28,7 +28,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       status: () => sdk.client.session.status().then((x) => setStore("session_status", x.data!)),
       config: () => sdk.client.config.get().then((x) => setStore("config", x.data!)),
       changes: () => sdk.client.file.status().then((x) => setStore("changes", x.data!)),
-      node: () => sdk.client.file.list({ query: { path: "/" } }).then((x) => setStore("node", x.data!)),
+      node: () => sdk.client.file.list({ path: "/" }).then((x) => setStore("node", x.data!)),
     }
 
     Promise.all(Object.values(load).map((p) => p())).then(() => setStore("ready", true))
@@ -41,6 +41,11 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       get ready() {
         return store.ready
       },
+      get project() {
+        const match = Binary.search(globalSync.data.projects, store.project, (p) => p.id)
+        if (match.found) return globalSync.data.projects[match.index]
+        return undefined
+      },
       session: {
         get(sessionID: string) {
           const match = Binary.search(store.session, sessionID, (s) => s.id)
@@ -49,10 +54,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         },
         async sync(sessionID: string, _isRetry = false) {
           const [session, messages, todo, diff] = await Promise.all([
-            sdk.client.session.get({ path: { id: sessionID }, throwOnError: true }),
-            sdk.client.session.messages({ path: { id: sessionID }, query: { limit: 100 } }),
-            sdk.client.session.todo({ path: { id: sessionID } }),
-            sdk.client.session.diff({ path: { id: sessionID } }),
+            sdk.client.session.get({ sessionID }, { throwOnError: true }),
+            sdk.client.session.messages({ sessionID, limit: 100 }),
+            sdk.client.session.todo({ sessionID }),
+            sdk.client.session.diff({ sessionID }),
           ])
           setStore(
             produce((draft) => {

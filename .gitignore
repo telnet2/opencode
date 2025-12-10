@@ -6,10 +6,10 @@ node_modules
 .idea
 .vscode
 *~
-openapi.json
 playground
 tmp
 dist
+ts-dist
 .turbo
 **/.serena
 .serena/

@@ -1,14 +1,14 @@
 {
   "name": "@opencode-ai/desktop",
-  "version": "1.0.134",
+  "version": "1.0.141",
   "description": "",
   "type": "module",
   "exports": {
-    ".": "./src/index.tsx",
+    ".": "./src/index.ts",
     "./vite": "./vite.js"
   },
   "scripts": {
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo -b",
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
@@ -16,8 +16,10 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@happy-dom/global-registrator": "20.0.11",
     "@tailwindcss/vite": "catalog:",
     "@tsconfig/bun": "1.0.9",
+    "@types/bun": "catalog:",
     "@types/luxon": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
