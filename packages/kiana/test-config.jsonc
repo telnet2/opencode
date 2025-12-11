@@ -1,0 +1,9 @@
+{
+  "provider": {
+    "type": "openai-compatible",
+    "apiKey": "23ed9d5c-c634-4cc1-9e70-9c9ac63a17ef",
+    "model": "ep-20250821060450-4bc6g",
+    "baseUrl": "https://ark-ap-southeast.byteintl.net/api/v3"
+  },
+  "workingDirectory": "/Users/joohwi.lee/telnet2/opencode/packages/kiana"
+}
