@@ -11,8 +11,6 @@ export interface ToolContext {
   callID?: string
   workingDirectory: string
   metadata(input: { title?: string; metadata?: Record<string, unknown> }): void
-  /** Whether to normalize stringified tool arguments (default: true) */
-  normalizeToolArgs?: boolean
 }
 
 /**
@@ -51,20 +49,20 @@ export function defineTool<P extends z.ZodType>(
     description: config.description,
     parameters: config.parameters,
     execute: async (args, ctx) => {
-      // Normalize args: some models erroneously stringify tool inputs; attempt to JSON.parse when string
-      // This can be disabled via normalizeToolArgs=false since AI SDK v6 handles this internally
-      let normalizedArgs: unknown = args
-      if (ctx.normalizeToolArgs !== false && typeof args === "string") {
-        try {
-          normalizedArgs = JSON.parse(args)
-        } catch {
-          // Fall through to validation error; safeParse will surface a clear message
-          normalizedArgs = args
-        }
-      }
+      // TODO: Temporarily disabled to test if AI SDK v6 handles this
+      // // Normalize args: some models erroneously stringify tool inputs; attempt to JSON.parse when string
+      // let normalizedArgs: unknown = args
+      // if (typeof args === "string") {
+      //   try {
+      //     normalizedArgs = JSON.parse(args)
+      //   } catch {
+      //     // Fall through to validation error; safeParse will surface a clear message
+      //     normalizedArgs = args
+      //   }
+      // }
 
       // Validate parameters
-      const result = config.parameters.safeParse(normalizedArgs)
+      const result = config.parameters.safeParse(args)
       if (!result.success) {
         const errors = result.error.issues
           .map((e: z.ZodIssue) => `${e.path.join(".")}: ${e.message}`)

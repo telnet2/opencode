@@ -886,6 +886,7 @@ function buildAITools(
           messageID,
           workingDirectory,
           abort: options.abortSignal ?? new AbortController().signal,
+          normalizeToolArgs: state.config.normalizeToolArgs,
           metadata: (val) => {
             // Find the tool part and update it
             const toolPart = parts.find(
@@ -949,6 +950,7 @@ Since you are running headless without user interaction:
 # Tool usage
 - Call multiple tools in parallel when independent.
 - Use specialized tools (Read, Write, Edit, Glob, Grep) instead of bash equivalents.
+- CRITICAL: When calling tools, pass arguments as a proper JSON object (not a string). Example good: {"command": "git status", "description": "Check git status"}. Example bad: "{\\"command\\": \\"git status\\"}".
 
 # Code References
 When referencing code, include \`file_path:line_number\` for navigation.`

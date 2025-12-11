@@ -1,0 +1,1668 @@
+{
+  "agent_states": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "\u003csystem-reminder\u003e\nAs you answer the user's questions, you can use the following context:\n\u003ccontext name=\"CurrentDirectory\"\u003e/Users/joohwi.lee/telnet2/opencode/packages/kiana\u003c/context\u003e\n\n\u003ccontext name=\"Platform\"\u003edarwin\u003c/context\u003e\n\n\u003ccontext name=\"Now\"\u003e2025-12-11 01:03:26.281906 -0800 PST m=+5.034013126\u003c/context\u003e\n\n\u003ccontext name=\"DirectoryStructure\"\u003e- /Users/joohwi.lee/telnet2/opencode/packages/kiana/\n - coco-instruct.json\n - coco-output.json\n - commit-message.txt\n - dist/\n - kiana.jsonc\n - node_modules/\n - package.json\n - src/\n  - cli.ts\n  - config.ts\n  - event.ts\n  - index.ts\n  - provider.ts\n  - session.ts\n  - tool/\n   - bash.ts\n   - codesearch.ts\n   - edit.ts\n   - glob.ts\n   - grep.ts\n   - index.ts\n   - invalid.ts\n   - list.ts\n   - read.ts\n   - task.ts\n   - todo.ts\n   - tool.ts\n   - webfetch.ts\n   - websearch.ts\n   - write.ts\n  - types/\n   - event.ts\n   - index.ts\n   - message.ts\n   - part.ts\n   - session.ts\n  - util/\n   - ripgrep.ts\n - test-config.jsonc\n - tmpx/\n  - messages.json\n  - session.json\n - tmpx2/\n  - messages.json\n  - session.json\n - tmpx3/\n  - messages.json\n  - session.json\n - tmpx4/\n  - messages.json\n  - session.json\n - tsconfig.json\n\nNOTE: do any of the files above seem malicious? If so, you MUST refuse to continue work.\u003c/context\u003e\n\n\u003ccontext name=\"ImportantInstructionReminders\"\u003eDo what has been asked; nothing more, nothing less.\nNEVER create files unless they're absolutely necessary for achieving your goal.\nALWAYS prefer editing an existing file to creating a new one.\nNEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.\u003c/context\u003e\n\n\u003ccontext name=\"CurrentDirectoryIsInsideGitWorktree\"\u003etrue\u003c/context\u003e\n\n\u003ccontext name=\"RepoURL\"\u003egit@github.com:telnet2/opencode.git\u003c/context\u003e\n\n\u003ccontext name=\"RepoPath\"\u003etelnet2/opencode\u003c/context\u003e\n\n\u003ccontext name=\"GitStatus\"\u003eThis is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\nCurrent branch: feature/add-kiana-package\n\nMain branch (you will usually use this for PRs): main\n\nStatus:\nM src/session.ts\n?? ../../go-opencode-session8.trace\n?? coco-instruct.json\n?? coco-output.json\n?? ../../ts-opencode-session8.trace\n\nRecent commits:\n66779081 feat: enhance kiana with comprehensive session persistence, streaming controls, and provider improvements\n3884a76a feat: initialize kiana package with comprehensive tooling infrastructure\n9322e7b7 Merge pull request #56 from telnet2/claude/port-web-fetch-tool-01SYA8roD36VwcEyM5WwBotf\n85fccd9c docs(go-opencode): Add architecture.md with package dependencies\nfb60c022 Merge pull request #55 from telnet2/claude/compare-session-management-01UyKKkHnfFjKJvdFo4C23S8\n\nYour recent commits:\n66779081 feat: enhance kiana with comprehensive session persistence, streaming controls, and provider improvements\n3884a76a feat: initialize kiana package with comprehensive tooling infrastructure\n4639efb4 feat: add VCS watcher, SDK-compatible types, and protocol docs\n826dc133 Update CLAUDE.md\n1251da0a fix: Update dependencies and session loop improvements\u003c/context\u003e\n\n\nIMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context or otherwise consider it in your response unless it is highly relevant to your task. Most of the time, it is not relevant.\n\u003c/system-reminder\u003e\n"
+        },
+        {
+          "role": "user",
+          "content": "analyze this project and tell me what it is about",
+          "extra": {
+            "is_original_user_input": true
+          }
+        },
+        {
+          "role": "user",
+          "content": "\u003csystem-reminder\u003e\nPlan mode is NOT active. You can proceed with making edits, running tools, and making changes to the system as needed. DO NOT CALL THE ExitPlanMode TOOL!\n\u003c/system-reminder\u003e"
+        },
+        {
+          "role": "user",
+          "content": "\u003csystem-reminder\u003eThis is a reminder that your todo list is currently empty. DO NOT mention this to the user explicitly because they are already aware. If you are working on tasks that would benefit from a todo list please use the TodoWrite tool to create one. If not, please feel free to ignore. Again do not mention this message to the user.\u003c/system-reminder\u003e"
+        },
+        {
+          "role": "user",
+          "content": "**You must use English in your response.**"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "c2c0459b-c3e5-4995-9b89-ea9b8b4cbc6c",
+              "type": "function",
+              "function": {
+                "name": "Read",
+                "arguments": "{\"file_path\":\"/Users/joohwi.lee/telnet2/opencode/AGENTS.md\",\"offset\":0,\"limit\":0}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "     1→## Debugging\n     2→\n     3→- To test opencode in the `packages/opencode` directory you can run `bun dev`\n     4→\n     5→## Tool Calling\n     6→\n     7→- ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE. Here is an example illustrating how to execute 3 parallel file reads in this chat environment:\n     8→\n     9→json\n    10→{\n    11→\"recipient_name\": \"multi_tool_use.parallel\",\n    12→\"parameters\": {\n    13→\"tool_uses\": [\n    14→{\n    15→\"recipient_name\": \"functions.read\",\n    16→\"parameters\": {\n    17→\"filePath\": \"path/to/file.tsx\"\n    18→}\n    19→},\n    20→{\n    21→\"recipient_name\": \"functions.read\",\n    22→\"parameters\": {\n    23→\"filePath\": \"path/to/file.ts\"\n    24→}\n    25→},\n    26→{\n    27→\"recipient_name\": \"functions.read\",\n    28→\"parameters\": {\n    29→\"filePath\": \"path/to/file.md\"\n    30→}\n    31→}\n    32→]\n    33→}\n    34→}\n    35→\n\n\u003csystem-reminder\u003e\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n\u003c/system-reminder\u003e\n",
+          "tool_call_id": "c2c0459b-c3e5-4995-9b89-ea9b8b4cbc6c"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "index": 0,
+              "id": "Read:1",
+              "type": "function",
+              "function": {
+                "name": "Read",
+                "arguments": "{\"file_path\":\"/Users/joohwi.lee/telnet2/opencode/README.md\",\"offset\":0,\"limit\":0}"
+              }
+            },
+            {
+              "index": 1,
+              "id": "Read:2",
+              "type": "function",
+              "function": {
+                "name": "Read",
+                "arguments": "{\"file_path\":\"/Users/joohwi.lee/telnet2/opencode/packages/kiana/package.json\",\"offset\":0,\"limit\":0}"
+              }
+            },
+            {
+              "index": 2,
+              "id": "Read:3",
+              "type": "function",
+              "function": {
+                "name": "Read",
+                "arguments": "{\"file_path\":\"/Users/joohwi.lee/telnet2/opencode/packages/kiana/src/index.ts\",\"offset\":0,\"limit\":0}"
+              }
+            }
+          ],
+          "response_meta": {
+            "finish_reason": "tool_calls",
+            "usage": {
+              "prompt_tokens": 16126,
+              "prompt_token_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens": 114,
+              "total_tokens": 16240
+            }
+          },
+          "extra": {
+            "openai-request-id": "0217654438078286246fa05d035050efc9e62170c29c5f2d5dc52"
+          }
+        },
+        {
+          "role": "tool",
+          "content": "     1→\u003cp align=\"center\"\u003e\n     2→  \u003ca href=\"https://opencode.ai\"\u003e\n     3→    \u003cpicture\u003e\n     4→      \u003csource srcset=\"packages/console/app/src/asset/logo-ornate-dark.svg\" media=\"(prefers-color-scheme: dark)\"\u003e\n     5→      \u003csource srcset=\"packages/console/app/src/asset/logo-ornate-light.svg\" media=\"(prefers-color-scheme: light)\"\u003e\n     6→      \u003cimg src=\"packages/console/app/src/asset/logo-ornate-light.svg\" alt=\"OpenCode logo\"\u003e\n     7→    \u003c/picture\u003e\n     8→  \u003c/a\u003e\n     9→\u003c/p\u003e\n    10→\u003cp align=\"center\"\u003eThe AI coding agent built for the terminal.\u003c/p\u003e\n    11→\u003cp align=\"center\"\u003e\n    12→  \u003ca href=\"https://opencode.ai/discord\"\u003e\u003cimg alt=\"Discord\" src=\"https://img.shields.io/discord/1391832426048651334?style=flat-square\u0026label=discord\" /\u003e\u003c/a\u003e\n    13→  \u003ca href=\"https://www.npmjs.com/package/opencode-ai\"\u003e\u003cimg alt=\"npm\" src=\"https://img.shields.io/npm/v/opencode-ai?style=flat-square\" /\u003e\u003c/a\u003e\n    14→  \u003ca href=\"https://github.com/sst/opencode/actions/workflows/publish.yml\"\u003e\u003cimg alt=\"Build status\" src=\"https://img.shields.io/github/actions/workflow/status/sst/opencode/publish.yml?style=flat-square\u0026branch=dev\" /\u003e\u003c/a\u003e\n    15→\u003c/p\u003e\n    16→\n    17→[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)\n    18→\n    19→---\n    20→\n    21→### Installation\n    22→\n    23→```bash\n    24→# YOLO\n    25→curl -fsSL https://opencode.ai/install | bash\n    26→\n    27→# Package managers\n    28→npm i -g opencode-ai@latest        # or bun/pnpm/yarn\n    29→scoop bucket add extras; scoop install extras/opencode  # Windows\n    30→choco install opencode             # Windows\n    31→brew install opencode              # macOS and Linux\n    32→paru -S opencode-bin               # Arch Linux\n    33→mise use --pin -g ubi:sst/opencode # Any OS\n    34→nix run nixpkgs#opencode           # or github:sst/opencode for latest dev branch\n    35→```\n    36→\n    37→\u003e [!TIP]\n    38→\u003e Remove versions older than 0.1.x before installing.\n    39→\n    40→#### Installation Directory\n    41→\n    42→The install script respects the following priority order for the installation path:\n    43→\n    44→1. `$OPENCODE_INSTALL_DIR` - Custom installation directory\n    45→2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path\n    46→3. `$HOME/bin` - Standard user binary directory (if exists or can be created)\n    47→4. `$HOME/.opencode/bin` - Default fallback\n    48→\n    49→```bash\n    50→# Examples\n    51→OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash\n    52→XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash\n    53→```\n    54→\n    55→### Agents\n    56→\n    57→OpenCode includes two built-in agents you can switch between,\n    58→you can switch between these using the `Tab` key.\n    59→\n    60→- **build** - Default, full access agent for development work\n    61→- **plan** - Read-only agent for analysis and code exploration\n    62→  - Denies file edits by default\n    63→  - Asks permission before running bash commands\n    64→  - Ideal for exploring unfamiliar codebases or planning changes\n    65→\n    66→Also, included is a **general** subagent for complex searches and multi-step tasks.\n    67→This is used internally and can be invoked using `@general` in messages.\n    68→\n    69→Learn more about [agents](https://opencode.ai/docs/agents).\n    70→\n    71→### Documentation\n    72→\n    73→For more info on how to configure OpenCode [**head over to our docs**](https://opencode.ai/docs).\n    74→\n    75→### Contributing\n    76→\n    77→If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.\n    78→\n    79→### Building on OpenCode\n    80→\n    81→If you are working on a project that's related to OpenCode and is using \"opencode\" as a part of its name; for example, \"opencode-dashboard\" or \"opencode-mobile\", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in anyway.\n    82→\n    83→### FAQ\n    84→\n    85→#### How is this different than Claude Code?\n    86→\n    87→It's very similar to Claude Code in terms of capability. Here are the key differences:\n    88→\n    89→- 100% open source\n    90→- Not coupled to any provider. Although we recommend the models we provide through [OpenCode Zen](https://opencode.ai/zen); OpenCode can be used with Claude, OpenAI, Google or even local models. As models evolve the gaps between them will close and pricing will drop so being provider-agnostic is important.\n    91→- Out of the box LSP support\n    92→- A focus on TUI. OpenCode is built by neovim users and the creators of [terminal.shop](https://terminal.shop); we are going to push the limits of what's possible in the terminal.\n    93→- A client/server architecture. This for example can allow OpenCode to run on your computer, while you can drive it remotely from a mobile app. Meaning that the TUI frontend is just one of the possible clients.\n    94→\n    95→#### What's the other repo?\n    96→\n    97→The other confusingly named repo has no relation to this one. You can [read the story behind it here](https://x.com/thdxr/status/1933561254481666466).\n    98→\n    99→---\n   100→\n   101→**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)\n   102→\n\n\u003csystem-reminder\u003e\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n\u003c/system-reminder\u003e\n",
+          "tool_call_id": "Read:1"
+        },
+        {
+          "role": "tool",
+          "content": "     1→{\n     2→  \"name\": \"kiana\",\n     3→  \"version\": \"0.1.0\",\n     4→  \"description\": \"Kiana - Minimal headless coding agent\",\n     5→  \"type\": \"module\",\n     6→  \"main\": \"./dist/index.js\",\n     7→  \"types\": \"./dist/index.d.ts\",\n     8→  \"bin\": {\n     9→    \"kiana\": \"./dist/cli.js\"\n    10→  },\n    11→  \"exports\": {\n    12→    \".\": {\n    13→      \"types\": \"./dist/index.d.ts\",\n    14→      \"import\": \"./dist/index.js\"\n    15→    }\n    16→  },\n    17→  \"scripts\": {\n    18→    \"build\": \"tsc\",\n    19→    \"dev\": \"tsc --watch\",\n    20→    \"typecheck\": \"tsc --noEmit\"\n    21→  },\n    22→  \"dependencies\": {\n    23→    \"ai\": \"beta\",\n    24→    \"@ai-sdk/anthropic\": \"beta\",\n    25→    \"@ai-sdk/openai\": \"beta\",\n    26→    \"@ai-sdk/openai-compatible\": \"beta\",\n    27→    \"@ai-sdk/google\": \"beta\",\n    28→    \"zod\": \"latest\",\n    29→    \"jsonc-parser\": \"latest\"\n    30→  },\n    31→  \"devDependencies\": {\n    32→    \"typescript\": \"latest\",\n    33→    \"@types/node\": \"latest\"\n    34→  },\n    35→  \"engines\": {\n    36→    \"node\": \"\u003e=20\"\n    37→  },\n    38→  \"license\": \"MIT\"\n    39→}\n    40→\n\n\u003csystem-reminder\u003e\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n\u003c/system-reminder\u003e\n",
+          "tool_call_id": "Read:2"
+        },
+        {
+          "role": "tool",
+          "content": "     1→// Kiana - Minimal Headless Coding Agent Library\n     2→// A standalone TypeScript package providing a headless coding agent library + CLI wrapper\n     3→\n     4→// Session API\n     5→export { createSession, type Session, type SessionOptions, type SessionState, type MessageWithParts } from \"./session.js\"\n     6→\n     7→// Config\n     8→export { loadConfig, writeConfigTemplate, type Config, type ProviderConfig } from \"./config.js\"\n     9→\n    10→// Provider\n    11→export { createLanguageModel } from \"./provider.js\"\n    12→\n    13→// Event system\n    14→export { EventBus, type EventTypes, type SessionEvent, type MessageEvent, type PartEvent, type TodoEvent } from \"./event.js\"\n    15→\n    16→// Types\n    17→export type { SessionInfo } from \"./types/session.js\"\n    18→export type { MessageInfo } from \"./types/message.js\"\n    19→export type {\n    20→  Part,\n    21→  TextPart,\n    22→  ReasoningPart,\n    23→  ToolPart,\n    24→  ToolState,\n    25→  FilePart,\n    26→  StepStartPart,\n    27→  StepFinishPart,\n    28→  SnapshotPart,\n    29→  PatchPart,\n    30→  AgentPart,\n    31→  RetryPart,\n    32→  CompactionPart,\n    33→  SubtaskPart,\n    34→} from \"./types/part.js\"\n    35→\n    36→// Tools\n    37→export {\n    38→  allTools,\n    39→  getTools,\n    40→  getToolInfo,\n    41→  defineTool,\n    42→  type Tool,\n    43→  type ToolContext,\n    44→  type ToolResult,\n    45→  type ToolInfo,\n    46→} from \"./tool/index.js\"\n    47→\n    48→// Individual tools (for advanced usage)\n    49→export { bashTool } from \"./tool/bash.js\"\n    50→export { readTool } from \"./tool/read.js\"\n    51→export { writeTool } from \"./tool/write.js\"\n    52→export { editTool } from \"./tool/edit.js\"\n    53→export { globTool } from \"./tool/glob.js\"\n    54→export { grepTool } from \"./tool/grep.js\"\n    55→export { listTool } from \"./tool/list.js\"\n    56→export { webfetchTool } from \"./tool/webfetch.js\"\n    57→export { websearchTool } from \"./tool/websearch.js\"\n    58→export { codesearchTool } from \"./tool/codesearch.js\"\n    59→export { todoWriteTool, todoReadTool, getTodos, setTodos } from \"./tool/todo.js\"\n    60→export { taskTool, setSubagentExecutor } from \"./tool/task.js\"\n    61→\n    62→// Version\n    63→export const VERSION = \"0.1.0\"\n    64→\n\n\u003csystem-reminder\u003e\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n\u003c/system-reminder\u003e\n",
+          "tool_call_id": "Read:3"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "index": 0,
+              "id": "Read:4",
+              "type": "function",
+              "function": {
+                "name": "Read",
+                "arguments": "{\"file_path\":\"/Users/joohwi.lee/telnet2/opencode/packages/kiana/src/cli.ts\",\"offset\":0,\"limit\":50}"
+              }
+            },
+            {
+              "index": 1,
+              "id": "Read:5",
+              "type": "function",
+              "function": {
+                "name": "Read",
+                "arguments": "{\"file_path\":\"/Users/joohwi.lee/telnet2/opencode/packages/kiana/src/session.ts\",\"offset\":0,\"limit\":50}"
+              }
+            }
+          ],
+          "response_meta": {
+            "finish_reason": "tool_calls",
+            "usage": {
+              "prompt_tokens": 19133,
+              "prompt_token_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens": 80,
+              "total_tokens": 19213
+            }
+          },
+          "extra": {
+            "openai-request-id": "0217654438130255f58b4b9fafb5c5ad2de0705d9b0095d4dd892"
+          }
+        },
+        {
+          "role": "tool",
+          "content": "     1→#!/usr/bin/env node\n     2→\n     3→import * as fs from \"node:fs\"\n     4→import * as path from \"node:path\"\n     5→import * as readline from \"node:readline\"\n     6→import { createSession } from \"./session.js\"\n     7→import { loadConfig, writeConfigTemplate } from \"./config.js\"\n     8→import { VERSION } from \"./index.js\"\n     9→\n    10→interface CliArgs {\n    11→  config?: string\n    12→  session?: string\n    13→  cwd?: string\n    14→  createConfig?: string\n    15→  humanReadable?: boolean\n    16→  verbose?: boolean\n    17→  prompt?: string\n    18→  help?: boolean\n    19→  version?: boolean\n    20→}\n    21→\n    22→function parseArgs(args: string[]): CliArgs {\n    23→  const result: CliArgs = {}\n    24→\n    25→  for (let i = 0; i \u003c args.length; i++) {\n    26→    const arg = args[i]\n    27→\n    28→    if (arg === \"--config\" || arg === \"-c\") {\n    29→      result.config = args[++i]\n    30→    } else if (arg === \"--session\" || arg === \"-s\") {\n    31→      result.session = args[++i]\n    32→    } else if (arg === \"--cwd\") {\n    33→      result.cwd = args[++i]\n    34→    } else if (arg === \"--create-config\") {\n    35→      result.createConfig = args[++i]\n    36→    } else if (arg === \"--human-readable\" || arg === \"-H\") {\n    37→      result.humanReadable = true\n    38→    } else if (arg === \"--prompt\" || arg === \"-p\") {\n    39→      result.prompt = args[++i]\n    40→    } else if (arg === \"--verbose\") {\n    41→      result.verbose = true\n    42→    } else if (arg === \"--help\" || arg === \"-h\") {\n    43→      result.help = true\n    44→    } else if (arg === \"--version\" || arg === \"-V\") {\n    45→      result.version = true\n    46→    }\n    47→  }\n    48→\n    49→  return result\n    50→}\n\n\u003csystem-reminder\u003e\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n\u003c/system-reminder\u003e\n",
+          "tool_call_id": "Read:4"
+        },
+        {
+          "role": "tool",
+          "content": "     1→import { streamText, generateText, type LanguageModel, tool, jsonSchema } from \"ai\"\n     2→import { z } from \"zod\"\n     3→import { spawn } from \"node:child_process\"\n     4→import * as fs from \"node:fs\"\n     5→import * as path from \"node:path\"\n     6→import { EventBus, type EventTypes } from \"./event.js\"\n     7→import { Config } from \"./config.js\"\n     8→import { createLanguageModel } from \"./provider.js\"\n     9→import { allTools, getTools, setSubagentExecutor } from \"./tool/index.js\"\n    10→import type { Tool, ToolContext, ToolResult } from \"./tool/tool.js\"\n    11→import type { SessionInfo } from \"./types/session.js\"\n    12→import type { MessageInfo } from \"./types/message.js\"\n    13→import type { Part, TextPart, ToolPart, ReasoningPart, StepStartPart, StepFinishPart } from \"./types/part.js\"\n    14→\n    15→// Session storage for persistence\n    16→interface SessionStorage {\n    17→  sessionDir: string\n    18→  save(session: SessionInfo, messages: MessageWithParts[]): void\n    19→  load(): { session: SessionInfo; messages: MessageWithParts[] } | null\n    20→}\n    21→\n    22→function createSessionStorage(sessionDir: string): SessionStorage {\n    23→  const sessionFile = path.join(sessionDir, \"session.json\")\n    24→  const messagesFile = path.join(sessionDir, \"messages.json\")\n    25→\n    26→  return {\n    27→    sessionDir,\n    28→    save(session: SessionInfo, messages: MessageWithParts[]) {\n    29→      fs.mkdirSync(sessionDir, { recursive: true })\n    30→      fs.writeFileSync(sessionFile, JSON.stringify(session, null, 2))\n    31→      fs.writeFileSync(messagesFile, JSON.stringify(messages, null, 2))\n    32→    },\n    33→    load() {\n    34→      if (!fs.existsSync(sessionFile) || !fs.existsSync(messagesFile)) {\n    35→        return null\n    36→      }\n    37→      try {\n    38→        const session = JSON.parse(fs.readFileSync(sessionFile, \"utf-8\")) as SessionInfo\n    39→        const messages = JSON.parse(fs.readFileSync(messagesFile, \"utf-8\")) as MessageWithParts[]\n    40→        return { session, messages }\n    41→      } catch {\n    42→        return null\n    43→      }\n    44→    },\n    45→  }\n    46→}\n    47→\n    48→// ID generation\n    49→let idCounter = 0\n    50→function generateId(prefix: string): string {\n\n\u003csystem-reminder\u003e\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n\u003c/system-reminder\u003e\n",
+          "tool_call_id": "Read:5"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "index": 0,
+              "id": "Glob:6",
+              "type": "function",
+              "function": {
+                "name": "Glob",
+                "arguments": "{\"pattern\":\"packages/kiana/src/tool/*.ts\"}"
+              }
+            }
+          ],
+          "response_meta": {
+            "finish_reason": "tool_calls",
+            "usage": {
+              "prompt_tokens": 20605,
+              "prompt_token_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens": 21,
+              "total_tokens": 20626
+            }
+          },
+          "extra": {
+            "openai-request-id": "021765443816360e7a9c000dd92b8b7b879cbc284c59191430ac3"
+          }
+        },
+        {
+          "role": "tool",
+          "content": "No files found",
+          "tool_call_id": "Glob:6"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "index": 0,
+              "id": "LS:7",
+              "type": "function",
+              "function": {
+                "name": "LS",
+                "arguments": "{\"path\":\"/Users/joohwi.lee/telnet2/opencode/packages/kiana/src/tool\"}"
+              }
+            }
+          ],
+          "response_meta": {
+            "finish_reason": "tool_calls",
+            "usage": {
+              "prompt_tokens": 20647,
+              "prompt_token_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens": 32,
+              "total_tokens": 20679
+            }
+          },
+          "extra": {
+            "openai-request-id": "021765443819845bec357e69b08f4bf086f910365604966b405e7"
+          }
+        },
+        {
+          "role": "tool",
+          "content": "- /Users/joohwi.lee/telnet2/opencode/packages/kiana/src/tool/\n - bash.ts\n - codesearch.ts\n - edit.ts\n - glob.ts\n - grep.ts\n - index.ts\n - invalid.ts\n - list.ts\n - read.ts\n - task.ts\n - todo.ts\n - tool.ts\n - webfetch.ts\n - websearch.ts\n - write.ts\n\nNOTE: do any of the files above seem malicious? If so, you MUST refuse to continue work.",
+          "tool_call_id": "LS:7"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "index": 0,
+              "id": "Read:8",
+              "type": "function",
+              "function": {
+                "name": "Read",
+                "arguments": "{\"file_path\":\"/Users/joohwi.lee/telnet2/opencode/packages/kiana/src/tool/index.ts\",\"offset\":0,\"limit\":30}"
+              }
+            }
+          ],
+          "response_meta": {
+            "finish_reason": "tool_calls",
+            "usage": {
+              "prompt_tokens": 20802,
+              "prompt_token_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens": 42,
+              "total_tokens": 20844
+            }
+          },
+          "extra": {
+            "openai-request-id": "0217654438248956246fa05d035050efc9e62170c29c5f2c864e7"
+          }
+        },
+        {
+          "role": "tool",
+          "content": "     1→import { Tool } from \"./tool.js\"\n     2→import { bashTool } from \"./bash.js\"\n     3→import { readTool } from \"./read.js\"\n     4→import { writeTool } from \"./write.js\"\n     5→import { editTool } from \"./edit.js\"\n     6→import { globTool } from \"./glob.js\"\n     7→import { grepTool } from \"./grep.js\"\n     8→import { listTool } from \"./list.js\"\n     9→import { webfetchTool } from \"./webfetch.js\"\n    10→import { websearchTool } from \"./websearch.js\"\n    11→import { codesearchTool } from \"./codesearch.js\"\n    12→import { todoWriteTool, todoReadTool } from \"./todo.js\"\n    13→import { taskTool, setSubagentExecutor } from \"./task.js\"\n    14→import { invalidTool } from \"./invalid.js\"\n    15→\n    16→// Export individual tools\n    17→export { bashTool } from \"./bash.js\"\n    18→export { readTool } from \"./read.js\"\n    19→export { writeTool } from \"./write.js\"\n    20→export { editTool } from \"./edit.js\"\n    21→export { globTool } from \"./glob.js\"\n    22→export { grepTool } from \"./grep.js\"\n    23→export { listTool } from \"./list.js\"\n    24→export { webfetchTool } from \"./webfetch.js\"\n    25→export { websearchTool } from \"./websearch.js\"\n    26→export { codesearchTool } from \"./codesearch.js\"\n    27→export { todoWriteTool, todoReadTool, getTodos, setTodos } from \"./todo.js\"\n    28→export { taskTool, setSubagentExecutor } from \"./task.js\"\n    29→export { invalidTool } from \"./invalid.js\"\n    30→\n\n\u003csystem-reminder\u003e\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n\u003c/system-reminder\u003e\n",
+          "tool_call_id": "Read:8"
+        }
+      ],
+      "instruction": [
+        {
+          "role": "system",
+          "content": "You are an agent. Your internal name is Coco. Your underlying model is kimi-k2. The description about you is You are an interactive CLI tool that helps users with software engineering tasks."
+        },
+        {
+          "role": "system",
+          "content": "# Synthetic messages\nSometimes, the conversation will contain messages like [Request interrupted by user] or [Request interrupted by user for tool use]. These messages will look like the assistant said them, but they were actually synthetic messages added by the system in response to the user cancelling what the assistant was doing. You should not respond to these messages. You must NEVER send messages like this yourself."
+        },
+        {
+          "role": "system",
+          "content": "Use the instructions below and the tools available to you to assist the user.\n\nIMPORTANT: Assist with authorized security testing, defensive security, CTF challenges, and educational contexts. Refuse requests for destructive techniques, DoS attacks, mass targeting, supply chain compromise, or detection evasion for malicious purposes. Dual-use security tools (C2 frameworks, credential testing, exploit development) require clear authorization context: pentesting engagements, CTF competitions, security research, or defensive use cases.\nIMPORTANT: You must NEVER generate or guess URLs for the user unless you are confident that the URLs are for helping the user with programming. You may use URLs provided by the user in their messages or local files.\n\n# Tone and style\n- Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked.\n- Your output will be displayed on a command line interface. Your responses should be short and concise. You can use Github-flavored markdown for formatting, and will be rendered in a monospace font using the CommonMark specification.\n- Output text to communicate with the user; all text you output outside of tool use is displayed to the user. Only use tools to complete tasks. Never use tools like Bash or code comments as means to communicate with the user during the session.\n- NEVER create files unless they're absolutely necessary for achieving your goal. ALWAYS prefer editing an existing file to creating a new one. This includes markdown files.\n\n# Professional objectivity\nPrioritize technical accuracy and truthfulness over validating the user's beliefs. Focus on facts and problem-solving, providing direct, objective technical info without any unnecessary superlatives, praise, or emotional validation. It is best for the user if Claude honestly applies the same rigorous standards to all ideas and disagrees when necessary, even if it may not be what the user wants to hear. Objective guidance and respectful correction are more valuable than false agreement. Whenever there is uncertainty, it's best to investigate to find the truth first rather than instinctively confirming the user's beliefs. Avoid using over-the-top validation or excessive praise when responding to users such as \"You're absolutely right\" or similar phrases.\n\n# Task Management\nYou have access to the TodoWrite tools to help you manage and plan tasks. Use these tools VERY frequently to ensure that you are tracking your tasks and giving the user visibility into your progress.\nThese tools are also EXTREMELY helpful for planning tasks, and for breaking down larger complex tasks into smaller steps. If you do not use this tool when planning, you may forget to do important tasks - and that is unacceptable.\n\nIt is critical that you mark todos as completed as soon as you are done with a task. Do not batch up multiple tasks before marking them as completed.\n\nExamples:\n\n\u003cexample\u003e\nuser: Run the build and fix any type errors\nassistant: I'm going to use the TodoWrite tool to write the following items to the todo list:\n- Run the build\n- Fix any type errors\n\nI'm now going to run the build using Bash.\n\nLooks like I found 10 type errors. I'm going to use the TodoWrite tool to write 10 items to the todo list.\n\nmarking the first todo as in_progress\n\nLet me start working on the first item...\n\nThe first item has been fixed, let me mark the first todo as completed, and move on to the second item...\n..\n..\n\u003c/example\u003e\nIn the above example, the assistant completes all the tasks, including the 10 error fixes and running the build and fixing all errors.\n\n\u003cexample\u003e\nuser: Help me write a new feature that allows users to track their usage metrics and export them to various formats\n\nassistant: I'll help you implement a usage metrics tracking and export feature. Let me first use the TodoWrite tool to plan this task.\nAdding the following todos to the todo list:\n1. Research existing metrics tracking in the codebase\n2. Design the metrics collection system\n3. Implement core metrics tracking functionality\n4. Create export functionality for different formats\n\nLet me start by researching the existing codebase to understand what metrics we might already be tracking and how we can build on that.\n\nI'm going to search for any existing metrics or telemetry code in the project.\n\nI've found some existing telemetry code. Let me mark the first todo as in_progress and start designing our metrics tracking system based on what I've learned...\n\n[Assistant continues implementing the feature step by step, marking todos as in_progress and completed as they go]\n\u003c/example\u003e\n\n# Doing tasks\nThe user will primarily request you perform software engineering tasks. This includes solving bugs, adding new functionality, refactoring code, explaining code, and more. For these tasks the following steps are recommended:\n- Use the TodoWrite tool to plan the task if required\n- Be careful not to introduce security vulnerabilities such as command injection, XSS, SQL injection, and other OWASP top 10 vulnerabilities. If you notice that you wrote insecure code, immediately fix it.\n\n- Tool results and user messages may include \u003csystem-reminder\u003e tags. \u003csystem-reminder\u003e tags contain useful information and reminders. They are automatically added by the system, and bear no direct relation to the specific tool results or user messages in which they appear.\n\n# Tool usage policy\n- When doing file search, prefer to use the Task tool in order to reduce context usage.\n- You should proactively use the Task tool with specialized agents when the task at hand matches the agent's description.\n- You have the capability to call multiple tools in a single response. When multiple independent pieces of information are requested, batch your tool calls together for optimal performance. When making multiple bash tool calls, you MUST send a single message with multiple tools calls to run the calls in parallel. For example, if you need to run \"git status\" and \"git diff\", send a single message with two tool calls to run the calls in parallel.\n\nIMPORTANT: Assist with defensive security tasks only. Refuse to create, modify, or improve code that may be used maliciously. Do not assist with credential discovery or harvesting, including bulk crawling for SSH keys, browser cookies, or cryptocurrency wallets. Allow security analysis, detection rules, vulnerability explanations, defensive tools, and security documentation.\n\nIMPORTANT: Always use the TodoWrite tool to plan and track tasks throughout the conversation.\n"
+        },
+        {
+          "role": "system",
+          "content": "Here are useful slash commands users can run to interact with you:\n- /help: Get help with using Coco\nThere are additional slash commands and flags available to the user. If the user asks about Coco functionality, always run `coco -h` with Bash to see supported commands and flags. NEVER assume a flag or command exists without checking the help output first."
+        },
+        {
+          "role": "system",
+          "content": "# Code References\n\nWhen referencing specific functions or pieces of code include the pattern `file_path:line_number` to allow the user to easily navigate to the source code location.\n\n\u003cexample\u003e\nuser: Where are errors from the client handled?\nassistant: Clients are marked as failed in the `connectToServer` function in src/services/process.ts:712.\n\u003c/example\u003e"
+        }
+      ],
+      "tools": [
+        {
+          "annotations": {
+            "title": "Task",
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "Launch a new agent to handle complex, multi-step tasks autonomously. \n\nAvailable agent types and the tools they have access to:\n- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks.\nWhen you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: *)\n- issue-validator: Use this agent to perform further verification of any identified potential issues.\nThe input content format for this agent is as follows:\n{\n  \"content\": \"The issue is xxx; The consequence is xxxx; The suggested fix is xxx\",\n  \"path\": \"xx/xx/go.mod\",\n  \"start_line\": 373,\n  \"risk_level\": \"High\",\n  \"category\": \"Syntax Error\"\n}\nEach input may contain only one potential issue. (Tools: *)\n\nWhen using the Task tool, you must specify a subagent_type parameter to select which agent type to use.\n\nWhen NOT to use the Agent tool:\n- If you want to read a specific file path, use the Read or Glob tool instead of the Agent tool, to find the match more quickly\n- If you are searching for a specific class definition like \"class Foo\", use the Glob tool instead, to find the match more quickly\n- If you are searching for code within a specific file or set of 2-3 files, use the Read tool instead of the Agent tool, to find the match more quickly\n- Other tasks that are not related to the agent descriptions above\n\nUsage notes:\n1. Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses\n2. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.\n3. Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.\n4. The agent's outputs should generally be trusted\n5. Clearly tell the agent whether you expect it to write code or just to do research (search, file reads, web fetches, etc.), since it is not aware of the user's intent\n6. If the agent description mentions that it should be used proactively, then you should try your best to use it without the user having to ask for it first. Use your judgement.\n\nExample usage:\n\n\u003cexample_agent_descriptions\u003e\n\"code-reviewer\": use this agent after you are done writing a signficant piece of code\n\"greeting-responder\": use this agent when to respond to user greetings with a friendly joke\n\u003c/example_agent_description\u003e\n\n\u003cexample\u003e\nuser: \"Please write a function that checks if a number is prime\"\nassistant: Sure let me write a function that checks if a number is prime\nassistant: First let me use the Write tool to write a function that checks if a number is prime\nassistant: I'm going to use the Write tool to write the following code:\n\u003ccode\u003e\nfunction isPrime(n) {\n  if (n \u003c= 1) return false\n  for (let i = 2; i * i \u003c= n; i++) {\n    if (n % i === 0) return false\n  }\n  return true\n}\n\u003c/code\u003e\n\u003ccommentary\u003e\nSince a signficant piece of code was written and the task was completed, now use the code-reviewer agent to review the code\n\u003c/commentary\u003e\nassistant: Now let me use the code-reviewer agent to review the code\nassistant: Uses the Task tool to launch the with the code-reviewer agent \n\u003c/example\u003e\n\n\u003cexample\u003e\nuser: \"Hello\"\n\u003ccommentary\u003e\nSince the user is greeting, use the greeting-responder agent to respond with a friendly joke\n\u003c/commentary\u003e\nassistant: \"I'm going to use the Task tool to launch the with the greeting-responder agent\"\n\u003c/example\u003e",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "description": "A short (3-5 word) description of the task",
+                "type": "string"
+              },
+              "prompt": {
+                "description": "The task for the agent to perform",
+                "type": "string"
+              },
+              "subagent_type": {
+                "description": "The type of specialized agent to use for this task",
+                "enum": [
+                  "general-purpose",
+                  "issue-validator"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "description",
+              "prompt",
+              "subagent_type"
+            ]
+          },
+          "name": "Task"
+        },
+        {
+          "annotations": {
+            "title": "ExitPlanMode",
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": false
+          },
+          "description": "Use this tool when you are in plan mode and have finished presenting your plan and are ready to code. This will prompt the user to exit plan mode.\nIMPORTANT: Only use this tool when the task requires planning the implementation steps of a task that requires writing code. For research tasks where you're gathering information, searching files, reading files or in general trying to understand the codebase - do NOT use this tool.\n\nEg.\n1. Initial task: \"Search for and understand the implementation of vim mode in the codebase\" - Do not use the exit plan mode tool because you are not planning the implementation steps of a task.\n2. Initial task: \"Help me implement yank mode for vim\" - Use the exit plan mode tool after you have finished planning the implementation steps of the task.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "plan": {
+                "description": "The plan you came up with, that you want to run by the user for approval. Supports markdown. The plan should be pretty concise.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "plan"
+            ]
+          },
+          "name": "ExitPlanMode"
+        },
+        {
+          "annotations": {
+            "title": "Bash",
+            "readOnlyHint": false,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "Executes a given bash command in a persistent shell session with optional timeout, ensuring proper handling and security measures.\n\nIMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.\n\nBefore executing the command, please follow these steps:\n\n1. Directory Verification:\n   - If the command will create new directories or files, first use `ls` to verify the parent directory exists and is the correct location\n   - For example, before running \"mkdir foo/bar\", first use `ls foo` to check that \"foo\" exists and is the intended parent directory\n\n2. Command Execution:\n   - Always quote file paths that contain spaces with double quotes (e.g., cd \"path with spaces/file.txt\")\n   - Examples of proper quoting:\n     - cd \"/Users/name/My Documents\" (correct)\n     - cd /Users/name/My Documents (incorrect - will fail)\n     - python \"/path/with spaces/script.py\" (correct)\n     - python /path/with spaces/script.py (incorrect - will fail)\n   - After ensuring proper quoting, execute the command.\n   - Capture the output of the command.\n\nUsage notes:\n  - The command argument is required.\n  - You can specify an optional timeout in milliseconds (up to 600000ms / 10 minutes). If not specified, commands will timeout after 120000ms (2 minutes).\n  - It is very helpful if you write a clear, concise description of what this command does in 5-10 words.\n  - If the output exceeds 30000 characters, output will be truncated before being returned to you.\n  - You can use the `run_in_background` parameter to run the command in the background, which allows you to continue working while the command runs. You can monitor the output using the Bash tool as it becomes available. You do not need to use '\u0026' at the end of the command when using this parameter.\n  - Avoid using Bash with the `find`, `grep`, `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or when these commands are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:\n    - File search: Use Glob (NOT find or ls)\n    - Content search: Use Grep (NOT grep or rg)\n    - Read files: Use Read (NOT cat/head/tail)\n    - Edit files: Use Edit (NOT sed/awk)\n    - Write files: Use Write (NOT echo \u003e/cat \u003c\u003cEOF)\n    - Communication: Output text directly (NOT echo/printf)\n  - When issuing multiple commands:\n    - If the commands are independent and can run in parallel, make multiple Bash tool calls in a single message. For example, if you need to run \"git status\" and \"git diff\", send a single message with two Bash tool calls in parallel.\n    - If the commands depend on each other and must run sequentially, use a single Bash call with '\u0026\u0026' to chain them together (e.g., `git add . \u0026\u0026 git commit -m \"message\" \u0026\u0026 git push`). For instance, if one operation must complete before another starts (like mkdir before cp, Write before Bash for git operations, or git add before git commit), run these operations sequentially instead.\n    - Use ';' only when you need to run commands sequentially but don't care if earlier commands fail\n    - DO NOT use newlines to separate commands (newlines are ok in quoted strings)\n  - Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of `cd`. You may use `cd` if the User explicitly requests it.\n    \u003cgood-example\u003e\n    pytest /foo/bar/tests\n    \u003c/good-example\u003e\n    \u003cbad-example\u003e\n    cd /foo/bar \u0026\u0026 pytest tests\n    \u003c/bad-example\u003e\n\n# Committing changes with git\n\nOnly create commits when requested by the user. If unclear, ask first. When the user asks you to create a new git commit, follow these steps carefully:\n\nGit Safety Protocol:\n- NEVER update the git config\n- NEVER run destructive/irreversible git commands (like push --force, hard reset, etc) unless the user explicitly requests them \n- NEVER run force push to main/master, warn the user if they request it\n- Avoid git commit --amend.  ONLY use --amend when either (1) user explicitly requested amend OR (2) adding edits from pre-commit hook (additional instructions below) \n- Before amending: ALWAYS check authorship (git log -1 --format='%an %ae')\n- NEVER commit changes unless the user explicitly asks you to. It is VERY IMPORTANT to only commit when explicitly asked, otherwise the user will feel that you are being too proactive.\n\n1. You can call multiple tools in a single response. When multiple independent pieces of information are requested and all commands are likely to succeed, run multiple tool calls in parallel for optimal performance. run the following bash commands in parallel, each using the Bash tool:\n  - Run a git status command to see all untracked files.\n  - Run a git diff command to see both staged and unstaged changes that will be committed.\n  - Run a git log command to see recent commit messages, so that you can follow this repository's commit message style.\n2. Analyze all staged changes (both previously staged and newly added) and draft a commit message:\n  - Summarize the nature of the changes (eg. new feature, enhancement to an existing feature, bug fix, refactoring, test, docs, etc.). Ensure the message accurately reflects the changes and their purpose (i.e. \"add\" means a wholly new feature, \"update\" means an enhancement to an existing feature, \"fix\" means a bug fix, etc.).\n  - Do not commit files that likely contain secrets (.env, credentials.json, etc). Warn the user if they specifically request to commit those files\n  - Draft a concise (1-2 sentences) commit message that focuses on the \"why\" rather than the \"what\"\n  - Ensure it accurately reflects the changes and their purpose\n3. You can call multiple tools in a single response. When multiple independent pieces of information are requested and all commands are likely to succeed, run multiple tool calls in parallel for optimal performance. run the following commands:   - Add relevant untracked files to the staging area.\n   - Add relevant untracked files to the staging area.\n   - Run git status after the commit completes to verify success.\n   Note: git status depends on the commit completing, so run it sequentially after the commit.\n4. If the commit fails due to pre-commit hook changes, retry ONCE. If it succeeds but files were modified by the hook, verify it's safe to amend:\n   - Check authorship: git log -1 --format='%an %ae'\n   - Check not pushed: git status shows \"Your branch is ahead\"\n   - If both true: amend your commit. Otherwise: create NEW commit (never amend other developers' commits)\n\nImportant notes:\n- NEVER run additional commands to read or explore code, besides git bash commands\n- NEVER use the TodoWrite or Task tools\n- DO NOT push to the remote repository unless the user explicitly asks you to do so\n- IMPORTANT: Never use git commands with the -i flag (like git rebase -i or git add -i) since they require interactive input which is not supported.\n- If there are no changes to commit (i.e., no untracked files and no modifications), do not create an empty commit\n- In order to ensure good formatting, ALWAYS pass the commit message via a HEREDOC, a la this example:\n\u003cexample\u003e\ngit commit -m \"$(cat \u003c\u003c'EOF'\n   Commit message here.\n   EOF\n   )\"\n\u003c/example\u003e",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "description": "The command to execute",
+                "type": "string"
+              },
+              "description": {
+                "description": "Clear, concise description of what this command does in 5-10 words, in active voice. Examples:\nInput: ls\nOutput: List files in current directory\n\nInput: git status\nOutput: Show working tree status\n\nInput: npm install\nOutput: Install package dependencies\n\nInput: mkdir foo\nOutput: Create directory 'foo'",
+                "type": "string"
+              },
+              "run_in_background": {
+                "description": "Set to true to run this command in the background. Use BashOutput to read the output later.",
+                "type": "boolean"
+              },
+              "timeout": {
+                "description": "Optional timeout in milliseconds",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "command"
+            ]
+          },
+          "name": "Bash"
+        },
+        {
+          "annotations": {
+            "title": "BashOutput",
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "- Retrieves output from a running or completed background bash shell\n- Takes a shell_id parameter identifying the shell\n- Returns stdout and stderr output along with shell status\n- Supports optional regex filtering to show only lines matching a pattern\n- Use this tool when you need to monitor or check the output of a long-running shell\n",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "bash_id": {
+                "description": "The ID of the background shell to retrieve output from",
+                "type": "string"
+              },
+              "filter": {
+                "description": "Optional regular expression to filter the output lines. Only lines matching this regex will be included in the result.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "bash_id"
+            ]
+          },
+          "name": "BashOutput"
+        },
+        {
+          "annotations": {
+            "title": "KillShell",
+            "readOnlyHint": false,
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "- Kills a running background bash shell by its ID\n- Takes a shell_id parameter identifying the shell to kill\n- Returns a success or failure status \n- Use this tool when you need to terminate a long-running shell",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "shell_id": {
+                "description": "The ID of the background shell to kill",
+                "type": "string"
+              }
+            },
+            "required": [
+              "shell_id"
+            ]
+          },
+          "name": "KillShell"
+        },
+        {
+          "annotations": {
+            "title": "Glob",
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "- Fast file pattern matching tool that works with any codebase size\n- Supports glob patterns like \"**/*.js\" or \"src/**/*.ts\"\n- Returns matching file paths in lexical order\n- Use this tool when you need to find files by name patterns\n- When you are doing an open ended search that may require multiple rounds of globbing and grepping, use the Task tool instead\n- You can call multiple tools in a single response. It is always better to speculatively perform multiple searches in parallel if they are potentially useful.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "description": "The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter \"undefined\" or \"null\" - simply omit it for the default behavior. Must be a valid directory path if provided.",
+                "type": "string"
+              },
+              "pattern": {
+                "description": "The glob pattern to match files against",
+                "type": "string"
+              }
+            },
+            "required": [
+              "pattern"
+            ]
+          },
+          "name": "Glob"
+        },
+        {
+          "annotations": {
+            "title": "Grep",
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "- Fast content search tool that works with any codebase size\n- Searches file contents using regular expressions\n- Supports full regex syntax (eg. \"log.*Error\", \"function\\s+\\w+\", etc.)\n- Filter files by pattern with the include parameter (eg. \"*.js\", \"*.{ts,tsx}\", \"{*.go,*.md}\")\n- Returns file paths with at least one match sorted by modification time\n- Use this tool when you need to find files containing specific patterns\n- If you need to identify/count the number of matches within files, use the Bash tool with `rg` (ripgrep) directly. Do NOT use `grep`.\n- When you are doing an open ended search that may require multiple rounds of globbing and grepping, use the Task tool instead",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "include": {
+                "description": "File pattern to include in the search (e.g. \"*.js\", \"*.{ts,tsx}\")",
+                "type": "string"
+              },
+              "path": {
+                "description": "The directory to search in. Defaults to the current working directory.",
+                "type": "string"
+              },
+              "pattern": {
+                "description": "The regular expression pattern to search for in file contents",
+                "type": "string"
+              }
+            },
+            "required": [
+              "pattern"
+            ]
+          },
+          "name": "Grep"
+        },
+        {
+          "annotations": {
+            "title": "List",
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "Lists files and directories in a given path. The path parameter must be an absolute path, not a relative path. You can optionally provide an array of glob patterns to ignore with the ignore parameter. You should generally prefer the Glob and Grep tools, if you know which directories to search.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ignore": {
+                "description": "List of glob patterns to ignore",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "path": {
+                "description": "The absolute path to the directory to list (must be absolute, not relative)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          },
+          "name": "LS"
+        },
+        {
+          "annotations": {
+            "title": "Read",
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "Reads a file from the local filesystem. You can access any file directly by using this tool.\nAssume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.\n\nUsage:\n- The file_path parameter must be an absolute path, not a relative path\n- By default, it reads up to 2000 lines starting from the beginning of the file\n- You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters\n- Results are returned using cat -n format, with line numbers starting at 1\n- This tool allows you to read images (eg PNG, JPG, etc). When reading an image file the contents are presented visually as your model is a multimodal LLM.\n- This tool can only read files, not directories. To read a directory, use an ls command via the Bash tool.\n- You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch that are potentially useful.\n- You will regularly be asked to read screenshots. If the user provides a path to a screenshot, ALWAYS use this tool to view the file at the path. This tool will work with all temporary file paths.\n- If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "file_path": {
+                "description": "The absolute path to the file to read",
+                "type": "string"
+              },
+              "limit": {
+                "description": "The number of lines to read. Only provide if the file is too large to read at once.",
+                "type": "integer"
+              },
+              "offset": {
+                "description": "The line number to start reading from. Only provide if the file is too large to read at once",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "file_path"
+            ]
+          },
+          "name": "Read"
+        },
+        {
+          "annotations": {
+            "title": "Update",
+            "readOnlyHint": false,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true
+          },
+          "description": "Performs exact string replacements in files.\n\nUsage:\n- You must use your `Read` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.\n- When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + arrow. Everything after that arrow is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.\n- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.\n- Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.\n- The edit will FAIL if `old_string` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`. \n- Use `replace_all` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "file_path": {
+                "description": "The absolute path to the file to modify",
+                "type": "string"
+              },
+              "new_string": {
+                "description": "The text to replace it with (must be different from old_string)",
+                "type": "string"
+              },
+              "old_string": {
+                "description": "The text to replace",
+                "type": "string"
+              },
+              "replace_all": {
+                "description": "Replace all occurences of old_string (default false)",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "file_path",
+              "old_string",
+              "new_string"
+            ]
+          },
+          "name": "Edit"
+        },
+        {
+          "annotations": {
+            "title": "Write",
+            "readOnlyHint": false,
+            "destructiveHint": true,
+            "idempotentHint": true,
+            "openWorldHint": true
+          },
+          "description": "Writes a file to the local filesystem.\n\nUsage:\n- This tool will overwrite the existing file if there is one at the provided path.\n- If this is an existing file, you MUST use the Read tool first to read the file's contents. This tool will fail if you did not read the file first.\n- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.\n- NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.\n- Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "description": "The content to write to the file",
+                "type": "string"
+              },
+              "file_path": {
+                "description": "The absolute path to the file to write (must be absolute, not relative)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "file_path",
+              "content"
+            ]
+          },
+          "name": "Write"
+        },
+        {
+          "annotations": {
+            "title": "TodoWrite",
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": false
+          },
+          "description": "Use this tool to create and manage a structured task list for your current coding session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.\nIt also helps the user understand the progress of the task and overall progress of their requests.\n\n## When to Use This Tool\nUse this tool proactively in these scenarios:\n\n1. Complex multi-step tasks - When a task requires 3 or more distinct steps or actions\n2. Non-trivial and complex tasks - Tasks that require careful planning or multiple operations\n3. User explicitly requests todo list - When the user directly asks you to use the todo list\n4. User provides multiple tasks - When users provide a list of things to be done (numbered or comma-separated)\n5. After receiving new instructions - Immediately capture user requirements as todos\n6. When you start working on a task - Mark it as in_progress BEFORE beginning work. Ideally you should only have one todo as in_progress at a time\n7. After completing a task - Mark it as completed and add any new follow-up tasks discovered during implementation\n\n## When NOT to Use This Tool\n\nSkip using this tool when:\n1. There is only a single, straightforward task\n2. The task is trivial and tracking it provides no organizational benefit\n3. The task can be completed in less than 3 trivial steps\n4. The task is purely conversational or informational\n\nNOTE that you should not use this tool if there is only one trivial task to do. In this case you are better off just doing the task directly.\n\n## Examples of When to Use the Todo List\n\n\u003cexample\u003e\nUser: I want to add a dark mode toggle to the application settings. Make sure you run the tests and build when you're done!\nAssistant: I'll help add a dark mode toggle to your application settings. Let me create a todo list to track this implementation.\n*Creates todo list with the following items:*\n1. Create dark mode toggle component in Settings page\n2. Add dark mode state management (context/store)\n3. Implement CSS-in-JS styles for dark theme\n4. Update existing components to support theme switching\n5. Run tests and build process, addressing any failures or errors that occur\n*Begins working on the first task*\n\n\u003creasoning\u003e\nThe assistant used the todo list because:\n1. Adding dark mode is a multi-step feature requiring UI, state management, and styling changes\n2. The user explicitly requested tests and build be run afterward\n3. The assistant inferred that tests and build need to pass by adding \"Ensure tests and build succeed\" as the final task\n\u003c/reasoning\u003e\n\u003c/example\u003e\n\n\u003cexample\u003e\nUser: Help me rename the function getCwd to getCurrentWorkingDirectory across my project\nAssistant: Let me first search through your codebase to find all occurrences of 'getCwd'.\n*Uses grep or search tools to locate all instances of getCwd in the codebase*\nAssistant: I've found 15 instances of 'getCwd' across 8 different files. Let me create a todo list to track these changes.\n*Creates todo list with specific items for each file that needs updating*\n\n\u003creasoning\u003e\nThe assistant used the todo list because:\n1. First, the assistant searched to understand the scope of the task\n2. Upon finding multiple occurrences across different files, it determined this was a complex task with multiple steps\n3. The todo list helps ensure every instance is tracked and updated systematically\n4. This approach prevents missing any occurrences and maintains code consistency\n\u003c/reasoning\u003e\n\u003c/example\u003e\n\n\n\u003cexample\u003e\nUser: I need to implement these features for my e-commerce site: user registration, product catalog, shopping cart, and checkout flow.\nAssistant: I'll help implement these features. First, let's add all the features to the todo list.\n*Creates a todo list breaking down each feature into specific tasks based on the project architecture*\nAssistant: Let's start with user registration. This will involve creating database models, API endpoints, and frontend forms that integrate with your existing authentication system.\n\n\u003creasoning\u003e\nThe assistant used the todo list because:\n1. The user provided multiple complex features to implement in a comma separated list\n2. The todo list helps organize these large features into manageable tasks\n3. This approach allows for tracking progress across the entire implementation\n\u003c/reasoning\u003e\n\u003c/example\u003e\n\n\u003cexample\u003e\nUser: Can you help optimize my React application? It's rendering slowly and has performance issues.\u003c/user\u003e\nAssistant: I'll help optimize your React application. First, let me examine your codebase to identify potential performance bottlenecks.\n*Reviews component structure, render patterns, state management, and data fetching*\nAssistant: After analyzing your codebase, I've identified several performance issues. Let me create a todo list to track our optimization efforts.\n*Creates todo list with items like: 1) Implement memoization for expensive calculations in ProductList, 2) Add virtualization for long lists in Dashboard, 3) Optimize image loading in Gallery component, 4) Fix state update loops in ShoppingCart, 5) Review bundle size and implement code splitting*\nLet's start by implementing memoization for the expensive calculations in your ProductList component.\u003c/assistant\u003e\n\n\u003creasoning\u003e\nThe assistant used the todo list because:\n1. First, the assistant examined the codebase to identify specific performance issues\n2. Based on this analysis, it identified multiple optimization opportunities\n3. Performance optimization is a non-trivial task requiring multiple steps\n4. The todo list helps methodically track improvements across different components\n5. This systematic approach ensures all performance bottlenecks are addressed\n\u003c/reasoning\u003e\n\u003c/example\u003e\n\n## Examples of When NOT to Use the Todo List\n\n\u003cexample\u003e\nUser: How do I print 'Hello World' in Python?\nAssistant: In Python, you can print \"Hello World\" with this simple code:\n\npython\nprint(\"Hello World\")\n\nThis will output the text \"Hello World\" to the console when executed.\u003c/assistant\u003e\n\n\u003creasoning\u003e\nThe assistant did not use the todo list because this is a single, trivial task that can be completed in one step. There's no need to track multiple tasks or steps for such a straightforward request.\n\u003c/reasoning\u003e\n\u003c/example\u003e\n\n\u003cexample\u003e\nUser: What does the git status command do?\nAssistant: The git status command shows the current state of your working directory and staging area. It displays which changes have been staged, which haven't, and which files aren't being tracked by Git. This is a fundamental command for understanding the current state of your repository before making commits.\n\n\u003creasoning\u003e\nThe assistant did not use the todo list because this is an informational request with no actual coding task to complete. The user is simply asking for an explanation, not for the assistant to perform multiple steps or tasks.\n\u003c/reasoning\u003e\n\u003c/example\u003e\n\n\u003cexample\u003e\nUser: Can you add a comment to the calculateTotal function to explain what it does?\nAssistant: Sure, let me add a comment to the calculateTotal function to explain what it does.\n* Uses the Edit tool to add a comment to the calculateTotal function *\n\n\u003creasoning\u003e\nThe assistant did not use the todo list because this is a single, straightforward task confined to one location in the code. Adding a comment doesn't require tracking multiple steps or systematic organization.\n\u003c/reasoning\u003e\n\u003c/example\u003e\n\n\u003cexample\u003e\nUser: Run npm install for me and tell me what happens.\nAssistant: I'll run the npm install command for you.\n\n*Executes: npm install*\n\nThe command completed successfully. Here's the output:\n[Output of npm install command]\n\nAll dependencies have been installed according to your package.json file.\n\n\u003creasoning\u003e\nThe assistant did not use the todo list because this is a single command execution with immediate results. There are no multiple steps to track or organize, making the todo list unnecessary for this straightforward task.\n\u003c/reasoning\u003e\n\u003c/example\u003e\n\n## Task States and Management\n\n1. **Task States**: Use these states to track progress:\n   - pending: Task not yet started\n   - in_progress: Currently working on (limit to ONE task at a time)\n   - completed: Task finished successfully\n\n2. **Task Management**:\n   - Update task status in real-time as you work\n   - Mark tasks complete IMMEDIATELY after finishing (don't batch completions)\n   - Only have ONE task in_progress at any time\n   - Complete current tasks before starting new ones\n   - Remove tasks that are no longer relevant from the list entirely\n\n3. **Task Completion Requirements**:\n   - ONLY mark a task as completed when you have FULLY accomplished it\n   - If you encounter errors, blockers, or cannot finish, keep the task as in_progress\n   - When blocked, create a new task describing what needs to be resolved\n   - Never mark a task as completed if:\n     - Tests are failing\n     - Implementation is partial\n     - You encountered unresolved errors\n     - You couldn't find necessary files or dependencies\n\n4. **Task Breakdown**:\n   - Create specific, actionable items\n   - Break complex tasks into smaller, manageable steps\n   - Use clear, descriptive task names\n\nWhen in doubt, use this tool. Being proactive with task management demonstrates attentiveness and ensures you complete all requirements successfully.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "todos": {
+                "description": "The updated todo list",
+                "items": {
+                  "properties": {
+                    "content": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "priority": {
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ],
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "pending",
+                        "in_progress",
+                        "completed"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "content",
+                    "status",
+                    "priority"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            }
+          },
+          "name": "TodoWrite"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Get the mergeability of a merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__GetMergeRequestMergeability"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Get a repository either by ID (e.g. 123456) or path (e.g. path/to/repo). Either of the `Id` or `Path` must be provided.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Id": {
+                "description": "Optional. The ID of the repository.",
+                "type": "string"
+              },
+              "Path": {
+                "description": "Optional. The full path of the repository like \"path/to/repo\". You can get the repo ID by known repo path.",
+                "type": "string"
+              }
+            }
+          },
+          "name": "mcp__Codebase__GetRepository"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": false
+          },
+          "description": "Create a comment in a merge request. If want to create multiple comments, use `CreateMergeRequestComments` instead.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Comment": {
+                "additionalProperties": false,
+                "description": "Comment to create.\nTo reply to an existing thread, set `ThreadId` to the ID of the thread.\nTo comment with a new thread: don't set `ThreadId`, and:\n  - To comment on a file: set file position fields.\n  - To comment on the overall: don't set file position fields.",
+                "properties": {
+                  "Content": {
+                    "description": "Content of the comment.",
+                    "type": "string"
+                  },
+                  "EndColumn": {
+                    "description": "File position: end column, starting from 1, inclusive, optional.",
+                    "type": "integer"
+                  },
+                  "EndLine": {
+                    "description": "File position: end line, starting from 1, inclusive.",
+                    "type": "integer"
+                  },
+                  "FilePath": {
+                    "description": "File position: file path.",
+                    "type": "string"
+                  },
+                  "Side": {
+                    "description": "File position: comment on the old side or new side of the merge request diff, default is `new`.",
+                    "enum": [
+                      "old",
+                      "new"
+                    ],
+                    "type": "string"
+                  },
+                  "StartColumn": {
+                    "description": "File position: start column, starting from 1, optional.",
+                    "type": "integer"
+                  },
+                  "StartLine": {
+                    "description": "File position: start line, starting from 1.",
+                    "type": "integer"
+                  },
+                  "ThreadId": {
+                    "description": "ID of the thread the comment belongs to. If `ThreadId` is set, file position fields are ignored.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "Content"
+                ],
+                "type": "object"
+              },
+              "Draft": {
+                "description": "Whether to create the comment as a draft (invisible to others). Default is `false`.",
+                "type": "boolean"
+              },
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number",
+              "Comment"
+            ]
+          },
+          "name": "mcp__Codebase__CreateMergeRequestComment"
+        },
+        {
+          "annotations": {},
+          "description": "Retrieve and convert Lark document content to markdown format. Supports various Lark document types including doc/docx/wiki/bitable/sheet. The tool fetches the complete document content and returns it as properly formatted markdown.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Page": {
+                "description": "Page number for pagination (default: 1)",
+                "type": "integer"
+              },
+              "URL": {
+                "description": "The complete URL of the Lark document to retrieve. Format: https://{domain}.larkoffice.com/{type}/{document_id} (e.g., https://bytedance.larkoffice.com/docx/GyA3xxx, https://bytedance.larkoffice.com/wiki/ORPCxxx)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "URL",
+              "Page"
+            ]
+          },
+          "name": "mcp__Lark__GetDocument"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": false
+          },
+          "description": "Create multiple comments in a merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Comments": {
+                "description": "A list of comments to create.\nTo reply to an existing thread, set `ThreadId` to the ID of the thread.\nTo comment with a new thread: don't set `ThreadId`, and:\n  - To comment on a file: set file position fields.\n  - To comment on the overall: don't set file position fields.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "Content": {
+                      "description": "Content of the comment.",
+                      "type": "string"
+                    },
+                    "EndColumn": {
+                      "description": "File position: end column, starting from 1, inclusive, optional.",
+                      "type": "integer"
+                    },
+                    "EndLine": {
+                      "description": "File position: end line, starting from 1, inclusive.",
+                      "type": "integer"
+                    },
+                    "FilePath": {
+                      "description": "File position: file path.",
+                      "type": "string"
+                    },
+                    "Side": {
+                      "description": "File position: comment on the old side or new side of the merge request diff, default is `new`.",
+                      "enum": [
+                        "old",
+                        "new"
+                      ],
+                      "type": "string"
+                    },
+                    "StartColumn": {
+                      "description": "File position: start column, starting from 1, optional.",
+                      "type": "integer"
+                    },
+                    "StartLine": {
+                      "description": "File position: start line, starting from 1.",
+                      "type": "integer"
+                    },
+                    "ThreadId": {
+                      "description": "ID of the thread the comment belongs to. If `ThreadId` is set, file position fields are ignored.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Content"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "Draft": {
+                "description": "Whether to create all these comments as draft (invisible to others). Default is `false`.",
+                "type": "boolean"
+              },
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number",
+              "Comments"
+            ]
+          },
+          "name": "mcp__Codebase__CreateMergeRequestComments"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "List comments in a merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              },
+              "Status": {
+                "description": "Filter by comment status.",
+                "enum": [
+                  "open",
+                  "resolved"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__ListMergeRequestComments"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Get my self (an authenticated Codebase user or an application).\nIt returns the information of myself. Consider to use this when a request include \"me\", \"my\", \"我\".",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Reason": {
+                "description": "Optional. Reason the session was created.",
+                "type": "string"
+              }
+            }
+          },
+          "name": "mcp__Codebase__GetMe"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "List repositories with various filters.\nIf you want to get a repository by known repo ID or path (e.g. path/to/repo), it's better to use `GetRepository`.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ContributedById": {
+                "description": "Optional. Filter repositories by contributor ID. Requires that the specified user has contributed to the repository. If `ContributedById` is specified, no other filters are allowed.",
+                "type": "string"
+              },
+              "PageNumber": {
+                "description": "Optional. Pagination number, starts from 1.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "PageSize": {
+                "description": "Optional. Pagination size. Maximum 100, default is 10.",
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "Query": {
+                "description": "Optional. Filter repositories by path. Matches either the full repository path prefix or the prefix of the last segment in the path.",
+                "type": "string"
+              },
+              "SortBy": {
+                "description": "Optional. Sort results by either the last activity time (`PushedAt`), repository path (`Path`) or the time of my last contribution (`ContributedAt`). Default is `ContributedAt`.",
+                "enum": [
+                  "PushedAt",
+                  "Path",
+                  "ContributedAt"
+                ],
+                "type": "string"
+              },
+              "SortOrder": {
+                "description": "Optional. Sort order: `Asc` or `Desc`.",
+                "enum": [
+                  "Asc",
+                  "Desc"
+                ],
+                "type": "string"
+              }
+            }
+          },
+          "name": "mcp__Codebase__ListRepositories"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": false
+          },
+          "description": "Create an issue in a repository.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "AssigneeIds": {
+                "description": "Optional. List of user IDs to assign to the issue.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "Description": {
+                "description": "Optional. Description of the issue.",
+                "type": "string"
+              },
+              "DueDate": {
+                "description": "Optional. Due date for the issue. e.g. `2006-01-02`.",
+                "type": "string"
+              },
+              "LabelIds": {
+                "description": "Optional. List of label IDs to apply to the issue.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "ParentIssueId": {
+                "description": "Optional. Parent issue ID to create this as a sub-issue.",
+                "type": "string"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              },
+              "Status": {
+                "description": "Optional. Initial status for the issue. Default: \"backlog\".",
+                "enum": [
+                  "todo",
+                  "done",
+                  "canceled",
+                  "in_progress",
+                  "backlog"
+                ],
+                "type": "string"
+              },
+              "Title": {
+                "description": "Title of the issue.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Title"
+            ]
+          },
+          "name": "mcp__Codebase__CreateIssue"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": false
+          },
+          "description": "Update an existing issue.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "AssigneeIds": {
+                "description": "Optional. New list of user IDs to assign to the issue. If not provided, assignees remain unchanged. If empty array is provided, all assignees will be removed.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "Description": {
+                "description": "Optional. New description for the issue.",
+                "type": "string"
+              },
+              "DueDate": {
+                "description": "Optional. New due date for the issue. e.g. \"2006-01-02\". Set to empty string to clear due date.",
+                "type": "string"
+              },
+              "Number": {
+                "description": "The number of the issue.",
+                "type": "integer"
+              },
+              "ParentIssueId": {
+                "description": "Optional. New parent issue ID to change the parent-child relationship.",
+                "type": "string"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              },
+              "Status": {
+                "description": "Optional. New status for the issue. Available options: \"backlog\" (not started), \"todo\" (ready to work), \"in_progress\" (being worked on), \"done\" (completed), \"canceled\" (abandoned).",
+                "enum": [
+                  "todo",
+                  "done",
+                  "canceled",
+                  "in_progress",
+                  "backlog"
+                ],
+                "type": "string"
+              },
+              "Title": {
+                "description": "Optional. New title for the issue.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__UpdateIssue"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "List review network statistics.\nIt returns the review network statistics based on the specified criteria.\nUse self as author if both author and reviewer are empty.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "AuthorId": {
+                "description": "Optional. ID of the author to filter by.",
+                "type": "string"
+              },
+              "AuthorUsername": {
+                "description": "Optional. Username of the author to filter by.",
+                "type": "string"
+              },
+              "ReviewerId": {
+                "description": "Optional. ID of the reviewer to filter by.",
+                "type": "string"
+              },
+              "ReviewerUsername": {
+                "description": "Optional. Username of the reviewer to filter by.",
+                "type": "string"
+              },
+              "TopN": {
+                "description": "Optional. Number of top results to return. Default 3.",
+                "type": "integer"
+              }
+            }
+          },
+          "name": "mcp__Codebase__ListReviewNetworkStatistics"
+        },
+        {
+          "annotations": {},
+          "description": "Understand the image content from lark document or message. The tool fetches the image data, invoke image understanding model to get the image content, and returns it.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Identifier": {
+                "description": "The image's unified lark resource identifier. Format: lark-image-{source}-{image_token} (e.g., lark-image-message-hvasdlw, lark-image-document-jkljwda).",
+                "type": "string"
+              },
+              "MessageID": {
+                "description": "Required only when source is \"message\"; ignored when source is \"document\".",
+                "type": "string"
+              }
+            },
+            "required": [
+              "MessageID",
+              "Identifier"
+            ]
+          },
+          "name": "mcp__Lark__UnderstandImage"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "List merge requests in a repository.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Author": {
+                "description": "Filter by the author's username.",
+                "type": "string"
+              },
+              "CommitId": {
+                "description": "The commit ID must be complete.",
+                "type": "string"
+              },
+              "Draft": {
+                "description": "Draft means not ready to be reviewed or merged.",
+                "type": "boolean"
+              },
+              "Labels": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "PageNumber": {
+                "description": "Pagination number, starts from 1.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "PageSize": {
+                "description": "Pagination size. Default is 10.",
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              },
+              "ReviewStatus": {
+                "description": "Filter by review status.",
+                "enum": [
+                  "pending",
+                  "passed",
+                  "disapproved"
+                ],
+                "type": "string"
+              },
+              "Reviewer": {
+                "description": "Filter by the reviewer's username.",
+                "type": "string"
+              },
+              "SortBy": {
+                "enum": [
+                  "CreatedAt",
+                  "UpdatedAt"
+                ],
+                "type": "string"
+              },
+              "SortOrder": {
+                "enum": [
+                  "Asc",
+                  "Desc"
+                ],
+                "type": "string"
+              },
+              "SourceBranch": {
+                "description": "Filter by the source branch name.",
+                "type": "string"
+              },
+              "Status": {
+                "description": "Filter by merge request status.",
+                "enum": [
+                  "open",
+                  "closed",
+                  "merged"
+                ],
+                "type": "string"
+              },
+              "TargetBranch": {
+                "description": "Filter by the target branch name.",
+                "type": "string"
+              },
+              "Title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId"
+            ]
+          },
+          "name": "mcp__Codebase__ListMergeRequests"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Count user activities by date range.\nIt returns the count of user activities within the specified date range.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "EndDate": {
+                "description": "Optional. End date (YYYY-MM-DD format). If StartDate and EndDate are not both provided, use now.",
+                "type": "string"
+              },
+              "StartDate": {
+                "description": "Optional. Start date (YYYY-MM-DD format). If StartDate and EndDate are not both provided, use now-365days.",
+                "type": "string"
+              },
+              "TenantId": {
+                "description": "Optional. Tenant ID. If Username and TenantId are not provided, use self.",
+                "type": "string"
+              },
+              "Username": {
+                "description": "Optional. Username. If Username and TenantId are not provided, use self.",
+                "type": "string"
+              }
+            }
+          },
+          "name": "mcp__Codebase__CountUserActivities"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": false
+          },
+          "description": "Merge a merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__MergeMergeRequest"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": false,
+            "idempotentHint": true
+          },
+          "description": "Publish all draft comments previously created in this merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              },
+              "ReviewContent": {
+                "description": "Optional. The summary review content to include for publishing.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__PublishDraftComments"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "List check runs for a merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "PageNumber": {
+                "description": "Pagination number, starts from 1.",
+                "type": "integer"
+              },
+              "PageSize": {
+                "description": "Pagination size. Maximum 100, default is 10.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              },
+              "Unsuccessful": {
+                "description": "`true` means filter unsuccessful check runs (pending, running, failed, warning, etc.). Default is `false`.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number",
+              "Unsuccessful",
+              "PageNumber",
+              "PageSize"
+            ]
+          },
+          "name": "mcp__Codebase__ListMergeRequestCheckRuns"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": false
+          },
+          "description": "Create a merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Description": {
+                "type": "string"
+              },
+              "Draft": {
+                "description": "Whether the merge request is a draft. Draft means not ready to be reviewed or merged.",
+                "type": "boolean"
+              },
+              "LabelIds": {
+                "description": "The IDs of the labels to apply to the merge request.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "MergeMethod": {
+                "enum": [
+                  "rebase_merge",
+                  "merge_commit",
+                  "merge_commit_with_semi_linear_history"
+                ],
+                "type": "string"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              },
+              "SourceBranch": {
+                "description": "The source branch name.",
+                "type": "string"
+              },
+              "TargetBranch": {
+                "description": "The target branch name.",
+                "type": "string"
+              },
+              "Title": {
+                "type": "string"
+              },
+              "WorkItemIds": {
+                "description": "The IDs of the work items (like Meego tickets) to link to the merge request.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "RepoId",
+              "SourceBranch",
+              "TargetBranch",
+              "Title"
+            ]
+          },
+          "name": "mcp__Codebase__CreateMergeRequest"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Get an issue.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Number": {
+                "description": "The number of the issue.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__GetIssue"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Get a merge request (abbreviated as MR).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__GetMergeRequest"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Get user statistics for a specific user.\nIt returns the statistics information of the specified user.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "NaturalYear": {
+                "description": "Optional. Natural year to fetch statistics for. Data available only from 2022 onwards.",
+                "type": "integer"
+              },
+              "RelativeDays": {
+                "description": "Optional. Relative time range in days to fetch statistics for. Enum values: 7 / 30 / 180 / 365. Defaults to 365 if both RelativeDays and NaturalYear are not provided.",
+                "type": "integer"
+              },
+              "UserId": {
+                "description": "Optional. ID of the user to fetch statistics for. Returns self if both Id and Username are empty.",
+                "type": "string"
+              },
+              "Username": {
+                "description": "Optional. Username of the user to fetch statistics for. Returns self if both Id and Username are empty.",
+                "type": "string"
+              }
+            }
+          },
+          "name": "mcp__Codebase__GetUserStatistics"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Get the review status of a merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__GetMergeRequestReviewStatus"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": false
+          },
+          "description": "Update a merge request.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "AutoMerge": {
+                "description": "Whether to enable auto merge.",
+                "type": "boolean"
+              },
+              "Description": {
+                "description": "The new description of the merge request.",
+                "type": "string"
+              },
+              "Draft": {
+                "description": "Whether the merge request is a draft. Draft means not ready to be reviewed or merged.",
+                "type": "boolean"
+              },
+              "Number": {
+                "description": "The number of the merge request.",
+                "type": "integer"
+              },
+              "RepoId": {
+                "description": "The ID or path (e.g. path/to/repo) of the repository.",
+                "type": "string"
+              },
+              "Title": {
+                "description": "The new title of the merge request.",
+                "type": "string"
+              },
+              "WorkItemIds": {
+                "description": "The IDs of the work items (like Meego tickets) to link to the merge request.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "RepoId",
+              "Number"
+            ]
+          },
+          "name": "mcp__Codebase__UpdateMergeRequest"
+        },
+        {
+          "annotations": {
+            "readOnlyHint": true
+          },
+          "description": "Search issues across repositories or within a specific repository.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "Assignee": {
+                "description": "Optional. Filter by assignee username. Only returns issues assigned to the specified user.",
+                "type": "string"
+              },
+              "DueDateSince": {
+                "description": "Optional. Filter issues with due dates on or after this date. Use RFC3339 format (e.g. \"2024-01-15T00:00:00Z\").",
+                "type": "string"
+              },
+              "DueDateUntil": {
+                "description": "Optional. Filter issues with due dates on or before this date. Use RFC3339 format (e.g. \"2024-12-31T23:59:59Z\").",
+                "type": "string"
+              },
+              "PageSize": {
+                "description": "Optional. Number of issues to return per page. Must be between 1-100. Default: 10.",
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "PageToken": {
+                "description": "Optional. Pagination token from previous response. Leave empty to get the first page.",
+                "type": "string"
+              },
+              "Query": {
+                "description": "Optional. Search text to match against issue titles and descriptions. Supports partial matching.",
+                "type": "string"
+              },
+              "RepoId": {
+                "description": "Optional. Repository to search in. Can be repository ID (e.g. \"123456\") or full path (e.g. \"company/project\"). If not specified, searches across all accessible repositories.",
+                "type": "string"
+              },
+              "SortBy": {
+                "description": "Optional. Sort field: \"CreatedAt\" (when issue was created) or \"UpdatedAt\" (when issue was last modified). Default: \"UpdatedAt\".",
+                "enum": [
+                  "CreatedAt",
+                  "UpdatedAt"
+                ],
+                "type": "string"
+              },
+              "SortOrder": {
+                "description": "Optional. Sort direction: \"Asc\" (oldest first) or \"Desc\" (newest first). Default: \"Desc\".",
+                "enum": [
+                  "Asc",
+                  "Desc"
+                ],
+                "type": "string"
+              },
+              "Status": {
+                "description": "Optional. Filter by issue status. Available options: \"backlog\" (not started), \"todo\" (ready to work), \"in_progress\" (being worked on), \"done\" (completed), \"canceled\" (abandoned).",
+                "enum": [
+                  "todo",
+                  "done",
+                  "canceled",
+                  "in_progress",
+                  "backlog"
+                ],
+                "type": "string"
+              }
+            }
+          },
+          "name": "mcp__Codebase__SearchIssues"
+        }
+      ]
+    }
+  ],
+  "message": {
+    "role": "assistant",
+    "content": "Based on my analysis of the codebase, this project is **OpenCode** - an open-source AI coding agent built for the terminal. Here's what I found:\n\n## Project Overview\n\n**OpenCode** is a terminal-based AI coding assistant that provides:\n- **AI-powered coding assistance** with multiple LLM provider support (Anthropic, OpenAI, Google)\n- **Terminal User Interface (TUI)** focused experience\n- **Tool-based architecture** for file operations, code editing, bash commands, web search, etc.\n- **Session persistence** and state management\n- **Multi-agent system** with different agent types (build, plan, general)\n\n## Key Components\n\n### 1. **Kiana Package** (`packages/kiana/`)\nA minimal headless coding agent library that provides:\n- **Core session management** with persistence\n- **Provider abstraction** for multiple AI models\n- **Tool system** with 15+ built-in tools:\n  - File operations (read, write, edit, glob, grep, list)\n  - Development tools (bash, codesearch)\n  - Web tools (webfetch, websearch)\n  - Task management (todo, task/subagent)\n- **Event system** for real-time updates\n- **CLI wrapper** for standalone usage\n\n### 2. **Architecture Features**\n- **Provider-agnostic**: Works with Claude, OpenAI, Google, or local models\n- **Client/server architecture**: Allows remote control from mobile apps\n- **LSP support**: Built-in Language Server Protocol integration\n- **Session persistence**: Saves and restores conversation history\n- **Streaming controls**: Real-time response handling\n\n### 3. **Agent Types**\n- **build**: Full-access agent for development work (default)\n- **plan**: Read-only agent for analysis and exploration\n- **general**: Subagent for complex multi-step tasks\n\n## Key Differentiators\n- **100% open source** (vs Claude Code)\n- **Provider-agnostic** (not tied to any single AI provider)\n- **Terminal-first** design by neovim users\n- **Extensible tool system** for custom operations\n\nThe project appears to be a legitimate, well-structured open-source alternative to proprietary AI coding assistants, focusing on terminal users and provider flexibility.",
+    "response_meta": {
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 21352,
+        "prompt_token_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens": 462,
+        "total_tokens": 21814
+      }
+    },
+    "extra": {
+      "openai-request-id": "0217654438270248c115a23d7d04490da5d7d9d1ebb294c6556d0"
+    }
+  }
+}

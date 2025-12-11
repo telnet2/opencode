@@ -16,16 +16,13 @@ export const ConfigSchema = z.object({
   systemPrompt: z.string().optional(),
   workingDirectory: z.string().nullable().optional(),
   tools: z.array(z.string()).nullable().optional(),
-  // Whether to use streaming mode (default: true)
-  // Set to false for proper token counting with openai-compatible providers
-  streaming: z.boolean().optional().default(true),
+  // Maximum number of steps in the agent loop (default: 50)
+  maxSteps: z.number().int().min(1).max(100).optional().default(50),
   // Maximum number of retries for rate limit errors (default: 5)
   // Uses exponential backoff and respects Retry-After headers
   maxRetries: z.number().int().min(0).max(10).optional().default(5),
-  // Whether to normalize stringified tool arguments (default: true)
-  // AI SDK v6 handles JSON parsing internally, so this may not be needed
-  // Set to false to test SDK's native parsing
-  normalizeToolArgs: z.boolean().optional().default(true),
+  // Enable streaming mode (default: true)
+  streaming: z.boolean().optional().default(true),
 })
 
 export type Config = z.infer<typeof ConfigSchema>
@@ -106,23 +103,21 @@ export const CONFIG_TEMPLATE = `{
   // Available: bash, read, write, edit, glob, grep, list, webfetch, websearch, codesearch, todowrite, todoread, task
   "tools": null,
 
-  // Whether to use streaming mode (default: true)
-  // Set to false for proper token counting with openai-compatible providers
-  "streaming": true,
+  // Maximum steps in agent loop (default: 50)
+  "maxSteps": 50,
 
   // Maximum retries for rate limit errors (default: 5)
   // Uses exponential backoff and respects Retry-After headers
-  "maxRetries": 5,
-
-  // Whether to normalize stringified tool arguments (default: true)
-  // AI SDK v6 handles JSON parsing internally, set to false to use SDK's native parsing
-  "normalizeToolArgs": true
+  "maxRetries": 5
 }
 `
 
 /**
- * Write config template to a file.
+ * Get config template string (or write to file if path provided).
  */
-export function writeConfigTemplate(path: string): void {
-  writeFileSync(path, CONFIG_TEMPLATE, "utf-8")
+export function writeConfigTemplate(path?: string): string {
+  if (path) {
+    writeFileSync(path, CONFIG_TEMPLATE, "utf-8")
+  }
+  return CONFIG_TEMPLATE
 }
