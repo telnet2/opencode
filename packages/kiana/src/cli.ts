@@ -106,6 +106,9 @@ const colors = {
   gray: "\x1b[90m",
 }
 
+// Track tool calls that have already shown their "running" header
+const seenRunningTools = new Set<string>()
+
 // Human-readable event formatter
 function formatEventHumanReadable(event: any, verbose: boolean = false): string | null {
   const indent = event.context ? "  ".repeat(event.context.depth) : ""
@@ -135,7 +138,11 @@ function formatEventHumanReadable(event: any, verbose: boolean = false): string 
           // Streaming text delta
           return `${indent}${agentPrefix}${delta}`
         }
-        return null // Final update without delta
+        // Non-streaming: print full text
+        if (part.text) {
+          return `${indent}${agentPrefix}${part.text}\n`
+        }
+        return null
       }
 
       if (part.type === "reasoning") {
@@ -148,6 +155,13 @@ function formatEventHumanReadable(event: any, verbose: boolean = false): string 
       if (part.type === "tool") {
         const state = part.state
         if (state.status === "running") {
+          // Only show the "running" header once per tool call
+          const toolKey = `${part.id}:${part.callID}`
+          if (seenRunningTools.has(toolKey)) {
+            return null // Already shown
+          }
+          seenRunningTools.add(toolKey)
+
           const toolName = part.tool
           const title = state.title || formatToolInput(toolName, state.input)
           let output = `\n${indent}${agentPrefix}${colors.cyan}▶ ${toolName}${colors.reset} ${colors.gray}${title}${colors.reset}\n`
@@ -297,8 +311,9 @@ async function main(): Promise<void> {
     config.workingDirectory = path.resolve(args.cwd)
   }
 
-  // Create session
-  const session = await createSession(config)
+  // Create session with optional persistence
+  const sessionDir = args.session ? path.resolve(args.session) : undefined
+  const session = await createSession(config, { sessionDir })
 
   // Subscribe to events and output
   if (args.humanReadable) {
@@ -313,29 +328,6 @@ async function main(): Promise<void> {
     session.onEvent((event) => {
       console.log(JSON.stringify(event))
     })
-  }
-
-  // Handle session persistence
-  if (args.session) {
-    const sessionDir = path.resolve(args.session)
-    fs.mkdirSync(sessionDir, { recursive: true })
-
-    // Save session info
-    const sessionFile = path.join(sessionDir, "session.json")
-    fs.writeFileSync(
-      sessionFile,
-      JSON.stringify(
-        {
-          id: session.id,
-          created: Date.now(),
-          config: configPath,
-        },
-        null,
-        2
-      )
-    )
-
-    // TODO: Implement full session persistence with messages/parts
   }
 
   // If --prompt is provided, send it and exit after completion

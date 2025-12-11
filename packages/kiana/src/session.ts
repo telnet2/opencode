@@ -1,6 +1,8 @@
-import { streamText, type LanguageModel, tool, jsonSchema } from "ai"
+import { streamText, generateText, type LanguageModel, tool, jsonSchema } from "ai"
 import { z } from "zod"
 import { spawn } from "node:child_process"
+import * as fs from "node:fs"
+import * as path from "node:path"
 import { EventBus, type EventTypes } from "./event.js"
 import { Config } from "./config.js"
 import { createLanguageModel } from "./provider.js"
@@ -9,6 +11,39 @@ import type { Tool, ToolContext, ToolResult } from "./tool/tool.js"
 import type { SessionInfo } from "./types/session.js"
 import type { MessageInfo } from "./types/message.js"
 import type { Part, TextPart, ToolPart, ReasoningPart, StepStartPart, StepFinishPart } from "./types/part.js"
+
+// Session storage for persistence
+interface SessionStorage {
+  sessionDir: string
+  save(session: SessionInfo, messages: MessageWithParts[]): void
+  load(): { session: SessionInfo; messages: MessageWithParts[] } | null
+}
+
+function createSessionStorage(sessionDir: string): SessionStorage {
+  const sessionFile = path.join(sessionDir, "session.json")
+  const messagesFile = path.join(sessionDir, "messages.json")
+
+  return {
+    sessionDir,
+    save(session: SessionInfo, messages: MessageWithParts[]) {
+      fs.mkdirSync(sessionDir, { recursive: true })
+      fs.writeFileSync(sessionFile, JSON.stringify(session, null, 2))
+      fs.writeFileSync(messagesFile, JSON.stringify(messages, null, 2))
+    },
+    load() {
+      if (!fs.existsSync(sessionFile) || !fs.existsSync(messagesFile)) {
+        return null
+      }
+      try {
+        const session = JSON.parse(fs.readFileSync(sessionFile, "utf-8")) as SessionInfo
+        const messages = JSON.parse(fs.readFileSync(messagesFile, "utf-8")) as MessageWithParts[]
+        return { session, messages }
+      } catch {
+        return null
+      }
+    },
+  }
+}
 
 // ID generation
 let idCounter = 0
@@ -29,11 +64,16 @@ interface SessionState {
   abortController: AbortController
   eventBus: EventBus
   workingDirectory: string
+  storage: SessionStorage | null
 }
 
 interface MessageWithParts {
   info: MessageInfo
   parts: Part[]
+}
+
+export interface SessionOptions {
+  sessionDir?: string // Directory for session persistence
 }
 
 export interface Session {
@@ -44,9 +84,14 @@ export interface Session {
   abort(): void
 }
 
-export async function createSession(config: Config): Promise<Session> {
-  const sessionID = generateId("session")
-  const projectID = generateId("project")
+export async function createSession(config: Config, options?: SessionOptions): Promise<Session> {
+  const storage = options?.sessionDir ? createSessionStorage(options.sessionDir) : null
+
+  // Try to load existing session
+  const existing = storage?.load()
+
+  const sessionID = existing?.session.id ?? generateId("session")
+  const projectID = existing?.session.projectID ?? generateId("project")
 
   const model = createLanguageModel(config.provider)
   const tools = getTools(config.tools)
@@ -60,10 +105,29 @@ export async function createSession(config: Config): Promise<Session> {
     config,
     model,
     tools,
-    messages: [],
+    messages: existing?.messages ?? [],
     abortController: new AbortController(),
     eventBus,
     workingDirectory,
+    storage,
+  }
+
+  // Helper to save session state
+  function saveSession() {
+    if (state.storage) {
+      const sessionInfo: SessionInfo = {
+        id: state.id,
+        projectID: state.projectID,
+        directory: state.workingDirectory,
+        title: "Session",
+        version: "1.0.0",
+        time: {
+          created: Date.now(),
+          updated: Date.now(),
+        },
+      }
+      state.storage.save(sessionInfo, state.messages)
+    }
   }
 
   // Setup subagent executor for Task tool
@@ -165,6 +229,9 @@ export async function createSession(config: Config): Promise<Session> {
 
     // Run agent loop
     await runAgentLoop(state)
+
+    // Save session after message completes
+    saveSession()
   }
 
   function onEvent(callback: (event: EventTypes) => void): () => void {
@@ -194,6 +261,52 @@ export async function createSession(config: Config): Promise<Session> {
     onEvent,
     getTools: getToolsInfo,
     abort,
+  }
+}
+
+/**
+ * Update message tokens from usage data.
+ * Handles both AI SDK v6 nested format and older flat format.
+ */
+function updateTokensFromUsage(message: MessageInfo, usage: any): void {
+  if (!usage) return
+
+  // AI SDK v6 with OpenAI provider uses nested format:
+  // { inputTokens: { total, noCache, cacheRead, cacheWrite }, outputTokens: { total, text, reasoning } }
+  // Older/simpler format: { inputTokens: number, outputTokens: number, cachedInputTokens: number }
+  let inputTotal = 0
+  let outputTotal = 0
+  let cachedRead = 0
+  let reasoning = 0
+
+  if (typeof usage.inputTokens === "object" && usage.inputTokens !== null) {
+    // New nested format from AI SDK v6 OpenAI provider
+    inputTotal = usage.inputTokens.total ?? 0
+    cachedRead = usage.inputTokens.cacheRead ?? 0
+  } else {
+    // Old flat format
+    inputTotal = usage.inputTokens ?? usage.promptTokens ?? 0
+    cachedRead = usage.cachedInputTokens ?? 0
+  }
+
+  if (typeof usage.outputTokens === "object" && usage.outputTokens !== null) {
+    // New nested format
+    outputTotal = usage.outputTokens.total ?? 0
+    reasoning = usage.outputTokens.reasoning ?? 0
+  } else {
+    // Old flat format
+    outputTotal = usage.outputTokens ?? usage.completionTokens ?? 0
+    reasoning = usage.reasoningTokens ?? 0
+  }
+
+  ;(message as any).tokens = {
+    input: inputTotal - cachedRead,
+    output: outputTotal,
+    reasoning: reasoning,
+    cache: {
+      read: cachedRead,
+      write: 0, // Provider-specific
+    },
   }
 }
 
@@ -272,235 +385,297 @@ async function runAgentLoop(state: SessionState): Promise<void> {
         properties: { part: stepStartPart },
       })
 
-      // Stream the response
-      let currentTextPart: TextPart | undefined
-      let currentReasoningPart: ReasoningPart | undefined
-      const toolParts: Record<string, ToolPart> = {}
+      // Check if streaming is enabled (default: true)
+      const useStreaming = config.streaming !== false
 
-      const stream = streamText({
-        model,
-        system: systemPrompt,
-        messages: aiMessages,
-        tools: aiTools,
-        maxRetries: 0,
-        abortSignal: state.abortController.signal,
-        // Repair malformed tool calls - following OpenCode's approach
-        experimental_repairToolCall: async ({ toolCall, error }) => {
-          // First, try to repair common JSON errors from LLMs
-          const repairedJson = tryRepairJson(toolCall.input)
-          if (repairedJson !== null) {
-            // Successfully repaired - return the fixed tool call
-            return {
-              type: "tool-call" as const,
-              toolCallId: toolCall.toolCallId,
-              toolName: toolCall.toolName,
-              input: JSON.stringify(repairedJson),
-            }
-          }
+      if (useStreaming) {
+        // Streaming mode
+        let currentTextPart: TextPart | undefined
+        let currentReasoningPart: ReasoningPart | undefined
+        const toolParts: Record<string, ToolPart> = {}
 
-          // Try to repair case-sensitivity issues (e.g., "Read" -> "read")
-          const lower = toolCall.toolName.toLowerCase()
-          if (lower !== toolCall.toolName && tools[lower]) {
-            return {
-              ...toolCall,
-              toolName: lower,
-            }
-          }
+        const stream = streamText({
+          model,
+          system: systemPrompt,
+          messages: aiMessages,
+          tools: aiTools,
+          maxRetries: config.maxRetries, // Retry with exponential backoff for rate limit errors
+          abortSignal: state.abortController.signal,
+        })
 
-          // Could not repair - redirect to "invalid" tool so LLM can see the error
-          // and retry with corrected arguments
-          return {
-            ...toolCall,
-            input: JSON.stringify({
-              tool: toolCall.toolName,
-              error: error.message,
-            }),
-            toolName: "invalid",
-          }
-        },
-      })
+        for await (const chunk of stream.fullStream) {
+          state.abortController.signal.throwIfAborted()
 
-      for await (const chunk of stream.fullStream) {
-        state.abortController.signal.throwIfAborted()
-
-        switch (chunk.type) {
-          case "text-start":
-            currentTextPart = {
-              id: generateId("part"),
-              sessionID: state.id,
-              messageID: assistantMessageID,
-              type: "text",
-              text: "",
-              time: { start: Date.now() },
-            }
-            assistantParts.push(currentTextPart)
-            break
-
-          case "text-delta":
-            if (currentTextPart) {
-              currentTextPart.text += chunk.text
-              eventBus.emit({
-                type: "message.part.updated",
-                properties: { part: currentTextPart, delta: chunk.text },
-              })
-            }
-            break
-
-          case "text-end":
-            if (currentTextPart) {
-              currentTextPart.text = currentTextPart.text.trimEnd()
-              currentTextPart.time = {
-                ...currentTextPart.time!,
-                end: Date.now(),
-              }
-              eventBus.emit({
-                type: "message.part.updated",
-                properties: { part: currentTextPart },
-              })
-              currentTextPart = undefined
-            }
-            break
-
-          case "reasoning-start":
-            currentReasoningPart = {
-              id: generateId("part"),
-              sessionID: state.id,
-              messageID: assistantMessageID,
-              type: "reasoning",
-              text: "",
-              time: { start: Date.now() },
-            }
-            assistantParts.push(currentReasoningPart)
-            break
-
-          case "reasoning-delta":
-            if (currentReasoningPart) {
-              currentReasoningPart.text += chunk.text
-              eventBus.emit({
-                type: "message.part.updated",
-                properties: { part: currentReasoningPart, delta: chunk.text },
-              })
-            }
-            break
-
-          case "reasoning-end":
-            if (currentReasoningPart) {
-              currentReasoningPart.text = currentReasoningPart.text.trimEnd()
-              currentReasoningPart.time = {
-                ...currentReasoningPart.time!,
-                end: Date.now(),
-              }
-              eventBus.emit({
-                type: "message.part.updated",
-                properties: { part: currentReasoningPart },
-              })
-              currentReasoningPart = undefined
-            }
-            break
-
-          case "tool-input-start": {
-            const toolPart: ToolPart = {
-              id: generateId("part"),
-              sessionID: state.id,
-              messageID: assistantMessageID,
-              type: "tool",
-              tool: chunk.toolName,
-              callID: chunk.id,
-              state: {
-                status: "pending",
-                input: {},
-                raw: "",
-              },
-            }
-            assistantParts.push(toolPart)
-            toolParts[chunk.id] = toolPart
-            eventBus.emit({
-              type: "message.part.updated",
-              properties: { part: toolPart },
-            })
-            break
-          }
-
-          case "tool-call": {
-            const toolPart = toolParts[chunk.toolCallId]
-            if (toolPart) {
-              toolPart.state = {
-                status: "running",
-                input: (chunk as any).input as Record<string, unknown> ?? {},
+          switch (chunk.type) {
+            case "text-start":
+              currentTextPart = {
+                id: generateId("part"),
+                sessionID: state.id,
+                messageID: assistantMessageID,
+                type: "text",
+                text: "",
                 time: { start: Date.now() },
               }
-              eventBus.emit({
-                type: "message.part.updated",
-                properties: { part: toolPart },
-              })
-            }
-            break
-          }
+              assistantParts.push(currentTextPart)
+              break
 
-          case "tool-result": {
-            const toolPart = toolParts[chunk.toolCallId]
-            if (toolPart && toolPart.state.status === "running") {
-              const output = chunk.output as ToolResult
-              toolPart.state = {
-                status: "completed",
-                input: (chunk as any).input as Record<string, unknown> ?? {},
-                output: output?.output ?? "",
-                title: output?.title ?? "",
-                metadata: output?.metadata ?? {},
-                time: {
-                  start: toolPart.state.time.start,
+            case "text-delta":
+              if (currentTextPart) {
+                currentTextPart.text += chunk.text
+                eventBus.emit({
+                  type: "message.part.updated",
+                  properties: { part: currentTextPart, delta: chunk.text },
+                })
+              }
+              break
+
+            case "text-end":
+              if (currentTextPart) {
+                currentTextPart.text = currentTextPart.text.trimEnd()
+                currentTextPart.time = {
+                  ...currentTextPart.time!,
                   end: Date.now(),
+                }
+                eventBus.emit({
+                  type: "message.part.updated",
+                  properties: { part: currentTextPart },
+                })
+                currentTextPart = undefined
+              }
+              break
+
+            case "reasoning-start":
+              currentReasoningPart = {
+                id: generateId("part"),
+                sessionID: state.id,
+                messageID: assistantMessageID,
+                type: "reasoning",
+                text: "",
+                time: { start: Date.now() },
+              }
+              assistantParts.push(currentReasoningPart)
+              break
+
+            case "reasoning-delta":
+              if (currentReasoningPart) {
+                currentReasoningPart.text += chunk.text
+                eventBus.emit({
+                  type: "message.part.updated",
+                  properties: { part: currentReasoningPart, delta: chunk.text },
+                })
+              }
+              break
+
+            case "reasoning-end":
+              if (currentReasoningPart) {
+                currentReasoningPart.text = currentReasoningPart.text.trimEnd()
+                currentReasoningPart.time = {
+                  ...currentReasoningPart.time!,
+                  end: Date.now(),
+                }
+                eventBus.emit({
+                  type: "message.part.updated",
+                  properties: { part: currentReasoningPart },
+                })
+                currentReasoningPart = undefined
+              }
+              break
+
+            case "tool-input-start": {
+              const toolPart: ToolPart = {
+                id: generateId("part"),
+                sessionID: state.id,
+                messageID: assistantMessageID,
+                type: "tool",
+                tool: chunk.toolName,
+                callID: chunk.id,
+                state: {
+                  status: "pending",
+                  input: {},
+                  raw: "",
                 },
               }
+              assistantParts.push(toolPart)
+              toolParts[chunk.id] = toolPart
               eventBus.emit({
                 type: "message.part.updated",
                 properties: { part: toolPart },
               })
+              break
             }
-            break
-          }
 
-          case "tool-error": {
-            const toolPart = toolParts[chunk.toolCallId]
-            if (toolPart && toolPart.state.status === "running") {
-              toolPart.state = {
-                status: "error",
-                input: (chunk as any).input as Record<string, unknown> ?? {},
-                error: String(chunk.error),
-                time: {
-                  start: toolPart.state.time.start,
-                  end: Date.now(),
-                },
+            case "tool-call": {
+              const toolPart = toolParts[chunk.toolCallId]
+              if (toolPart) {
+                toolPart.state = {
+                  status: "running",
+                  input: (chunk as any).input as Record<string, unknown> ?? {},
+                  time: { start: Date.now() },
+                }
+                eventBus.emit({
+                  type: "message.part.updated",
+                  properties: { part: toolPart },
+                })
               }
+              break
+            }
+
+            case "tool-result": {
+              const toolPart = toolParts[chunk.toolCallId]
+              if (toolPart && toolPart.state.status === "running") {
+                const output = chunk.output as ToolResult
+                toolPart.state = {
+                  status: "completed",
+                  input: (chunk as any).input as Record<string, unknown> ?? {},
+                  output: output?.output ?? "",
+                  title: output?.title ?? "",
+                  metadata: output?.metadata ?? {},
+                  time: {
+                    start: toolPart.state.time.start,
+                    end: Date.now(),
+                  },
+                }
+                eventBus.emit({
+                  type: "message.part.updated",
+                  properties: { part: toolPart },
+                })
+              }
+              break
+            }
+
+            case "tool-error": {
+              const toolPart = toolParts[chunk.toolCallId]
+              if (toolPart && toolPart.state.status === "running") {
+                toolPart.state = {
+                  status: "error",
+                  input: (chunk as any).input as Record<string, unknown> ?? {},
+                  error: String(chunk.error),
+                  time: {
+                    start: toolPart.state.time.start,
+                    end: Date.now(),
+                  },
+                }
+                eventBus.emit({
+                  type: "message.part.updated",
+                  properties: { part: toolPart },
+                })
+              }
+              break
+            }
+
+            case "finish-step": {
+              // Update message with usage
+              const usage = chunk.usage as any
+              updateTokensFromUsage(assistantMessage, usage)
+              ;(assistantMessage as any).finish = chunk.finishReason
+
+              // Emit step finish
+              const stepFinishPart: StepFinishPart = {
+                id: generateId("part"),
+                sessionID: state.id,
+                messageID: assistantMessageID,
+                type: "step-finish",
+                reason: chunk.finishReason,
+                tokens: (assistantMessage as any).tokens,
+                cost: 0,
+              }
+              assistantParts.push(stepFinishPart)
               eventBus.emit({
                 type: "message.part.updated",
-                properties: { part: toolPart },
+                properties: { part: stepFinishPart },
+              })
+              break
+            }
+
+            case "error":
+              throw chunk.error
+          }
+        }
+
+        // After streaming completes, get final totalUsage for accurate token counts
+        // This is the accumulated usage across all steps, which is more accurate
+        // than per-step usage from finish-step events
+        try {
+          const totalUsage = await stream.totalUsage
+          if (totalUsage) {
+            updateTokensFromUsage(assistantMessage, totalUsage)
+            // Update the message event with final tokens
+            eventBus.emit({
+              type: "message.updated",
+              properties: { message: assistantMessage },
+            })
+          }
+        } catch {
+          // totalUsage may not be available if stream was aborted
+        }
+      } else {
+        // Non-streaming mode - better for token counting with some providers
+        // Use onStepFinish callback to emit events in real-time as each step completes
+        const result = await generateText({
+          model,
+          system: systemPrompt,
+          messages: aiMessages,
+          tools: aiTools,
+          maxRetries: config.maxRetries, // Retry with exponential backoff for rate limit errors
+          abortSignal: state.abortController.signal,
+          onStepFinish: async (step) => {
+            // Process text content for this step
+            if (step.text) {
+              const textPart: TextPart = {
+                id: generateId("part"),
+                sessionID: state.id,
+                messageID: assistantMessageID,
+                type: "text",
+                text: step.text.trimEnd(),
+                time: { start: Date.now(), end: Date.now() },
+              }
+              assistantParts.push(textPart)
+              eventBus.emit({
+                type: "message.part.updated",
+                properties: { part: textPart },
               })
             }
-            break
-          }
 
-          case "finish-step": {
-            // Update message with usage
-            const usage = chunk.usage as any
-            if (usage) {
-              ;(assistantMessage as any).tokens = {
-                input: usage.promptTokens || usage.inputTokens || 0,
-                output: usage.completionTokens || usage.outputTokens || 0,
-                reasoning: 0,
-                cache: { read: 0, write: 0 },
+            // Process tool results - update existing tool parts to "completed"
+            // Note: "running" state was already emitted by onInputAvailable
+            for (const toolResult of step.toolResults ?? []) {
+              const toolPart = assistantParts.find(
+                (p): p is ToolPart => p.type === "tool" && p.callID === toolResult.toolCallId
+              )
+              if (toolPart) {
+                const output = toolResult.output as ToolResult
+                toolPart.state = {
+                  status: "completed",
+                  input: toolPart.state.input,
+                  output: output?.output ?? "",
+                  title: output?.title ?? toolPart.tool,
+                  metadata: output?.metadata ?? {},
+                  time: {
+                    start: (toolPart.state as any).time?.start ?? Date.now(),
+                    end: Date.now(),
+                  },
+                }
+                // Emit completed state
+                eventBus.emit({
+                  type: "message.part.updated",
+                  properties: { part: toolPart },
+                })
               }
             }
-            ;(assistantMessage as any).finish = chunk.finishReason
 
-            // Emit step finish
+            // Emit step finish for this step
             const stepFinishPart: StepFinishPart = {
               id: generateId("part"),
               sessionID: state.id,
               messageID: assistantMessageID,
               type: "step-finish",
-              reason: chunk.finishReason,
-              tokens: (assistantMessage as any).tokens,
+              reason: step.finishReason,
+              tokens: {
+                input: step.usage?.inputTokens ?? 0,
+                output: step.usage?.outputTokens ?? 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
               cost: 0,
             }
             assistantParts.push(stepFinishPart)
@@ -508,12 +683,12 @@ async function runAgentLoop(state: SessionState): Promise<void> {
               type: "message.part.updated",
               properties: { part: stepFinishPart },
             })
-            break
-          }
+          },
+        })
 
-          case "error":
-            throw chunk.error
-        }
+        // Update total token counts from usage
+        updateTokensFromUsage(assistantMessage, result.usage as any)
+        ;(assistantMessage as any).finish = result.finishReason
       }
 
       // Update message completion time
@@ -605,7 +780,8 @@ function buildAIMessages(messages: MessageWithParts[]): any[] {
             type: "tool-call",
             toolCallId: toolPart.callID,
             toolName: toolPart.tool,
-            args: toolPart.state.input,
+            // AI SDK v6 expects input as stringified JSON
+            input: JSON.stringify(toolPart.state.input),
           })
         }
 
@@ -617,26 +793,30 @@ function buildAIMessages(messages: MessageWithParts[]): any[] {
         }
 
         // Add tool results as separate messages (AI SDK 6 format)
+        // All tool results go in a single tool message
+        const toolResultContent: any[] = []
         for (const toolPart of allToolParts) {
           // Handle both completed and error states
-          const outputValue =
-            toolPart.state.status === "error"
-              ? `Error: ${(toolPart.state as any).error}`
-              : (toolPart.state as any).output ?? ""
+          const isError = toolPart.state.status === "error"
+          const outputValue = isError
+            ? `Error: ${(toolPart.state as any).error}`
+            : (toolPart.state as any).output ?? ""
 
+          toolResultContent.push({
+            type: "tool-result",
+            toolCallId: toolPart.callID,
+            toolName: toolPart.tool,
+            output: {
+              type: isError ? "error-text" : "text",
+              value: String(outputValue),
+            },
+          })
+        }
+
+        if (toolResultContent.length > 0) {
           aiMessages.push({
             role: "tool",
-            content: [
-              {
-                type: "tool-result",
-                toolCallId: toolPart.callID,
-                toolName: toolPart.tool,
-                output: {
-                  type: "text",
-                  value: outputValue,
-                },
-              },
-            ],
+            content: toolResultContent,
           })
         }
       } else if (allTextParts.length > 0) {
@@ -670,6 +850,36 @@ function buildAITools(
     aiTools[name] = tool({
       description: toolDef.description,
       inputSchema: jsonSchema(schema as any),
+      // Called before tool execution - emit "running" state event
+      // In streaming mode, the part is already created by tool-input-start
+      // In non-streaming mode, this is where we create the part
+      async onInputAvailable({ input, toolCallId }) {
+        // Check if part already exists (streaming mode creates it in tool-input-start)
+        let toolPart = parts.find(
+          (p): p is ToolPart => p.type === "tool" && p.callID === toolCallId
+        )
+        if (!toolPart) {
+          // Non-streaming mode: create the part
+          toolPart = {
+            id: generateId("part"),
+            sessionID: state.id,
+            messageID,
+            type: "tool",
+            tool: name,
+            callID: toolCallId,
+            state: {
+              status: "running",
+              input: input as Record<string, unknown>,
+              time: { start: Date.now() },
+            },
+          }
+          parts.push(toolPart)
+          eventBus.emit({
+            type: "message.part.updated",
+            properties: { part: toolPart },
+          })
+        }
+      },
       async execute(args, options) {
         const ctx: ToolContext = {
           sessionID: state.id,
@@ -902,53 +1112,6 @@ async function runCommand(
   })
 }
 
-/**
- * Attempt to repair common JSON errors from LLMs.
- * Returns the parsed object if successful, null if repair failed.
- *
- * Common errors handled:
- * - Missing quote before property name: {"a":"b",c":"d"} -> {"a":"b","c":"d"}
- * - Unquoted property names: {command:"ls"} -> {"command":"ls"}
- * - Single quotes: {'key':'val'} -> {"key":"val"}
- * - Trailing commas: {"a":1,} -> {"a":1}
- */
-function tryRepairJson(input: string): Record<string, unknown> | null {
-  // First try parsing as-is
-  try {
-    return JSON.parse(input)
-  } catch {
-    // Continue to repair attempts
-  }
-
-  let repaired = input.trim()
-
-  // Fix 1: Add missing quotes around unquoted property names
-  // {command:"value"} -> {"command":"value"}
-  repaired = repaired.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
-
-  // Fix 2: Fix missing quote before property name after comma
-  // {"a":"b",c":"d"} -> {"a":"b","c":"d"}
-  repaired = repaired.replace(/,([a-zA-Z_][a-zA-Z0-9_]*)"/g, ',"$1"')
-
-  // Fix 3: Replace single quotes with double quotes (careful with strings containing apostrophes)
-  // Only replace if it looks like JSON structure
-  if (repaired.includes("'")) {
-    repaired = repaired.replace(/'([^']*)'(\s*[,}\]:])/g, '"$1"$2')
-  }
-
-  // Fix 4: Remove trailing commas before } or ]
-  repaired = repaired.replace(/,(\s*[}\]])/g, "$1")
-
-  // Fix 5: Handle unescaped newlines in strings (replace with \n)
-  // This is a simple heuristic - may not work for all cases
-  repaired = repaired.replace(/:\s*"([^"]*)\n([^"]*)"/g, ':"$1\\n$2"')
-
-  try {
-    return JSON.parse(repaired)
-  } catch {
-    return null
-  }
-}
 
 // Export types
 export type { SessionState, MessageWithParts }

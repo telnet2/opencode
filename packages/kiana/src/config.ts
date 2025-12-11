@@ -16,6 +16,12 @@ export const ConfigSchema = z.object({
   systemPrompt: z.string().optional(),
   workingDirectory: z.string().nullable().optional(),
   tools: z.array(z.string()).nullable().optional(),
+  // Whether to use streaming mode (default: true)
+  // Set to false for proper token counting with openai-compatible providers
+  streaming: z.boolean().optional().default(true),
+  // Maximum number of retries for rate limit errors (default: 5)
+  // Uses exponential backoff and respects Retry-After headers
+  maxRetries: z.number().int().min(0).max(10).optional().default(5),
 })
 
 export type Config = z.infer<typeof ConfigSchema>
@@ -66,6 +72,10 @@ Since you are running headless without user interaction:
 # Tool usage
 - Call multiple tools in parallel when independent.
 - Use specialized tools (Read, Write, Edit, Glob, Grep) instead of bash equivalents.
+- CRITICAL: When calling tools, pass arguments as a proper JSON object, NOT as a string.
+  - Correct: {"command": "git status", "description": "Check git status"}
+  - Wrong: "{\"command\": \"git status\", \"description\": \"Check git status\"}"
+- Never stringify or escape the arguments object - pass it directly as structured data.
 
 # Code References
 When referencing code, include \`file_path:line_number\` for navigation.`
@@ -90,7 +100,15 @@ export const CONFIG_TEMPLATE = `{
 
   // Tool whitelist (optional, null = all tools enabled)
   // Available: bash, read, write, edit, glob, grep, list, webfetch, websearch, codesearch, todowrite, todoread, task
-  "tools": null
+  "tools": null,
+
+  // Whether to use streaming mode (default: true)
+  // Set to false for proper token counting with openai-compatible providers
+  "streaming": true,
+
+  // Maximum retries for rate limit errors (default: 5)
+  // Uses exponential backoff and respects Retry-After headers
+  "maxRetries": 5
 }
 `
 

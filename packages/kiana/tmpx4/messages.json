@@ -1,0 +1,82 @@
+[
+  {
+    "info": {
+      "id": "message_mj16ykao0002",
+      "sessionID": "session_mj16ykao0000",
+      "role": "user",
+      "time": {
+        "created": 1765442630976
+      }
+    },
+    "parts": [
+      {
+        "id": "part_mj16ykao0003",
+        "sessionID": "session_mj16ykao0000",
+        "messageID": "message_mj16ykao0002",
+        "type": "text",
+        "text": "say hello"
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16ykap0004",
+      "sessionID": "session_mj16ykao0000",
+      "role": "assistant",
+      "parentID": "message_mj16ykao0002",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765442630977,
+        "completed": 1765442632480
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 5921,
+        "output": 2,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "stop"
+    },
+    "parts": [
+      {
+        "id": "part_mj16ykgt0005",
+        "sessionID": "session_mj16ykao0000",
+        "messageID": "message_mj16ykap0004",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj16ylcu0006",
+        "sessionID": "session_mj16ykao0000",
+        "messageID": "message_mj16ykap0004",
+        "type": "text",
+        "text": "Hello!",
+        "time": {
+          "start": 1765442632350,
+          "end": 1765442632475
+        }
+      },
+      {
+        "id": "part_mj16ylgd0007",
+        "sessionID": "session_mj16ykao0000",
+        "messageID": "message_mj16ykap0004",
+        "type": "step-finish",
+        "reason": "stop",
+        "tokens": {
+          "input": 5921,
+          "output": 2,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  }
+]

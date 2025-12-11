@@ -1,0 +1,70 @@
+feat: enhance kiana with comprehensive session persistence, streaming controls, and provider improvements
+
+## Summary
+This major update significantly enhances the Kiana headless coding agent with robust session persistence, configurable streaming modes, improved provider compatibility, and comprehensive token tracking capabilities.
+
+## Key Features
+
+### 🔍 Session Persistence & State Management
+- **Full Session Persistence**: Complete session state including messages, parts, and metadata saved to disk
+- **Session Storage**: New `SessionStorage` interface with JSON-based persistence in `session.json` and `messages.json`
+- **Session Reloading**: Automatic loading of existing sessions when session directory is provided
+- **State Recovery**: Seamless continuation of previous sessions with full message history
+
+### ⚙️ Streaming & Configuration Enhancements
+- **Configurable Streaming**: New `streaming` config option to toggle between streaming and non-streaming modes
+- **Non-Streaming Mode**: Better token counting support for OpenAI-compatible providers
+- **Retry Logic**: Configurable `maxRetries` (default: 5) with exponential backoff for rate limit handling
+- **Provider Compatibility**: Enhanced support for Ark, Moonshot, and other OpenAI-compatible APIs
+
+### 📊 Token Tracking & Usage Analytics
+- **Comprehensive Token Counting**: Support for both AI SDK v6 nested format and legacy flat format
+- **Usage Data**: Detailed token breakdown including input, output, reasoning, and cache metrics
+- **Real-time Updates**: Token counts updated throughout streaming sessions
+- **Final Usage**: Accurate total usage accumulation across all steps
+
+### 🛠️ CLI & Provider Improvements
+- **CLI Session Handling**: Simplified session creation with optional persistence directory
+- **Provider Configuration**: Added `includeUsage: true` for OpenAI-compatible streaming usage
+- **Tool Call Deduplication**: Prevent duplicate "running" headers for the same tool call
+- **Error Handling**: Improved error handling and state management throughout the pipeline
+
+### 🔄 Code Architecture
+- **Session Options**: New `SessionOptions` interface for optional session configuration
+- **Storage Abstraction**: Clean separation between session logic and persistence layer
+- **Backward Compatibility**: All new features are optional with sensible defaults
+- **Type Safety**: Enhanced TypeScript types for all new functionality
+
+## Breaking Changes
+None - all new features are backward compatible with existing configurations.
+
+## Configuration Updates
+```jsonc
+{
+  // New configuration options
+  "streaming": true,           // Enable/disable streaming mode
+  "maxRetries": 5,            // Rate limit retry attempts
+  // ... existing config
+}
+```
+
+## Usage Examples
+```typescript
+// Create session with persistence
+const session = await createSession(config, { 
+  sessionDir: './my-session' 
+});
+
+// Disable streaming for better token counting
+const config = {
+  ...baseConfig,
+  streaming: false,
+  maxRetries: 3
+};
+```
+
+## Technical Details
+- **File Structure**: Sessions saved as `session.json` (metadata) and `messages.json` (full history)
+- **Error Recovery**: Graceful handling of corrupted session files
+- **Performance**: Minimal overhead for persistence operations
+- **Cross-Platform**: Works on all Node.js supported platforms

@@ -30,10 +30,14 @@ export function createLanguageModel(config: ProviderConfig): LanguageModel {
       if (!config.baseUrl) {
         throw new Error("baseUrl is required for openai-compatible provider")
       }
+      // Use openai-compatible provider for APIs like Ark, Moonshot, etc.
+      // includeUsage: true sends stream_options.include_usage to get token counts in streaming mode
+      // (requires provider support for OpenAI's streaming usage extension)
       const compatible = createOpenAICompatible({
         name: "openai-compatible",
         apiKey: config.apiKey,
         baseURL: config.baseUrl,
+        includeUsage: true,
       })
       return compatible(config.model)
     }

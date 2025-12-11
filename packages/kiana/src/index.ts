@@ -2,7 +2,7 @@
 // A standalone TypeScript package providing a headless coding agent library + CLI wrapper
 
 // Session API
-export { createSession, type Session, type SessionState, type MessageWithParts } from "./session.js"
+export { createSession, type Session, type SessionOptions, type SessionState, type MessageWithParts } from "./session.js"
 
 // Config
 export { loadConfig, writeConfigTemplate, type Config, type ProviderConfig } from "./config.js"

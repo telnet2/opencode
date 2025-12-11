@@ -1,0 +1,82 @@
+[
+  {
+    "info": {
+      "id": "message_mj16whvw0002",
+      "sessionID": "session_mj16whvw0000",
+      "role": "user",
+      "time": {
+        "created": 1765442534540
+      }
+    },
+    "parts": [
+      {
+        "id": "part_mj16whvw0003",
+        "sessionID": "session_mj16whvw0000",
+        "messageID": "message_mj16whvw0002",
+        "type": "text",
+        "text": "say hello"
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16whvx0004",
+      "sessionID": "session_mj16whvw0000",
+      "role": "assistant",
+      "parentID": "message_mj16whvw0002",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765442534541,
+        "completed": 1765442536098
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "stop"
+    },
+    "parts": [
+      {
+        "id": "part_mj16wi2h0005",
+        "sessionID": "session_mj16whvw0000",
+        "messageID": "message_mj16whvx0004",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj16wj0n0006",
+        "sessionID": "session_mj16whvw0000",
+        "messageID": "message_mj16whvx0004",
+        "type": "text",
+        "text": "Hello!",
+        "time": {
+          "start": 1765442536007,
+          "end": 1765442536095
+        }
+      },
+      {
+        "id": "part_mj16wj340007",
+        "sessionID": "session_mj16whvw0000",
+        "messageID": "message_mj16whvx0004",
+        "type": "step-finish",
+        "reason": "stop",
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  }
+]
