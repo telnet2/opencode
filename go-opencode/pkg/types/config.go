@@ -69,9 +69,6 @@ type ProviderConfig struct {
 	// Model/Endpoint ID (for providers like ARK that require endpoint specification)
 	Model string `json:"model,omitempty"`
 
-	// Model/Endpoint ID (for providers like ARK that require endpoint specification)
-	Model string `json:"model,omitempty"`
-
 	// Nested options (TypeScript style)
 	Options *ProviderOptions `json:"options,omitempty"`
 

@@ -211,6 +211,13 @@ func getDefaultProviders() []ProviderInfo {
 				},
 			},
 		},
+		{
+			ID:     "ark",
+			Name:   "ARK (Volcengine)",
+			Env:    []string{"ARK_API_KEY"},
+			Npm:    "",
+			Models: map[string]ProviderModel{}, // Models populated dynamically from config
+		},
 	}
 }
 
@@ -245,6 +252,34 @@ type ProviderListResponse struct {
 func (s *Server) listAllProviders(w http.ResponseWriter, r *http.Request) {
 	providers := getDefaultProviders()
 
+	// Populate dynamic provider models from registry (e.g., ARK endpoint IDs from config)
+	if s.providerReg != nil {
+		for i := range providers {
+			if providers[i].ID == "ark" && len(providers[i].Models) == 0 {
+				// Get ARK models from the registered provider
+				if arkProvider, err := s.providerReg.Get("ark"); err == nil {
+					for _, m := range arkProvider.Models() {
+						providers[i].Models[m.ID] = ProviderModel{
+							ID:   m.ID,
+							Name: m.Name,
+							Capabilities: &ModelCapabilities{
+								Temperature: true,
+								Reasoning:   true,
+								Attachment:  true,
+								ToolCall:    m.SupportsTools,
+								Input:       ModalityCapabilities{Text: true, Audio: false, Image: m.SupportsVision, Video: false, PDF: false},
+								Output:      ModalityCapabilities{Text: true, Audio: false, Image: false, Video: false, PDF: false},
+							},
+							Cost:    ModelCost{Input: m.InputPrice, Output: m.OutputPrice},
+							Limit:   ModelLimit{Context: m.ContextLength, Output: m.MaxOutputTokens},
+							Options: map[string]any{},
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Build default model map
 	defaultModels := make(map[string]string)
 	for _, p := range providers {
@@ -257,11 +292,27 @@ func (s *Server) listAllProviders(w http.ResponseWriter, r *http.Request) {
 	// Get connected providers (those with API keys configured)
 	connected := []string{}
 	for _, p := range providers {
-		// Check if provider has API key in environment
+		// Check if provider has API key in environment or if it's registered
 		for _, envVar := range p.Env {
 			if val := getEnvValue(envVar); val != "" {
 				connected = append(connected, p.ID)
 				break
+			}
+		}
+		// Also check if provider is registered (has credentials from config)
+		if s.providerReg != nil {
+			if _, err := s.providerReg.Get(p.ID); err == nil {
+				// Provider is registered, add to connected if not already
+				found := false
+				for _, c := range connected {
+					if c == p.ID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					connected = append(connected, p.ID)
+				}
 			}
 		}
 	}

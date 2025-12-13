@@ -1,0 +1,20 @@
+{
+  // ARK/Kimi K2 model configuration
+  "$schema": "https://opencode.ai/config.json",
+  "model": "ark/ep-20250821060450-4bc6g",
+  "provider": {
+    "ark": {
+      // Kimi K2 endpoint ID
+      "model": "ep-20250821060450-4bc6g",
+      "options": {
+        "apiKey": "23ed9d5c-c634-4cc1-9e70-9c9ac63a17ef",
+        "baseURL": "https://ark-ap-southeast.byteintl.net/api/v3"
+      }
+    }
+  },
+  "permission": {
+    "edit": "ask",
+    "bash": "ask",
+    "webfetch": "ask"
+  }
+}

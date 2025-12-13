@@ -163,6 +163,7 @@ func InitializeProviders(ctx context.Context, config *types.Config) (*Registry, 
 
 		configuredProviders[name] = true
 		apiKey, baseURL := getProviderCredentials(cfg)
+		fmt.Printf("[provider] Processing provider %s: apiKey=%t, baseURL=%s, model=%s\n", name, apiKey != "", baseURL, cfg.Model)
 
 		// Determine provider type from npm field or provider name
 		npm := cfg.Npm
@@ -216,10 +217,14 @@ func InitializeProviders(ctx context.Context, config *types.Config) (*Registry, 
 
 		if err != nil {
 			// Log error but continue with other providers
+			fmt.Printf("[provider] Failed to create provider %s: %v\n", name, err)
 			continue
 		}
 		if provider != nil {
+			fmt.Printf("[provider] Registered provider: %s\n", name)
 			registry.Register(provider)
+		} else {
+			fmt.Printf("[provider] Provider %s was nil (no credentials?)\n", name)
 		}
 	}
 
@@ -253,19 +258,6 @@ func InitializeProviders(ctx context.Context, config *types.Config) (*Registry, 
 			if err == nil && provider != nil {
 				registry.Register(provider)
 			}
-		}
-	}
-
-	// Initialize ARK if API key is available
-	if cfg, ok := config.Provider["ark"]; ok && cfg.APIKey != "" {
-		provider, err := NewArkProvider(ctx, &ArkConfig{
-			APIKey:    cfg.APIKey,
-			BaseURL:   cfg.BaseURL,
-			Model:     cfg.Model,
-			MaxTokens: 4096,
-		})
-		if err == nil {
-			registry.Register(provider)
 		}
 	}
 
