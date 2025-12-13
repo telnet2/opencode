@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -62,6 +63,14 @@ func (t *WriteTool) Execute(ctx context.Context, input json.RawMessage, toolCtx 
 		return nil, fmt.Errorf("invalid input: %w", err)
 	}
 
+	// Read any existing content to surface diffs and additions
+	var previousContent string
+	if existing, err := os.ReadFile(params.FilePath); err == nil {
+		previousContent = string(existing)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("failed to read existing file: %w", err)
+	}
+
 	// Ensure parent directory exists
 	dir := filepath.Dir(params.FilePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -83,14 +92,25 @@ func (t *WriteTool) Execute(ctx context.Context, input json.RawMessage, toolCtx 
 		})
 	}
 
+	diffText, additions, deletions := buildDiffMetadata(params.FilePath, previousContent, params.Content, t.workDir)
+
+	metadata := map[string]any{
+		"file":      params.FilePath,
+		"bytes":     len(params.Content),
+		"before":    previousContent,
+		"after":     params.Content,
+		"additions": additions,
+		"deletions": deletions,
+	}
+	if diffText != "" {
+		metadata["diff"] = diffText
+	}
+
 	return &Result{
 		Title: fmt.Sprintf("Wrote %s", filepath.Base(params.FilePath)),
 		Output: fmt.Sprintf("Successfully wrote %d bytes to %s",
 			len(params.Content), params.FilePath),
-		Metadata: map[string]any{
-			"file":  params.FilePath,
-			"bytes": len(params.Content),
-		},
+		Metadata: metadata,
 	}, nil
 }
 
