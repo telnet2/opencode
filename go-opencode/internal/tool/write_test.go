@@ -27,6 +27,10 @@ func TestWriteTool_Execute(t *testing.T) {
 		t.Error("Output should indicate success")
 	}
 
+	if result.Metadata["diff"] == "" {
+		t.Errorf("Expected diff metadata to be present for new files")
+	}
+
 	// Verify file contents
 	data, err := os.ReadFile(testFile)
 	if err != nil {
@@ -77,9 +81,16 @@ func TestWriteTool_Overwrite(t *testing.T) {
 	toolCtx := testContext()
 
 	input := json.RawMessage(`{"filePath": "` + testFile + `", "content": "Updated"}`)
-	_, err := tool.Execute(ctx, input, toolCtx)
+	result, err := tool.Execute(ctx, input, toolCtx)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if adds, ok := result.Metadata["additions"].(int); !ok || adds == 0 {
+		t.Errorf("Expected additions recorded, got %v", result.Metadata["additions"])
+	}
+	if dels, ok := result.Metadata["deletions"].(int); !ok || dels == 0 {
+		t.Errorf("Expected deletions recorded, got %v", result.Metadata["deletions"])
 	}
 
 	data, _ := os.ReadFile(testFile)
@@ -184,6 +195,15 @@ func TestWriteTool_Metadata(t *testing.T) {
 	}
 	if result.Metadata["bytes"] != len(content) {
 		t.Errorf("Expected %d bytes in metadata, got %v", len(content), result.Metadata["bytes"])
+	}
+	if result.Metadata["before"] != "" {
+		t.Errorf("Expected empty before metadata for new file, got %v", result.Metadata["before"])
+	}
+	if result.Metadata["after"] != content {
+		t.Errorf("Expected after metadata to match content, got %v", result.Metadata["after"])
+	}
+	if result.Metadata["additions"].(int) == 0 {
+		t.Errorf("Expected additions to be tracked")
 	}
 }
 

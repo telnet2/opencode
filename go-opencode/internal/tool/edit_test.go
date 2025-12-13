@@ -34,6 +34,18 @@ func TestEditTool_Execute(t *testing.T) {
 		t.Errorf("Output should mention 'Replaced', got: %s", result.Output)
 	}
 
+	if result.Metadata["diff"] == "" {
+		t.Errorf("Expected diff metadata to be populated")
+	}
+
+	if adds, ok := result.Metadata["additions"].(int); !ok || adds == 0 {
+		t.Errorf("Expected additions count, got %v", result.Metadata["additions"])
+	}
+
+	if dels, ok := result.Metadata["deletions"].(int); !ok || dels == 0 {
+		t.Errorf("Expected deletions count, got %v", result.Metadata["deletions"])
+	}
+
 	data, _ := os.ReadFile(testFile)
 	if string(data) != "Hello Go" {
 		t.Errorf("File content = %q, want 'Hello Go'", string(data))
