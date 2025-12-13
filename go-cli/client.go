@@ -17,6 +17,12 @@ type SimpleClient struct {
     cancel    context.CancelFunc
 }
 
+// streamState tracks message roles and tool states for filtering during streaming.
+type streamState struct {
+    assistantMsgIDs map[string]bool   // Track which message IDs are from assistant
+    toolStates      map[string]string // Track last rendered state per tool (by callID)
+}
+
 func newSimpleClient(cfg ResolvedConfig, renderer *Renderer) (*SimpleClient, error) {
     opts := []option.RequestOption{option.WithBaseURL(cfg.URL)}
     if cfg.APIKey != "" {
@@ -49,12 +55,16 @@ func newSimpleClient(cfg ResolvedConfig, renderer *Renderer) (*SimpleClient, err
 
     renderer.Trace("session", map[string]any{"sessionID": sessionID})
 
+    state := &streamState{
+        assistantMsgIDs: make(map[string]bool),
+        toolStates:      make(map[string]string),
+    }
     streamCtx, cancel := context.WithCancel(context.Background())
     stream := client.Event.ListStreaming(streamCtx, opencode.EventListParams{Directory: opencode.F(cfg.Directory)})
     go func() {
         for stream.Next() {
             evt := stream.Current()
-            handleEvent(evt, sessionID, renderer)
+            handleEvent(evt, sessionID, renderer, state)
         }
         if err := stream.Err(); err != nil {
             renderer.Trace("event stream closed", map[string]any{"error": err.Error()})
@@ -107,15 +117,22 @@ func (c *SimpleClient) SendPrompt(ctx context.Context, text string, cfg Resolved
     return resp, nil
 }
 
-func handleEvent(evt opencode.EventListResponse, sessionID string, renderer *Renderer) {
+func handleEvent(evt opencode.EventListResponse, sessionID string, renderer *Renderer, state *streamState) {
     switch v := evt.AsUnion().(type) {
     case opencode.EventListResponseEventMessageUpdated:
         if v.Properties.Info.SessionID == sessionID {
-            renderer.RenderMessage(v.Properties.Info.ID, v.Properties.Info.Role == opencode.MessageRoleAssistant, nil)
+            // Track assistant messages so we only stream their parts
+            if v.Properties.Info.Role == opencode.MessageRoleAssistant {
+                state.assistantMsgIDs[v.Properties.Info.ID] = true
+            }
+            renderer.Trace("message updated", map[string]any{"id": v.Properties.Info.ID, "role": v.Properties.Info.Role})
         }
     case opencode.EventListResponseEventMessagePartUpdated:
         if v.Properties.Part.SessionID == sessionID {
-            renderer.RenderPart(v.Properties.Part)
+            // Only stream parts from assistant messages (skip user message echo)
+            if state.assistantMsgIDs[v.Properties.Part.MessageID] {
+                renderer.RenderStreamingPart(v.Properties.Part, v.Properties.Delta, state.toolStates)
+            }
         }
     }
 }

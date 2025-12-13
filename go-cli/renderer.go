@@ -4,6 +4,7 @@ import (
     "encoding/json"
     "fmt"
     "os"
+    "strings"
 
     "github.com/fatih/color"
     opencode "github.com/sst/opencode-sdk-go"
@@ -128,6 +129,109 @@ func (r *Renderer) RenderPart(part opencode.Part) {
     case opencode.ToolPart:
         r.Tool(v)
     }
+}
+
+// RenderStreamingPart renders a part during streaming, using delta if available.
+func (r *Renderer) RenderStreamingPart(part opencode.Part, delta string, toolStates map[string]string) {
+    switch part.Type {
+    case opencode.PartTypeText:
+        // Use the delta if provided for efficient streaming, otherwise use full text
+        text := delta
+        if text == "" {
+            text = part.Text
+        }
+        if text != "" {
+            if r.opts.JSON {
+                b, _ := json.Marshal(map[string]string{"type": "delta", "text": text})
+                fmt.Println(string(b))
+            } else {
+                fmt.Print(text)
+            }
+        }
+    case opencode.PartTypeTool:
+        // Only render tool if state changed
+        state, _ := part.State.(opencode.ToolPartState)
+        currentState := string(state.Status)
+        lastState := toolStates[part.CallID]
+        if currentState != lastState {
+            toolStates[part.CallID] = currentState
+            r.ToolFromPart(part)
+        }
+    }
+}
+
+// ToolFromPart renders tool information from a Part struct.
+func (r *Renderer) ToolFromPart(part opencode.Part) {
+    state, ok := part.State.(opencode.ToolPartState)
+    summary := "unknown"
+    if ok {
+        summary = describeToolState(state)
+    }
+
+    // Get tool name - prefer Tool field, fallback to Name
+    toolName := part.Tool
+    if toolName == "" {
+        toolName = part.Name
+    }
+
+    // Format input args
+    var argsStr string
+    if ok && state.Input != nil {
+        switch input := state.Input.(type) {
+        case map[string]interface{}:
+            argsStr = formatToolArgs(input)
+        case string:
+            argsStr = truncateArg(input, 50)
+        }
+    }
+
+    if r.opts.JSON {
+        b, _ := json.Marshal(map[string]any{
+            "type":   "tool",
+            "tool":   toolName,
+            "callID": part.CallID,
+            "state":  summary,
+            "input":  state.Input,
+        })
+        fmt.Println(string(b))
+        return
+    }
+
+    // Format: → tool_name(arg1=val1, arg2=val2) [status]
+    if argsStr != "" {
+        fmt.Printf("%s\n", color.New(color.FgYellow).Sprintf("→ %s(%s) [%s]", toolName, argsStr, summary))
+    } else {
+        fmt.Printf("%s\n", color.New(color.FgYellow).Sprintf("→ %s [%s]", toolName, summary))
+    }
+}
+
+// formatToolArgs formats tool arguments for display.
+func formatToolArgs(args map[string]interface{}) string {
+    if len(args) == 0 {
+        return ""
+    }
+    var parts []string
+    for k, v := range args {
+        valStr := fmt.Sprintf("%v", v)
+        valStr = truncateArg(valStr, 40)
+        parts = append(parts, fmt.Sprintf("%s=%s", k, valStr))
+    }
+    result := strings.Join(parts, ", ")
+    if len(result) > 80 {
+        return result[:77] + "..."
+    }
+    return result
+}
+
+// truncateArg truncates a string argument for display.
+func truncateArg(s string, maxLen int) string {
+    // Remove newlines for cleaner display
+    s = strings.ReplaceAll(s, "\n", " ")
+    s = strings.ReplaceAll(s, "\r", "")
+    if len(s) > maxLen {
+        return s[:maxLen-3] + "..."
+    }
+    return s
 }
 
 func describeToolState(state opencode.ToolPartState) string {

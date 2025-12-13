@@ -77,12 +77,14 @@ func runRepl(cfg *ResolvedConfig, client *SimpleClient, renderer *Renderer) erro
         }
 
         renderer.User(trimmed)
-        resp, err := client.SendPrompt(context.Background(), trimmed, *cfg)
+        _, err = client.SendPrompt(context.Background(), trimmed, *cfg)
         if err != nil {
             renderer.Trace("prompt failed", map[string]any{"error": err.Error()})
             fmt.Fprintf(os.Stderr, "Failed to send prompt: %v\n", err)
             continue
         }
-        renderer.RenderMessage(resp.Info.ID, true, resp.Parts)
+        // Don't call RenderMessage here - streaming already rendered the parts via events
+        // Just add a newline after streaming completes
+        fmt.Println()
     }
 }
