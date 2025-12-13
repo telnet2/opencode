@@ -100,7 +100,7 @@ function mapTextareaKeybindings(
     shift: binding.shift || undefined,
     super: binding.super || undefined,
     action,
-  }))
+  })) as KeyBinding[]
 }
 
 export function Prompt(props: PromptProps) {
@@ -139,7 +139,7 @@ export function Prompt(props: PromptProps) {
       { name: "return", action: "submit" },
       { name: "return", meta: true, action: "newline" },
       ...TEXTAREA_ACTIONS.flatMap((action) => mapTextareaKeybindings(keybinds, action)),
-    ] satisfies KeyBinding[]
+    ] as KeyBinding[]
   })
 
   const fileStyleId = syntax().getStyleId("extmark.file")!

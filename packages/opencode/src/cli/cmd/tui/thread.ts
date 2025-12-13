@@ -55,6 +55,10 @@ export const TuiThreadCommand = cmd({
         default: "127.0.0.1",
       }),
   handler: async (args) => {
+    // Capture console.log/error/warn/debug to log file in TUI mode
+    // This must be called after Log.init() which is done in the CLI middleware
+    Log.captureConsole()
+
     // Resolve relative paths against PWD to preserve behavior when using --cwd flag
     const baseCwd = process.env.PWD ?? process.cwd()
     const cwd = args.project ? path.resolve(baseCwd, args.project) : process.cwd()

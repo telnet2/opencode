@@ -1,0 +1,39 @@
+{
+  "name": "kiana-v6",
+  "version": "0.1.0",
+  "description": "Kiana v6 - Headless coding agent using Vercel AI SDK v6 ToolLoopAgent",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "kiana-v6": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ai": "beta",
+    "@ai-sdk/anthropic": "beta",
+    "@ai-sdk/openai": "beta",
+    "@ai-sdk/openai-compatible": "beta",
+    "@ai-sdk/google": "beta",
+    "zod": "latest",
+    "jsonc-parser": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "@types/node": "latest"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

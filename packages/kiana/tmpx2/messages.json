@@ -1,0 +1,156 @@
+[
+  {
+    "info": {
+      "id": "message_mj16ed5y0002",
+      "sessionID": "session_mj16ed5y0000",
+      "role": "user",
+      "time": {
+        "created": 1765441688614
+      }
+    },
+    "parts": [
+      {
+        "id": "part_mj16ed5y0003",
+        "sessionID": "session_mj16ed5y0000",
+        "messageID": "message_mj16ed5y0002",
+        "type": "text",
+        "text": "read the first 10 lines of package.json"
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16ed5z0004",
+      "sessionID": "session_mj16ed5y0000",
+      "role": "assistant",
+      "parentID": "message_mj16ed5y0002",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441688615,
+        "completed": 1765441691210
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 5879,
+        "output": 39,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "tool-calls"
+    },
+    "parts": [
+      {
+        "id": "part_mj16edd90005",
+        "sessionID": "session_mj16ed5y0000",
+        "messageID": "message_mj16ed5z0004",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj16ef600006",
+        "sessionID": "session_mj16ed5y0000",
+        "messageID": "message_mj16ed5z0004",
+        "type": "tool",
+        "tool": "read",
+        "callID": "read:0",
+        "state": {
+          "status": "completed",
+          "input": {
+            "filePath": "/Users/joohwi.lee/telnet2/opencode/packages/kiana/package.json",
+            "limit": 10
+          },
+          "output": "<file>\n    1\t{\n    2\t  \"name\": \"kiana\",\n    3\t  \"version\": \"0.1.0\",\n    4\t  \"description\": \"Kiana - Minimal headless coding agent\",\n    5\t  \"type\": \"module\",\n    6\t  \"main\": \"./dist/index.js\",\n    7\t  \"types\": \"./dist/index.d.ts\",\n    8\t  \"bin\": {\n    9\t    \"kiana\": \"./dist/cli.js\"\n   10\t  },\n\n(File has more lines. Use 'offset' parameter to read beyond line 10)\n</file>",
+          "title": "package.json",
+          "metadata": {
+            "preview": "{\n  \"name\": \"kiana\",\n  \"version\": \"0.1.0\",\n  \"description\": \"Kiana - Minimal headless coding agent\",\n  \"type\": \"module\",\n  \"main\": \"./dist/index.js\",\n  \"types\": \"./dist/index.d.ts\",\n  \"bin\": {\n    \"kiana\": \"./dist/cli.js\"\n  },"
+          },
+          "time": {
+            "start": 1765441691208,
+            "end": 1765441691210
+          }
+        }
+      },
+      {
+        "id": "part_mj16ef620007",
+        "sessionID": "session_mj16ed5y0000",
+        "messageID": "message_mj16ed5z0004",
+        "type": "step-finish",
+        "reason": "tool-calls",
+        "tokens": {
+          "input": 5879,
+          "output": 39,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16ef620008",
+      "sessionID": "session_mj16ed5y0000",
+      "role": "assistant",
+      "parentID": "message_mj16ed5y0002",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441691210,
+        "completed": 1765441693787
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 6065,
+        "output": 92,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "stop"
+    },
+    "parts": [
+      {
+        "id": "part_mj16ef900009",
+        "sessionID": "session_mj16ed5y0000",
+        "messageID": "message_mj16ef620008",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj16eh5n000a",
+        "sessionID": "session_mj16ed5y0000",
+        "messageID": "message_mj16ef620008",
+        "type": "text",
+        "text": "Here are the first 10 lines of package.json:\n\n```json\n{\n  \"name\": \"kiana\",\n  \"version\": \"0.1.0\",\n  \"description\": \"Kiana - Minimal headless coding agent\",\n  \"type\": \"module\",\n  \"main\": \"./dist/index.js\",\n  \"types\": \"./dist/index.d.ts\",\n  \"bin\": {\n    \"kiana\": \"./dist/cli.js\"\n  },\n```",
+        "time": {
+          "start": 1765441693787,
+          "end": 1765441693787
+        }
+      },
+      {
+        "id": "part_mj16eh5n000b",
+        "sessionID": "session_mj16ed5y0000",
+        "messageID": "message_mj16ef620008",
+        "type": "step-finish",
+        "reason": "stop",
+        "tokens": {
+          "input": 6065,
+          "output": 92,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  }
+]

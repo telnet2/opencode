@@ -1,0 +1,591 @@
+[
+  {
+    "info": {
+      "id": "message_mj169i600002",
+      "sessionID": "session_mj169i5z0000",
+      "role": "user",
+      "time": {
+        "created": 1765441461816
+      }
+    },
+    "parts": [
+      {
+        "id": "part_mj169i600003",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169i600002",
+        "type": "text",
+        "text": "list files in src directory"
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj169i610004",
+      "sessionID": "session_mj169i5z0000",
+      "role": "assistant",
+      "parentID": "message_mj169i600002",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441461817,
+        "completed": 1765441463680
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 5860,
+        "output": 31,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "tool-calls"
+    },
+    "parts": [
+      {
+        "id": "part_mj169ic80005",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169i610004",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj169jld0006",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169i610004",
+        "type": "tool",
+        "tool": "list",
+        "callID": "list:0",
+        "state": {
+          "status": "completed",
+          "input": {
+            "path": "/Users/joohwi.lee/telnet2/opencode/packages/kiana/src"
+          },
+          "output": "/Users/joohwi.lee/telnet2/opencode/packages/kiana/src/\n  tool/\n    bash.ts\n    codesearch.ts\n    edit.ts\n    glob.ts\n    grep.ts\n    index.ts\n    invalid.ts\n    list.ts\n    read.ts\n    task.ts\n    todo.ts\n    tool.ts\n    webfetch.ts\n    websearch.ts\n    write.ts\n  types/\n    event.ts\n    index.ts\n    message.ts\n    part.ts\n    session.ts\n  util/\n    ripgrep.ts\n  cli.ts\n  config.ts\n  event.ts\n  index.ts\n  provider.ts\n  session.ts\n",
+          "title": "src",
+          "metadata": {
+            "count": 27,
+            "truncated": false
+          },
+          "time": {
+            "start": 1765441463665,
+            "end": 1765441463680
+          }
+        }
+      },
+      {
+        "id": "part_mj169jls0007",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169i610004",
+        "type": "step-finish",
+        "reason": "tool-calls",
+        "tokens": {
+          "input": 5860,
+          "output": 31,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj169jls0008",
+      "sessionID": "session_mj169i5z0000",
+      "role": "assistant",
+      "parentID": "message_mj169i600002",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441463680,
+        "completed": 1765441466677
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 6051,
+        "output": 114,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "stop"
+    },
+    "parts": [
+      {
+        "id": "part_mj169jol0009",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169jls0008",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj169lx1000a",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169jls0008",
+        "type": "text",
+        "text": "The `src` directory contains:\n\n**Root files:**\n- `cli.ts`\n- `config.ts`\n- `event.ts`\n- `index.ts`\n- `provider.ts`\n- `session.ts`\n\n**Subdirectories:**\n- `tool/` - Contains various tool implementations (bash, codesearch, edit, glob, grep, list, read, task, todo, webfetch, websearch, write)\n- `types/` - TypeScript type definitions (event, index, message, part, session)\n- `util/` - Utility functions (ripgrep)",
+        "time": {
+          "start": 1765441466677,
+          "end": 1765441466677
+        }
+      },
+      {
+        "id": "part_mj169lx1000b",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169jls0008",
+        "type": "step-finish",
+        "reason": "stop",
+        "tokens": {
+          "input": 6051,
+          "output": 114,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj169seb0000",
+      "sessionID": "session_mj169i5z0000",
+      "role": "user",
+      "time": {
+        "created": 1765441475075
+      }
+    },
+    "parts": [
+      {
+        "id": "part_mj169seb0001",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169seb0000",
+        "type": "text",
+        "text": "what tools are available in the tool directory?"
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj169sec0002",
+      "sessionID": "session_mj169i5z0000",
+      "role": "assistant",
+      "parentID": "message_mj169seb0000",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441475076,
+        "completed": 1765441479858
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 6193,
+        "output": 161,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "stop"
+    },
+    "parts": [
+      {
+        "id": "part_mj169sh30003",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169sec0002",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj169w350004",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169sec0002",
+        "type": "text",
+        "text": "The `src/tool/` directory contains the following tool implementations:\n\n- `bash.ts` - Executes bash commands\n- `codesearch.ts` - Code search functionality\n- `edit.ts` - File editing operations\n- `glob.ts` - File pattern matching\n- `grep.ts` - Content searching\n- `index.ts` - Tool index/exports\n- `invalid.ts` - Invalid tool handling\n- `list.ts` - Directory listing\n- `read.ts` - File reading\n- `task.ts` - Task management\n- `todo.ts` - Todo list management\n- `tool.ts` - Base tool interface\n- `webfetch.ts` - Web content fetching\n- `websearch.ts` - Web search functionality\n- `write.ts` - File writing operations",
+        "time": {
+          "start": 1765441479857,
+          "end": 1765441479857
+        }
+      },
+      {
+        "id": "part_mj169w360005",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj169sec0002",
+        "type": "step-finish",
+        "reason": "stop",
+        "tokens": {
+          "input": 6193,
+          "output": 161,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16f4sa0000",
+      "sessionID": "session_mj169i5z0000",
+      "role": "user",
+      "time": {
+        "created": 1765441724410
+      }
+    },
+    "parts": [
+      {
+        "id": "part_mj16f4sa0001",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16f4sa0000",
+        "type": "text",
+        "text": "analyze this directory, please analyze what it is about"
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16f4sc0002",
+      "sessionID": "session_mj169i5z0000",
+      "role": "assistant",
+      "parentID": "message_mj16f4sa0000",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441724412,
+        "completed": 1765441822754
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 6390,
+        "output": 191,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "tool-calls"
+    },
+    "parts": [
+      {
+        "id": "part_mj16f4va0003",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16f4sc0002",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj16f9m20004",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16f4sc0002",
+        "type": "tool",
+        "tool": "task",
+        "callID": "task:1",
+        "state": {
+          "status": "completed",
+          "input": {
+            "description": "Analyze kiana directory structure",
+            "prompt": "Analyze the entire kiana directory structure and codebase to understand what this project is about. Look at:\n\n1. package.json for project metadata and dependencies\n2. README or any documentation files\n3. Main entry points (index.ts, cli.ts) to understand the architecture\n4. Key source files to understand the core functionality\n5. The types and tool directories to understand the abstraction layers\n\nProvide a comprehensive analysis of:\n- What this project does\n- Its main purpose and functionality\n- The architecture and design patterns used\n- Key components and their roles\n- How the tools and types directories relate to the overall system\n- Any unique or interesting aspects of the codebase\n\nFocus on understanding the project's purpose and how it's structured rather than line-by-line code analysis.",
+            "subagent_type": "explore"
+          },
+          "output": "No output from subagent\n\n<task_metadata>\nsession_id: session_mj16f9m30005\n</task_metadata>",
+          "title": "Analyze kiana directory structure",
+          "metadata": {
+            "sessionId": "session_mj16f9m30005",
+            "status": "completed"
+          },
+          "time": {
+            "start": 1765441730666,
+            "end": 1765441822753
+          }
+        }
+      },
+      {
+        "id": "part_mj16h8o2001u",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16f4sc0002",
+        "type": "step-finish",
+        "reason": "tool-calls",
+        "tokens": {
+          "input": 6390,
+          "output": 191,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16h8o2001v",
+      "sessionID": "session_mj169i5z0000",
+      "role": "assistant",
+      "parentID": "message_mj16f4sa0000",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441822754,
+        "completed": 1765441825729
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 6637,
+        "output": 97,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "tool-calls"
+    },
+    "parts": [
+      {
+        "id": "part_mj16h8r0001w",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16h8o2001v",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj16hayn001x",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16h8o2001v",
+        "type": "tool",
+        "tool": "read",
+        "callID": "read:2",
+        "state": {
+          "status": "completed",
+          "input": {
+            "filePath": "/Users/joohwi.lee/telnet2/opencode/packages/kiana/package.json"
+          },
+          "output": "<file>\n    1\t{\n    2\t  \"name\": \"kiana\",\n    3\t  \"version\": \"0.1.0\",\n    4\t  \"description\": \"Kiana - Minimal headless coding agent\",\n    5\t  \"type\": \"module\",\n    6\t  \"main\": \"./dist/index.js\",\n    7\t  \"types\": \"./dist/index.d.ts\",\n    8\t  \"bin\": {\n    9\t    \"kiana\": \"./dist/cli.js\"\n   10\t  },\n   11\t  \"exports\": {\n   12\t    \".\": {\n   13\t      \"types\": \"./dist/index.d.ts\",\n   14\t      \"import\": \"./dist/index.js\"\n   15\t    }\n   16\t  },\n   17\t  \"scripts\": {\n   18\t    \"build\": \"tsc\",\n   19\t    \"dev\": \"tsc --watch\",\n   20\t    \"typecheck\": \"tsc --noEmit\"\n   21\t  },\n   22\t  \"dependencies\": {\n   23\t    \"ai\": \"beta\",\n   24\t    \"@ai-sdk/anthropic\": \"beta\",\n   25\t    \"@ai-sdk/openai\": \"beta\",\n   26\t    \"@ai-sdk/openai-compatible\": \"beta\",\n   27\t    \"@ai-sdk/google\": \"beta\",\n   28\t    \"zod\": \"latest\",\n   29\t    \"jsonc-parser\": \"latest\"\n   30\t  },\n   31\t  \"devDependencies\": {\n   32\t    \"typescript\": \"latest\",\n   33\t    \"@types/node\": \"latest\"\n   34\t  },\n   35\t  \"engines\": {\n   36\t    \"node\": \">=20\"\n   37\t  },\n   38\t  \"license\": \"MIT\"\n   39\t}\n   40\t\n\n(End of file - total 40 lines)\n</file>",
+          "title": "package.json",
+          "metadata": {
+            "preview": "{\n  \"name\": \"kiana\",\n  \"version\": \"0.1.0\",\n  \"description\": \"Kiana - Minimal headless coding agent\",\n  \"type\": \"module\",\n  \"main\": \"./dist/index.js\",\n  \"types\": \"./dist/index.d.ts\",\n  \"bin\": {\n    \"kiana\": \"./dist/cli.js\"\n  },\n  \"exports\": {\n    \".\": {\n      \"types\": \"./dist/index.d.ts\",\n      \"import\": \"./dist/index.js\"\n    }\n  },\n  \"scripts\": {\n    \"build\": \"tsc\",\n    \"dev\": \"tsc --watch\",\n    \"typecheck\": \"tsc --noEmit\""
+          },
+          "time": {
+            "start": 1765441825727,
+            "end": 1765441825728
+          }
+        }
+      },
+      {
+        "id": "part_mj16hayn001y",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16h8o2001v",
+        "type": "tool",
+        "tool": "read",
+        "callID": "read:3",
+        "state": {
+          "status": "completed",
+          "input": {
+            "filePath": "/Users/joohwi.lee/telnet2/opencode/packages/kiana/src/index.ts"
+          },
+          "output": "<file>\n    1\t// Kiana - Minimal Headless Coding Agent Library\n    2\t// A standalone TypeScript package providing a headless coding agent library + CLI wrapper\n    3\t\n    4\t// Session API\n    5\texport { createSession, type Session, type SessionOptions, type SessionState, type MessageWithParts } from \"./session.js\"\n    6\t\n    7\t// Config\n    8\texport { loadConfig, writeConfigTemplate, type Config, type ProviderConfig } from \"./config.js\"\n    9\t\n   10\t// Provider\n   11\texport { createLanguageModel } from \"./provider.js\"\n   12\t\n   13\t// Event system\n   14\texport { EventBus, type EventTypes, type SessionEvent, type MessageEvent, type PartEvent, type TodoEvent } from \"./event.js\"\n   15\t\n   16\t// Types\n   17\texport type { SessionInfo } from \"./types/session.js\"\n   18\texport type { MessageInfo } from \"./types/message.js\"\n   19\texport type {\n   20\t  Part,\n   21\t  TextPart,\n   22\t  ReasoningPart,\n   23\t  ToolPart,\n   24\t  ToolState,\n   25\t  FilePart,\n   26\t  StepStartPart,\n   27\t  StepFinishPart,\n   28\t  SnapshotPart,\n   29\t  PatchPart,\n   30\t  AgentPart,\n   31\t  RetryPart,\n   32\t  CompactionPart,\n   33\t  SubtaskPart,\n   34\t} from \"./types/part.js\"\n   35\t\n   36\t// Tools\n   37\texport {\n   38\t  allTools,\n   39\t  getTools,\n   40\t  getToolInfo,\n   41\t  defineTool,\n   42\t  type Tool,\n   43\t  type ToolContext,\n   44\t  type ToolResult,\n   45\t  type ToolInfo,\n   46\t} from \"./tool/index.js\"\n   47\t\n   48\t// Individual tools (for advanced usage)\n   49\texport { bashTool } from \"./tool/bash.js\"\n   50\texport { readTool } from \"./tool/read.js\"\n   51\texport { writeTool } from \"./tool/write.js\"\n   52\texport { editTool } from \"./tool/edit.js\"\n   53\texport { globTool } from \"./tool/glob.js\"\n   54\texport { grepTool } from \"./tool/grep.js\"\n   55\texport { listTool } from \"./tool/list.js\"\n   56\texport { webfetchTool } from \"./tool/webfetch.js\"\n   57\texport { websearchTool } from \"./tool/websearch.js\"\n   58\texport { codesearchTool } from \"./tool/codesearch.js\"\n   59\texport { todoWriteTool, todoReadTool, getTodos, setTodos } from \"./tool/todo.js\"\n   60\texport { taskTool, setSubagentExecutor } from \"./tool/task.js\"\n   61\t\n   62\t// Version\n   63\texport const VERSION = \"0.1.0\"\n   64\t\n\n(End of file - total 64 lines)\n</file>",
+          "title": "src/index.ts",
+          "metadata": {
+            "preview": "// Kiana - Minimal Headless Coding Agent Library\n// A standalone TypeScript package providing a headless coding agent library + CLI wrapper\n\n// Session API\nexport { createSession, type Session, type SessionOptions, type SessionState, type MessageWithParts } from \"./session.js\"\n\n// Config\nexport { loadConfig, writeConfigTemplate, type Config, type ProviderConfig } from \"./config.js\"\n\n// Provider\nexport { createLanguageModel } from \"./provider.js\"\n\n// Event system\nexport { EventBus, type EventTypes, type SessionEvent, type MessageEvent, type PartEvent, type TodoEvent } from \"./event.js\"\n\n// Types\nexport type { SessionInfo } from \"./types/session.js\"\nexport type { MessageInfo } from \"./types/message.js\"\nexport type {\n  Part,"
+          },
+          "time": {
+            "start": 1765441825727,
+            "end": 1765441825728
+          }
+        }
+      },
+      {
+        "id": "part_mj16hayn001z",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16h8o2001v",
+        "type": "tool",
+        "tool": "read",
+        "callID": "read:4",
+        "state": {
+          "status": "completed",
+          "input": {
+            "filePath": "/Users/joohwi.lee/telnet2/opencode/packages/kiana/src/cli.ts"
+          },
+          "output": "<file>\n    1\t#!/usr/bin/env node\n    2\t\n    3\timport * as fs from \"node:fs\"\n    4\timport * as path from \"node:path\"\n    5\timport * as readline from \"node:readline\"\n    6\timport { createSession } from \"./session.js\"\n    7\timport { loadConfig, writeConfigTemplate } from \"./config.js\"\n    8\timport { VERSION } from \"./index.js\"\n    9\t\n   10\tinterface CliArgs {\n   11\t  config?: string\n   12\t  session?: string\n   13\t  cwd?: string\n   14\t  createConfig?: string\n   15\t  humanReadable?: boolean\n   16\t  verbose?: boolean\n   17\t  prompt?: string\n   18\t  help?: boolean\n   19\t  version?: boolean\n   20\t}\n   21\t\n   22\tfunction parseArgs(args: string[]): CliArgs {\n   23\t  const result: CliArgs = {}\n   24\t\n   25\t  for (let i = 0; i < args.length; i++) {\n   26\t    const arg = args[i]\n   27\t\n   28\t    if (arg === \"--config\" || arg === \"-c\") {\n   29\t      result.config = args[++i]\n   30\t    } else if (arg === \"--session\" || arg === \"-s\") {\n   31\t      result.session = args[++i]\n   32\t    } else if (arg === \"--cwd\") {\n   33\t      result.cwd = args[++i]\n   34\t    } else if (arg === \"--create-config\") {\n   35\t      result.createConfig = args[++i]\n   36\t    } else if (arg === \"--human-readable\" || arg === \"-H\") {\n   37\t      result.humanReadable = true\n   38\t    } else if (arg === \"--prompt\" || arg === \"-p\") {\n   39\t      result.prompt = args[++i]\n   40\t    } else if (arg === \"--verbose\") {\n   41\t      result.verbose = true\n   42\t    } else if (arg === \"--help\" || arg === \"-h\") {\n   43\t      result.help = true\n   44\t    } else if (arg === \"--version\" || arg === \"-V\") {\n   45\t      result.version = true\n   46\t    }\n   47\t  }\n   48\t\n   49\t  return result\n   50\t}\n   51\t\n   52\tfunction printHelp(): void {\n   53\t  console.log(`\n   54\tKiana - Minimal Headless Coding Agent\n   55\t\n   56\tUsage:\n   57\t  kiana --config <path> [options]\n   58\t  kiana --create-config <path>\n   59\t\n   60\tOptions:\n   61\t  --config, -c <path>       Path to JSONC config file (required)\n   62\t  --prompt, -p <text>       Initial prompt to send (exits after completion)\n   63\t  --session, -s <dir>       Directory to persist session\n   64\t  --cwd <dir>               Working directory for tools\n   65\t  --human-readable, -H      Output in human-readable format (streaming text)\n   66\t  --verbose                 Show detailed tool inputs/outputs (with -H)\n   67\t  --create-config <path>    Write config template and exit\n   68\t  --help, -h                Show this help message\n   69\t  --version, -V             Show version\n   70\t\n   71\tStdin/Stdout Protocol:\n   72\t  Input (stdin):  Line-delimited JSON commands\n   73\t    {\"type\": \"message\", \"text\": \"Fix the bug in auth.ts\"}\n   74\t    {\"type\": \"abort\"}\n   75\t\n   76\t  Output (stdout): Line-delimited JSON events\n   77\t    {\"type\": \"session.created\", \"properties\": {...}}\n   78\t    {\"type\": \"message.part.updated\", \"properties\": {...}}\n   79\t\n   80\tExample:\n   81\t  kiana --config ./kiana.jsonc\n   82\t  echo '{\"type\":\"message\",\"text\":\"Hello\"}' | kiana --config ./kiana.jsonc\n   83\t`)\n   84\t}\n   85\t\n   86\tfunction printVersion(): void {\n   87\t  console.log(`kiana v${VERSION}`)\n   88\t}\n   89\t\n   90\tinterface StdinCommand {\n   91\t  type: \"message\" | \"abort\"\n   92\t  text?: string\n   93\t}\n   94\t\n   95\t// ANSI color codes\n   96\tconst colors = {\n   97\t  reset: \"\\x1b[0m\",\n   98\t  bold: \"\\x1b[1m\",\n   99\t  dim: \"\\x1b[2m\",\n  100\t  cyan: \"\\x1b[36m\",\n  101\t  green: \"\\x1b[32m\",\n  102\t  yellow: \"\\x1b[33m\",\n  103\t  blue: \"\\x1b[34m\",\n  104\t  magenta: \"\\x1b[35m\",\n  105\t  red: \"\\x1b[31m\",\n  106\t  gray: \"\\x1b[90m\",\n  107\t}\n  108\t\n  109\t// Track tool calls that have already shown their \"running\" header\n  110\tconst seenRunningTools = new Set<string>()\n  111\t\n  112\t// Human-readable event formatter\n  113\tfunction formatEventHumanReadable(event: any, verbose: boolean = false): string | null {\n  114\t  const indent = event.context ? \"  \".repeat(event.context.depth) : \"\"\n  115\t  const agentPrefix = event.context\n  116\t    ? `${colors.magenta}[${event.context.agentType || \"subagent\"}]${colors.reset} `\n  117\t    : \"\"\n  118\t\n  119\t  switch (event.type) {\n  120\t    case \"session.created\":\n  121\t      return `${colors.dim}Session started: ${event.properties.session.id}${colors.reset}\\n`\n  122\t\n  123\t    case \"session.idle\":\n  124\t      return `${colors.dim}--- Session idle ---${colors.reset}\\n`\n  125\t\n  126\t    case \"message.created\":\n  127\t      if (event.properties.message.role === \"user\") {\n  128\t        return null // User message text is shown via part.updated\n  129\t      }\n  130\t      return null // Don't show assistant message creation\n  131\t\n  132\t    case \"message.part.updated\": {\n  133\t      const part = event.properties.part\n  134\t      const delta = event.properties.delta\n  135\t\n  136\t      if (part.type === \"text\") {\n  137\t        if (delta) {\n  138\t          // Streaming text delta\n  139\t          return `${indent}${agentPrefix}${delta}`\n  140\t        }\n  141\t        // Non-streaming: print full text\n  142\t        if (part.text) {\n  143\t          return `${indent}${agentPrefix}${part.text}\\n`\n  144\t        }\n  145\t        return null\n  146\t      }\n  147\t\n  148\t      if (part.type === \"reasoning\") {\n  149\t        if (delta) {\n  150\t          return `${indent}${agentPrefix}${colors.dim}${delta}${colors.reset}`\n  151\t        }\n  152\t        return null\n  153\t      }\n  154\t\n  155\t      if (part.type === \"tool\") {\n  156\t        const state = part.state\n  157\t        if (state.status === \"running\") {\n  158\t          // Only show the \"running\" header once per tool call\n  159\t          const toolKey = `${part.id}:${part.callID}`\n  160\t          if (seenRunningTools.has(toolKey)) {\n  161\t            return null // Already shown\n  162\t          }\n  163\t          seenRunningTools.add(toolKey)\n  164\t\n  165\t          const toolName = part.tool\n  166\t          const title = state.title || formatToolInput(toolName, state.input)\n  167\t          let output = `\\n${indent}${agentPrefix}${colors.cyan}▶ ${toolName}${colors.reset} ${colors.gray}${title}${colors.reset}\\n`\n  168\t          // In verbose mode, show the full input\n  169\t          if (verbose && state.input && Object.keys(state.input).length > 0) {\n  170\t            const inputStr = JSON.stringify(state.input, null, 2)\n  171\t              .split(\"\\n\")\n  172\t              .map((line) => `${indent}  ${colors.dim}${line}${colors.reset}`)\n  173\t              .join(\"\\n\")\n  174\t            output += `${inputStr}\\n`\n  175\t          }\n  176\t          return output\n  177\t        }\n  178\t        if (state.status === \"completed\") {\n  179\t          const title = state.title || part.tool\n  180\t          // Check if this is actually an error wrapped as a completed result\n  181\t          const isError = state.metadata?.error || state.metadata?.validationError || state.metadata?.parseError\n  182\t          const icon = isError ? \"✗\" : \"✓\"\n  183\t          const color = isError ? colors.red : colors.green\n  184\t          let output = `${indent}${agentPrefix}${color}${icon} ${title}${colors.reset}\\n`\n  185\t          // In verbose mode, show the output (truncated)\n  186\t          if (verbose && state.output) {\n  187\t            const outputLines = String(state.output).split(\"\\n\").slice(0, 10)\n  188\t            if (String(state.output).split(\"\\n\").length > 10) {\n  189\t              outputLines.push(\"... (truncated)\")\n  190\t            }\n  191\t            const outputStr = outputLines\n  192\t              .map((line) => `${indent}  ${colors.dim}${line}${colors.reset}`)\n  193\t              .join(\"\\n\")\n  194\t            output += `${outputStr}\\n`\n  195\t          }\n  196\t          return output\n  197\t        }\n  198\t        if (state.status === \"error\") {\n  199\t          let errorOutput = `${indent}${agentPrefix}${colors.red}✗ ${part.tool}: ${state.error}${colors.reset}\\n`\n  200\t          // Always show the input that caused the error for debugging\n  201\t          if (state.input && Object.keys(state.input).length > 0) {\n  202\t            const inputStr = JSON.stringify(state.input, null, 2)\n  203\t              .split(\"\\n\")\n  204\t              .map((line) => `${indent}  ${colors.dim}${line}${colors.reset}`)\n  205\t              .join(\"\\n\")\n  206\t            errorOutput += `${inputStr}\\n`\n  207\t          }\n  208\t          return errorOutput\n  209\t        }\n  210\t        return null\n  211\t      }\n  212\t\n  213\t      if (part.type === \"step-start\") {\n  214\t        return null // Don't show step start\n  215\t      }\n  216\t\n  217\t      if (part.type === \"step-finish\") {\n  218\t        return `\\n` // Add newline after step\n  219\t      }\n  220\t\n  221\t      return null\n  222\t    }\n  223\t\n  224\t    case \"message.updated\": {\n  225\t      const msg = event.properties.message\n  226\t      if (msg.error) {\n  227\t        return `${colors.red}Error: ${msg.error.message || msg.error}${colors.reset}\\n`\n  228\t      }\n  229\t      return null\n  230\t    }\n  231\t\n  232\t    case \"todo.updated\": {\n  233\t      const todos = event.properties.todos\n  234\t      if (!todos || todos.length === 0) return null\n  235\t\n  236\t      let output = `\\n${colors.yellow}📋 Todos:${colors.reset}\\n`\n  237\t      for (const todo of todos) {\n  238\t        const icon = todo.status === \"completed\" ? \"✓\" : todo.status === \"in_progress\" ? \"▶\" : \"○\"\n  239\t        const color = todo.status === \"completed\" ? colors.green : todo.status === \"in_progress\" ? colors.cyan : colors.gray\n  240\t        output += `  ${color}${icon} ${todo.content}${colors.reset}\\n`\n  241\t      }\n  242\t      return output\n  243\t    }\n  244\t\n  245\t    default:\n  246\t      return null\n  247\t  }\n  248\t}\n  249\t\n  250\tfunction formatToolInput(toolName: string, input: Record<string, unknown>): string {\n  251\t  switch (toolName) {\n  252\t    case \"read\":\n  253\t      return String(input.filePath || input.file_path || \"\")\n  254\t    case \"write\":\n  255\t      return String(input.filePath || input.file_path || \"\")\n  256\t    case \"edit\":\n  257\t      return String(input.filePath || input.file_path || \"\")\n  258\t    case \"bash\":\n  259\t      return String(input.command || \"\").slice(0, 50) + (String(input.command || \"\").length > 50 ? \"...\" : \"\")\n  260\t    case \"glob\":\n  261\t      return String(input.pattern || \"\")\n  262\t    case \"grep\":\n  263\t      return String(input.pattern || \"\")\n  264\t    case \"list\":\n  265\t      return String(input.path || \".\")\n  266\t    case \"task\":\n  267\t      return String(input.description || \"\")\n  268\t    default:\n  269\t      return \"\"\n  270\t  }\n  271\t}\n  272\t\n  273\tasync function main(): Promise<void> {\n  274\t  const args = parseArgs(process.argv.slice(2))\n  275\t\n  276\t  if (args.help) {\n  277\t    printHelp()\n  278\t    process.exit(0)\n  279\t  }\n  280\t\n  281\t  if (args.version) {\n  282\t    printVersion()\n  283\t    process.exit(0)\n  284\t  }\n  285\t\n  286\t  if (args.createConfig) {\n  287\t    const configPath = path.resolve(args.createConfig)\n  288\t    writeConfigTemplate(configPath)\n  289\t    console.error(`Config template written to: ${configPath}`)\n  290\t    process.exit(0)\n  291\t  }\n  292\t\n  293\t  if (!args.config) {\n  294\t    console.error(\"Error: --config is required\")\n  295\t    console.error(\"Use --help for usage information\")\n  296\t    process.exit(1)\n  297\t  }\n  298\t\n  299\t  const configPath = path.resolve(args.config)\n  300\t\n  301\t  if (!fs.existsSync(configPath)) {\n  302\t    console.error(`Error: Config file not found: ${configPath}`)\n  303\t    process.exit(1)\n  304\t  }\n  305\t\n  306\t  // Load config\n  307\t  const config = loadConfig(configPath)\n  308\t\n  309\t  // Override working directory if specified\n  310\t  if (args.cwd) {\n  311\t    config.workingDirectory = path.resolve(args.cwd)\n  312\t  }\n  313\t\n  314\t  // Create session with optional persistence\n  315\t  const sessionDir = args.session ? path.resolve(args.session) : undefined\n  316\t  const session = await createSession(config, { sessionDir })\n  317\t\n  318\t  // Subscribe to events and output\n  319\t  if (args.humanReadable) {\n  320\t    const verbose = args.verbose ?? false\n  321\t    session.onEvent((event) => {\n  322\t      const formatted = formatEventHumanReadable(event, verbose)\n  323\t      if (formatted) {\n  324\t        process.stdout.write(formatted)\n  325\t      }\n  326\t    })\n  327\t  } else {\n  328\t    session.onEvent((event) => {\n  329\t      console.log(JSON.stringify(event))\n  330\t    })\n  331\t  }\n  332\t\n  333\t  // If --prompt is provided, send it and exit after completion\n  334\t  if (args.prompt) {\n  335\t    await session.sendMessage(args.prompt)\n  336\t    process.exit(0)\n  337\t  }\n  338\t\n  339\t  // Otherwise, read commands from stdin\n  340\t  let pendingMessage: Promise<void> | null = null\n  341\t  let stdinClosed = false\n  342\t\n  343\t  const rl = readline.createInterface({\n  344\t    input: process.stdin,\n  345\t    output: undefined,\n  346\t    terminal: false,\n  347\t  })\n  348\t\n  349\t  rl.on(\"line\", async (line) => {\n  350\t    if (!line.trim()) return\n  351\t\n  352\t    try {\n  353\t      const command: StdinCommand = JSON.parse(line)\n  354\t\n  355\t      switch (command.type) {\n  356\t        case \"message\":\n  357\t          if (command.text) {\n  358\t            pendingMessage = session.sendMessage(command.text)\n  359\t            await pendingMessage\n  360\t            pendingMessage = null\n  361\t            // If stdin already closed, exit after message completes\n  362\t            if (stdinClosed) {\n  363\t              process.exit(0)\n  364\t            }\n  365\t          }\n  366\t          break\n  367\t\n  368\t        case \"abort\":\n  369\t          session.abort()\n  370\t          break\n  371\t\n  372\t        default:\n  373\t          console.error(JSON.stringify({ error: `Unknown command type: ${(command as any).type}` }))\n  374\t      }\n  375\t    } catch (error) {\n  376\t      console.error(\n  377\t        JSON.stringify({\n  378\t          error: `Failed to parse command: ${error instanceof Error ? error.message : String(error)}`,\n  379\t        })\n  380\t      )\n  381\t    }\n  382\t  })\n  383\t\n  384\t  rl.on(\"close\", async () => {\n  385\t    stdinClosed = true\n  386\t    // Wait for any pending message to complete before exiting\n  387\t    if (pendingMessage) {\n  388\t      await pendingMessage\n  389\t    }\n  390\t    process.exit(0)\n  391\t  })\n  392\t\n  393\t  // Handle signals\n  394\t  process.on(\"SIGINT\", () => {\n  395\t    session.abort()\n  396\t    process.exit(0)\n  397\t  })\n  398\t\n  399\t  process.on(\"SIGTERM\", () => {\n  400\t    session.abort()\n  401\t    process.exit(0)\n  402\t  })\n  403\t}\n  404\t\n  405\tmain().catch((error) => {\n  406\t  console.error(`Fatal error: ${error instanceof Error ? error.message : String(error)}`)\n  407\t  process.exit(1)\n  408\t})\n  409\t\n\n(End of file - total 409 lines)\n</file>",
+          "title": "src/cli.ts",
+          "metadata": {
+            "preview": "#!/usr/bin/env node\n\nimport * as fs from \"node:fs\"\nimport * as path from \"node:path\"\nimport * as readline from \"node:readline\"\nimport { createSession } from \"./session.js\"\nimport { loadConfig, writeConfigTemplate } from \"./config.js\"\nimport { VERSION } from \"./index.js\"\n\ninterface CliArgs {\n  config?: string\n  session?: string\n  cwd?: string\n  createConfig?: string\n  humanReadable?: boolean\n  verbose?: boolean\n  prompt?: string\n  help?: boolean\n  version?: boolean\n}"
+          },
+          "time": {
+            "start": 1765441825727,
+            "end": 1765441825728
+          }
+        }
+      },
+      {
+        "id": "part_mj16hayo0020",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16h8o2001v",
+        "type": "step-finish",
+        "reason": "tool-calls",
+        "tokens": {
+          "input": 6637,
+          "output": 97,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16hayp0021",
+      "sessionID": "session_mj169i5z0000",
+      "role": "assistant",
+      "parentID": "message_mj16f4sa0000",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441825729,
+        "completed": 1765441841204
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 12157,
+        "output": 732,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "stop"
+    },
+    "parts": [
+      {
+        "id": "part_mj16hb1d0022",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16hayp0021",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj16hmwj0023",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16hayp0021",
+        "type": "text",
+        "text": "## Analysis: Kiana - Minimal Headless Coding Agent\n\n**Kiana** is a minimal, headless coding agent designed as a standalone TypeScript package that provides both a **library API** and a **CLI wrapper**. Based on my analysis, here's what this project is about:\n\n### Core Purpose\nKiana is a lightweight AI-powered coding assistant that operates in a headless (non-interactive) mode. It provides a framework for AI agents to perform software engineering tasks using a comprehensive set of development tools.\n\n### Architecture Overview\n\n**1. Dual Interface Design:**\n- **Library API**: Exportable functions for programmatic use\n- **CLI Tool**: Command-line interface for direct usage\n\n**2. Event-Driven Architecture:**\n- Uses an event bus system for real-time communication\n- Supports streaming responses and tool execution updates\n- JSON-based protocol for stdin/stdout communication\n\n**3. Modular Tool System:**\n- **15 specialized tools** organized in `src/tool/`:\n  - File operations: `read`, `write`, `edit`, `list`, `glob`\n  - Code analysis: `grep`, `codesearch`\n  - System operations: `bash`\n  - Web operations: `webfetch`, `websearch`\n  - Task management: `task`, `todo`\n  - Development utilities: All tools have proper TypeScript typing\n\n### Key Components\n\n**Session Management (`src/session.ts`):**\n- Creates and manages AI agent sessions\n- Handles message persistence and state management\n- Supports session directories for continuity\n\n**Provider System (`src/provider.ts`):**\n- Multi-provider support (OpenAI, Anthropic, Google)\n- Uses the `ai` SDK beta for language model integration\n- Configurable through JSONC configuration files\n\n**Event System (`src/event.ts`):**\n- Real-time event streaming\n- Supports different event types: session, message, part, todo\n- Human-readable formatting for CLI usage\n\n**Configuration (`src/config.ts`):**\n- JSONC-based configuration\n- Provider-specific settings\n- Working directory management\n\n### Unique Features\n\n1. **Headless Operation**: Designed for non-interactive, automated workflows\n2. **Streaming Protocol**: JSONL (JSON Lines) protocol for stdin/stdout\n3. **Tool Abstraction**: Clean separation between tools and AI logic\n4. **Subagent Support**: Hierarchical task delegation via the `task` tool\n5. **Session Persistence**: Optional state persistence across runs\n6. **Human-Readable Mode**: Optional colored CLI output for debugging\n\n### Usage Patterns\n\n**CLI Mode:**\n```bash\nkiana --config kiana.jsonc --prompt \"Fix the bug in auth.ts\"\n```\n\n**Library Mode:**\n```typescript\nimport { createSession, loadConfig } from 'kiana'\nconst session = await createSession(config)\nawait session.sendMessage(\"Implement user authentication\")\n```\n\n**Streaming Protocol:**\n```json\n// Input (stdin)\n{\"type\": \"message\", \"text\": \"List all TypeScript files\"}\n\n// Output (stdout)\n{\"type\": \"session.created\", \"properties\": {...}}\n{\"type\": \"message.part.updated\", \"properties\": {...}}\n```\n\n### Design Philosophy\nKiana embraces minimalism while providing comprehensive tooling. It's designed to be:\n- **Lightweight**: Minimal dependencies, focused functionality\n- **Composable**: Tools can be combined for complex workflows\n- **Extensible**: Easy to add new tools and providers\n- **Observable**: Rich event system for monitoring and debugging\n\nThis makes Kiana ideal for automated CI/CD pipelines, development workflows, or as a foundation for more complex AI-powered development tools.",
+        "time": {
+          "start": 1765441841203,
+          "end": 1765441841203
+        }
+      },
+      {
+        "id": "part_mj16hmwj0024",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16hayp0021",
+        "type": "step-finish",
+        "reason": "stop",
+        "tokens": {
+          "input": 12157,
+          "output": 732,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16iygm0000",
+      "sessionID": "session_mj169i5z0000",
+      "role": "user",
+      "time": {
+        "created": 1765441902838
+      }
+    },
+    "parts": [
+      {
+        "id": "part_mj16iygm0001",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16iygm0000",
+        "type": "text",
+        "text": "analyze this directory, please analyze what it is about"
+      }
+    ]
+  },
+  {
+    "info": {
+      "id": "message_mj16iygo0002",
+      "sessionID": "session_mj169i5z0000",
+      "role": "assistant",
+      "parentID": "message_mj16iygm0000",
+      "modelID": "ep-20250821060450-4bc6g",
+      "providerID": "openai-compatible",
+      "time": {
+        "created": 1765441902840,
+        "completed": 1765441929511
+      },
+      "cost": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "finish": "stop"
+    },
+    "parts": [
+      {
+        "id": "part_mj16iyjz0003",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16iygo0002",
+        "type": "step-start"
+      },
+      {
+        "id": "part_mj16j0mw0004",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16iygo0002",
+        "type": "text",
+        "text": "## Kiana: Minimal Headless Coding Agent - Comprehensive Analysis\n\nBased on my analysis of the codebase, **Kiana** is a sophisticated, minimal headless coding agent that provides both a **library API** and **CLI wrapper** for AI-powered software development tasks.\n\n### Core Identity\n**Kiana** positions itself as a \"minimal headless coding agent\" - a lightweight, non-interactive AI assistant designed for automated software development workflows. It's built as a standalone TypeScript package that can be used both programmatically and via command-line.\n\n### Architecture Overview\n\n#### 1. **Dual Interface Design**\n- **Library Mode**: Exportable TypeScript functions for integration into other applications\n- **CLI Mode**: Command-line interface with JSONL protocol for stdin/stdout communication\n\n#### 2. **Event-Driven Architecture**\nThe system uses a sophisticated event bus with real-time streaming:\n- **Session events**: Creation, idle states\n- **Message events**: User/assistant message handling\n- **Part events**: Streaming text, reasoning, tool execution\n- **Todo events**: Task management and progress tracking\n\n#### 3. **Modular Tool System** (15 specialized tools)\nThe `src/tool/` directory contains a comprehensive toolkit:\n\n**File Operations:**\n- `read.ts` - File reading with line limits\n- `write.ts` - File writing and creation\n- `edit.ts` - Precise string replacement editing\n- `list.ts` - Directory listing with glob filtering\n- `glob.ts` - Advanced file pattern matching\n\n**Code Analysis:**\n- `grep.ts` - Content searching with regex\n- `codesearch.ts` - Code-specific search functionality\n\n**System Operations:**\n- `bash.ts` - Command execution with timeout and security\n\n**Web Operations:**\n- `webfetch.ts` - HTTP content fetching\n- `websearch.ts` - Web search integration\n\n**Task Management:**\n- `task.ts` - Subagent creation for complex workflows\n- `todo.ts` - Todo list management and tracking\n\n**Utilities:**\n- `tool.ts` - Base tool interface and definitions\n- `index.ts` - Tool registry and management\n\n### Key Design Patterns\n\n#### 1. **Headless Operation**\n- Designed for non-interactive, automated workflows\n- JSONL protocol for stdin/stdout communication\n- No human intervention required during execution\n\n#### 2. **Provider Abstraction**\n- Multi-provider support via `ai` SDK beta\n- OpenAI, Anthropic, Google providers\n- Configurable through JSONC configuration files\n\n#### 3. **Session Persistence**\n- Optional session directory for state persistence\n- Message history and context retention\n- Working directory management\n\n#### 4. **Subagent Architecture**\n- Hierarchical task delegation via `task` tool\n- Context-aware subagents with depth tracking\n- Recursive problem decomposition\n\n### Usage Patterns\n\n#### **CLI Usage:**\n```bash\n# Interactive mode with JSONL protocol\nkiana --config kiana.jsonc\n\n# One-shot execution\nkiana --config kiana.jsonc --prompt \"Fix the bug in auth.ts\"\n\n# Human-readable streaming\nkiana --config kiana.jsonc --human-readable --prompt \"List all TypeScript files\"\n```\n\n#### **Library Usage:**\n```typescript\nimport { createSession, loadConfig } from 'kiana'\n\nconst config = await loadConfig('./kiana.jsonc')\nconst session = await createSession(config)\n\n// Send message and stream results\nsession.onEvent((event) => {\n  console.log('Received:', event)\n})\n\nawait session.sendMessage(\"Implement user authentication\")\n```\n\n#### **Streaming Protocol:**\n```json\n// Input (stdin)\n{\"type\": \"message\", \"text\": \"Find all console.log statements\"}\n\n// Output (stdout)\n{\"type\": \"session.created\", \"properties\": {...}}\n{\"type\": \"message.part.updated\", \"properties\": {...}}\n{\"type\": \"tool\", \"properties\": {\"tool\": \"grep\", \"state\": {\"status\": \"running\"}}}\n```\n\n### Unique Features\n\n#### 1. **Human-Readable Mode**\n- Optional colored CLI output for debugging\n- Real-time tool execution visualization\n- Progress tracking with todo lists\n\n#### 2. **Tool Context System**\n- Each tool execution has context (depth, agent type)\n- Visual indentation for subagent hierarchies\n- Error handling with detailed debugging info\n\n#### 3. **Compaction System**\n- Automatic message history compaction\n- Configurable context window management\n- Efficient token usage\n\n#### 4. **Validation & Security**\n- Tool input validation with Zod schemas\n- Command timeout handling\n- Safe file system operations\n\n### Configuration System\n- **JSONC format** (JSON with comments)\n- Provider-specific settings\n- Working directory configuration\n- Tool-specific parameters\n\n### Development Philosophy\nKiana embraces **minimalism with power**:\n- **Minimal dependencies**: Only essential packages (`ai`, `zod`, `jsonc-parser`)\n- **Maximum functionality**: Comprehensive toolset for software development\n- **Clean abstractions**: Clear separation between tools, providers, and sessions\n- **Extensibility**: Easy to add new tools and providers\n- **Observability**: Rich event system for monitoring and debugging\n\n### Target Use Cases\n1. **CI/CD Integration**: Automated code review and fixes\n2. **Development Workflows**: Automated refactoring and testing\n3. **Code Analysis**: Large-scale codebase analysis\n4. **Documentation Generation**: Automated API docs\n5. **Research Projects**: AI-powered code exploration\n\nKiana represents a **modern approach to AI-powered development tools** - lightweight, composable, and designed for the era of automated software engineering workflows.",
+        "time": {
+          "start": 1765441905656,
+          "end": 1765441929507
+        }
+      },
+      {
+        "id": "part_mj16jj1h0005",
+        "sessionID": "session_mj169i5z0000",
+        "messageID": "message_mj16iygo0002",
+        "type": "step-finish",
+        "reason": "stop",
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "cost": 0
+      }
+    ]
+  }
+]

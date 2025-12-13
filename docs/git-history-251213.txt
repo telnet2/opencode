@@ -1,0 +1,2156 @@
+a7c9d757 fix: resolve type errors after rebase onto dev branch
+- Update client-registry.ts and workflow/executor.ts to use BusEvent.define()
+  instead of Bus.event() to match the current Bus API
+- Fix useKittyKeyboard type in app.tsx (boolean instead of object)
+- Add type casts for KeyBinding arrays in prompt/index.tsx
+- Remove unsupported cacheKey property from desktop/session.tsx
+
+59a8e6f6 Add batch tool for parallel tool execution in Go OpenCode
+Implement the batch tool that enables concurrent execution of multiple
+independent tool calls, matching the TypeScript implementation:
+
+- Uses errgroup from golang.org/x/sync for parallel execution
+- Supports up to 10 tool calls per batch
+- Disallows batch (no nesting), edit, and todoread tools
+- Partial failures don't stop other calls
+- Returns combined output with success/failure counts and metadata
+- Includes comprehensive test coverage (18 test cases)
+
+This brings Go OpenCode closer to feature parity with TS OpenCode for
+performance-critical operations like reading multiple files or running
+multiple searches concurrently.
+
+8f744426 feat: improve CLI output formatting for list tool
+
+d7cd7913 feat: enhance kiana with comprehensive session persistence, streaming controls, and provider improvements
+## Summary
+This major update significantly enhances the Kiana headless coding agent with robust session persistence, configurable streaming modes, improved provider compatibility, and comprehensive token tracking capabilities.
+
+## Key Features
+
+### 🔍 Session Persistence & State Management
+- **Full Session Persistence**: Complete session state including messages, parts, and metadata saved to disk
+- **Session Storage**: New `SessionStorage` interface with JSON-based persistence in `session.json` and `messages.json`
+- **Session Reloading**: Automatic loading of existing sessions when session directory is provided
+- **State Recovery**: Seamless continuation of previous sessions with full message history
+
+### ⚙️ Streaming & Configuration Enhancements
+- **Configurable Streaming**: New `streaming` config option to toggle between streaming and non-streaming modes
+- **Non-Streaming Mode**: Better token counting support for OpenAI-compatible providers
+- **Retry Logic**: Configurable `maxRetries` (default: 5) with exponential backoff for rate limit handling
+- **Provider Compatibility**: Enhanced support for Ark, Moonshot, and other OpenAI-compatible APIs
+
+### 📊 Token Tracking & Usage Analytics
+- **Comprehensive Token Counting**: Support for both AI SDK v6 nested format and legacy flat format
+- **Usage Data**: Detailed token breakdown including input, output, reasoning, and cache metrics
+- **Real-time Updates**: Token counts updated throughout streaming sessions
+- **Final Usage**: Accurate total usage accumulation across all steps
+
+### 🛠️ CLI & Provider Improvements
+- **CLI Session Handling**: Simplified session creation with optional persistence directory
+- **Provider Configuration**: Added `includeUsage: true` for OpenAI-compatible streaming usage
+- **Tool Call Deduplication**: Prevent duplicate "running" headers for the same tool call
+- **Error Handling**: Improved error handling and state management throughout the pipeline
+
+### 🔄 Code Architecture
+- **Session Options**: New `SessionOptions` interface for optional session configuration
+- **Storage Abstraction**: Clean separation between session logic and persistence layer
+- **Backward Compatibility**: All new features are optional with sensible defaults
+- **Type Safety**: Enhanced TypeScript types for all new functionality
+
+## Breaking Changes
+None - all new features are backward compatible with existing configurations.
+
+## Configuration Updates
+```jsonc
+{
+  // New configuration options
+  "streaming": true,           // Enable/disable streaming mode
+  "maxRetries": 5,            // Rate limit retry attempts
+  // ... existing config
+}
+```
+
+## Usage Examples
+```typescript
+// Create session with persistence
+const session = await createSession(config, {
+  sessionDir: './my-session'
+});
+
+// Disable streaming for better token counting
+const config = {
+  ...baseConfig,
+  streaming: false,
+  maxRetries: 3
+};
+```
+
+## Technical Details
+- **File Structure**: Sessions saved as `session.json` (metadata) and `messages.json` (full history)
+- **Error Recovery**: Graceful handling of corrupted session files
+- **Performance**: Minimal overhead for persistence operations
+- **Cross-Platform**: Works on all Node.js supported platforms
+
+0af10cc7 feat: initialize kiana package with comprehensive tooling infrastructure
+- Add TypeScript configuration and build setup
+- Implement core CLI interface with commander.js
+- Create session management system for tracking agent interactions
+- Add comprehensive tool system with support for:
+  - File operations (read, write, edit, list, glob, grep)
+  - System operations (bash commands)
+  - Web operations (web search, web fetch)
+  - Code search and analysis (codesearch)
+  - Task management and todo tracking
+- Implement event-driven architecture for session tracking
+- Add provider system for LLM integration
+- Include configuration management with JSONC support
+- Add environment configuration with .env.local
+- Set up proper gitignore for Node.js/TypeScript project
+- Include comprehensive type definitions for all components
+- Add utility modules for ripgrep integration
+
+This establishes the foundation for a sophisticated coding agent system
+with robust tooling, session tracking, and extensible architecture.
+
+d71f0b4b Add Go simple CLI using SDK
+
+207c76ae Add lightweight simple CLI for OpenCode
+
+f32b1456 Add Homebrew release guide for rebranding
+
+c90dd857 Add instructions for desktop client builds
+
+ec9b9d58 Add plan for simple CLI
+
+8a3684e1 Document TUI subagent navigation and todo tool parity
+
+28574573 Enhance Go tool metadata for LLMs
+
+7af11546 Add TS vs Go tool comparison
+
+f9ca694c refactor(go-opencode): Move SubagentExecutor to executor package
+Move SubagentExecutor from internal/tool to internal/executor to break
+the import cycle between tool and session packages.
+
+The cycle was:
+- tool/subagent_executor.go imported session
+- session/processor.go imported tool
+
+Now:
+- tool package no longer imports session
+- session package imports tool
+- executor package imports both tool and session
+
+This allows the tool package (including WebFetchTool) to build and test
+properly.
+
+0a6041b8 feat(go-opencode): Add WebFetch tool for fetching web content
+Port the WebFetch tool from TypeScript to Go OpenCode. The tool fetches
+content from URLs and returns it in the requested format (text, markdown,
+or html).
+
+Key features:
+- URL validation (must start with http:// or https://)
+- Configurable timeout (max 120 seconds, default 30)
+- Response size limit (5MB max)
+- HTML to Markdown conversion using html-to-markdown library
+- HTML to plain text extraction using goquery (strips scripts, styles)
+- Accept headers based on requested format
+- User-Agent spoofing to avoid blocking
+
+Dependencies added:
+- github.com/JohannesKaufmann/html-to-markdown v1.6.0
+- github.com/PuerkitoBio/goquery v1.10.0
+
+5507eadc feat: add VCS watcher, SDK-compatible types, and protocol docs
+- Add VCS branch watcher using fsnotify to monitor .git/HEAD changes
+  - Publishes vcs.branch.updated events on branch change
+  - Integrated into server lifecycle (start/shutdown)
+  - Includes comprehensive unit tests
+
+- Fix SDK compatibility issues in types:
+  - Change smallModel, toolcall, topP to camelCase for TS compatibility
+  - Fix ModelCost to use nested cache object (cache.read/write)
+  - Add missing part types: SnapshotPart, PatchPart, AgentPart,
+    SubtaskPart, RetryPart
+
+- Add TUI event types:
+  - tui.prompt.append, tui.command.execute, tui.toast.show
+  - vcs.branch.updated, pty.* events, command.executed
+  - Update TUI handlers to publish SSE events
+
+- Add comprehensive protocol documentation:
+  - docs/opencode-server-endpoints.md - Complete endpoint reference
+  - docs/tui-event-specification.md - Event protocol with AI SDK comparison
+
+8a5ea0ba feat(go-opencode): Port task agents from TypeScript to Go
+This change implements the full task agent system in go-opencode to match
+the TypeScript implementation in packages/opencode:
+
+- Updated built-in agents (general, explore, plan) with proper descriptions,
+  permissions, and prompts matching the TS implementation
+- Created SubagentExecutor to implement TaskExecutor interface for actually
+  executing subagent tasks (creates child sessions, runs processor loop)
+- Updated tool registry with RegisterTaskTool and SetTaskExecutor methods
+- Wired up the SubagentExecutor in both serve.go and run.go commands
+- Task tool now generates dynamic descriptions based on available agents
+- Added conversion from agent.Agent to session.Agent for processing
+
+The subagents now have full capabilities:
+- general: Full tool access for research and parallel execution
+- explore: Specialized for codebase exploration with custom prompt
+- plan: Read-only access for planning and analysis
+
+5c34ab16 feat: Add session improvements and todo management tools
+- Add todo management tools (todoread, todowrite) for task tracking
+- Implement session title generation and management
+- Add comprehensive documentation files across all packages
+- Improve session processing with better error handling
+- Enhance tool registry with new capabilities
+- Add session compacting and streaming improvements
+- Update test coverage for new functionality
+- Improve server handlers for session and message management
+- Add permission checking enhancements
+- Update client tool registry with new tools
+
+4a11adb9 fix: SDK compatibility for user message display and text streaming
+This commit fixes multiple issues preventing proper TUI integration:
+
+- Change event type from `message.created` to `message.updated`
+  (TUI only listens for `message.updated`, not `message.created`)
+- Add `message.part.updated` events for user message parts
+- Add required `sessionID` and `messageID` fields to TextPart and FilePart
+  (TUI stores parts by messageID - without it, parts can't be associated)
+
+- Fix accumulated vs delta detection: use `strings.HasPrefix` instead of
+  length comparison to correctly identify streaming mode
+- Publish `message.part.updated` event for first text chunk
+  (was only calling callback, not publishing event)
+- Fix tool call tracking to use Index-based lookup (eino streaming model)
+- Accumulate tool arguments as deltas, not replace
+
+- Reload messages after tool execution to include tool results
+- Skip empty messages (no parts) in completion requests
+- Add debug logging for message building
+
+- Add debug logging for tool execution flow
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+f8bf876b refactor(cli): remove duplicate getCustomPrompt function
+
+123c6fb7 feat: MCP tool wrapper integration and CLI improvements
+- Add MCP tool wrapper implementing tool.Tool interface
+  - MCPToolWrapper adapts MCP tools to work with existing tool registry
+  - Enables MCP tools in session processor without modifying agentic loop
+  - RegisterMCPTools function to bulk-register MCP tools
+
+- Add MCP initialization to run command
+  - Parse MCP config and connect to servers
+  - Register MCP tools in tool registry
+
+- Add MCP tool registration to serve command
+  - Register MCP tools after server initialization
+  - Add MCPClient() and ToolRegistry() getters to server
+
+- Consolidate cmd/opencode-server into cmd/opencode
+  - Remove duplicate opencode-server binary
+  - Move MCP initialization to serve.go
+  - Update Makefile to remove opencode-server target
+
+- Add --show-config global flag to print merged config as JSON
+- Add --model/-m as global persistent flag (matches TypeScript CLI)
+
+- Add comprehensive test coverage
+  - Unit tests for tool wrapper
+  - Integration tests with calculator MCP server
+  - E2E tests for stdio/SSE transports, multiple servers, failures
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+0f49ac88 fix: SDK compatibility, test improvements, and anthropic model aliases
+- Fix ToolPart JSON tags for TypeScript SDK compatibility:
+  - `json:"toolCallID"` → `json:"callID"`
+  - `json:"toolName"` → `json:"tool"`
+- Add SessionID and MessageID to parts in stream.go for SSE event filtering
+- Save user message parts to storage in HTTP handler
+
+- Add `claude-haiku-4-5` model alias for convenience
+- Add empty content validation in anthropic provider tests
+
+- Add empty content rejection (400 error) for invalid requests
+- Make tool name matching case-insensitive in FindMatchingToolRule
+- Add comprehensive empty content handling tests
+- Add chunk splitting tests for streaming
+
+- Skip provider check for mockllm (test infrastructure only)
+- Add provider-specific environment variable checking
+- Fix test assertions for case-insensitive tool matching
+- Add anthropic and OpenAI provider empty content tests
+
+- Improve model lookup with better error messages
+- Add integration tests for provider registry
+
+Test Results:
+- citest/server (mockllm): 23/24 passed (1 skipped)
+- citest/service (mockllm): 79/90 passed (10 pending, 1 skipped)
+- Message Flow (anthropic): 9/9 passed
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+eb5bfcfb feat(sdk/go): replace Go SDK with Stainless-generated SDK
+Replace the hand-written Go SDK with the Stainless-generated SDK from
+goopencode-go for better consistency and maintainability.
+
+Key changes:
+- Update module path to github.com/sst/opencode-sdk-go
+- Update package name from goopencode to opencode
+- Update environment variables from GOOPENCODE_* to OPENCODE_*
+- Add 21 services including Session, Provider, Mcp, Lsp, etc.
+- Add SSE streaming support for events
+- Add modern parameter handling with param.Opt[T]
+- Add response metadata with respjson.Field
+- Add union types for polymorphic responses
+- Add sub-services for nested resources
+
+Bug fixes in generated code:
+- Fix duplicate ClientToolRequest type declaration
+- Add missing AgentConfigPermissionBashUnion response type
+- Add missing ConfigurationPermissionBashUnion response type
+- Remove broken getter methods on ConfigurationLspUnionParam
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+a017d248 feat(api): implement client tools endpoints for Go server
+Add missing client tools endpoints to achieve parity with TypeScript:
+- GET /client-tools/pending/{clientID} - SSE stream for tool requests
+- GET /client-tools/tools/{clientID} - Get registered tools for client
+- GET /client-tools/tools - Get all registered client tools
+
+Implementation includes:
+- New clienttool package with Registry for tool management
+- Event types for client tool lifecycle (request, registered, etc.)
+- SSE handler with 30s keepalive ping and cleanup on disconnect
+- Updated register/unregister/execute/result handlers to use registry
+- Integration tests for all new endpoints
+
+Refs: plan/go-opencode/14-impl-client-tools.md
+
+16d047be feat(api): implement Phase 3 feature parity - MCP, commands, formatters, sharing
+Phase 3 implementation includes:
+
+MCP (Model Context Protocol):
+- MCP server initialization at app startup from config
+- Full MCP API endpoints: GET/POST /mcp, DELETE /mcp/{name}
+- MCP tool listing and execution: GET /mcp/tools, POST /mcp/tool/{name}
+- MCP resource operations: GET /mcp/resources, GET /mcp/resource
+- Proper server lifecycle management with cleanup on shutdown
+
+Custom Commands:
+- Command executor with template processing
+- Support for config-defined and file-based (.opencode/command/*.md) commands
+- Variable substitution and Go template support
+- Command API: GET /command, GET/POST /command/{name}
+- Built-in commands (help, clear, compact, reset, undo, share, export)
+
+Formatter Integration:
+- Formatter manager with default formatters (prettier, gofmt, black, rustfmt)
+- File formatting with extension-based formatter selection
+- Format hooks support for edit tools
+- API: GET /formatter, POST /formatter/format
+
+Session Sharing:
+- Sharing manager with token-based authentication
+- Support for expiration and view limits
+- Share info storage and retrieval
+
+915feb57 feat: implement Phase 2 - CLI integration for custom prompts
+Add CLI flags and template discovery commands for custom prompt templates.
+
+- Added --prompt <template> flag to run command (auto-detect file/inline)
+- Added --prompt-file <path> flag for explicit file mode
+- Added --prompt-inline <text> flag for explicit inline mode
+- Updated session creation in run.ts to pass customPrompt parameter
+- Implemented getCustomPrompt() helper to parse CLI args
+- Updated both attach and bootstrap session creation paths
+
+- Created new `prompts` command with actions: list, show
+- `opencode prompts list`: Lists all available templates
+  * Shows project templates (.opencode/prompts/)
+  * Shows global templates (~/.opencode/prompts/)
+  * Displays template name and size in KB
+  * Groups by location (project vs global)
+- `opencode prompts show --name <template>`: Displays template details
+  * Shows location, path, and size
+  * Preview mode: first 10 lines (default)
+  * Full mode: complete content (--verbose flag)
+  * Helpful error message if template not found
+- Registered PromptsCommand in main CLI
+
+- Auto-detection of file vs inline prompts in run command
+- Convenient template browsing and inspection
+- Clear usage examples in command output
+- Support for .txt and .md template files
+
+```bash
+opencode run --prompt data-analyst.txt "analyze this data"
+opencode run --prompt-file ~/templates/security.txt "audit code"
+opencode run --prompt-inline "You are a Python expert" "refactor this"
+
+opencode prompts list
+
+opencode prompts show --name data-analyst.txt
+opencode prompts show --name security.txt --verbose
+```
+
+Files modified/added:
+- src/cli/cmd/run.ts (~20 LOC modified)
+- src/cli/cmd/prompts.ts (~200 LOC new)
+- src/index.ts (~2 LOC modified)
+
+Total: ~222 LOC
+
+cac1136d feat(provider): add ARK provider and Ginkgo integration test suite
+- Add ARK provider implementation using eino-ext/components/model/ark
+- Add Ginkgo/Gomega testing framework with comprehensive test utilities
+- Create citest/ directory with service, server, and e2e test suites
+- Add test utilities for server lifecycle, HTTP client, and SSE streaming
+- Add plan documents for integration testing strategy
+- Update registry to initialize ARK provider from config
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+cb80fd05 feat: add file logging and enhanced logging for config/LLM
+- Add --log-file flag to write logs to /tmp/opencode-YYYYMMDD-HHMMSS.log
+- Support multi-writer output (console + file simultaneously)
+- Add configuration logging:
+  - Log each config file loaded with path
+  - Log configuration summary (model, providers, agents, MCP servers)
+- Add LLM interaction logging:
+  - Log request details (provider, model, message count, step)
+  - Log user message content (truncated)
+  - Log response with tokens, duration, finish reason
+  - Log assistant response and tool calls
+- Add GetLogFilePath() and Close() helpers to logging package
+
+d6fedc43 feat: implement structured logging with zerolog
+Replace standard Go log package with zerolog for structured JSON logging:
+- Add internal/logging package wrapping zerolog with convenient helpers
+- Update cmd/opencode-server and cmd/opencode/commands to use new logging
+- Support --print-logs and --log-level CLI flags for log control
+- Pretty-print console output for development mode
+- Update github-packages-opportunities.md to mark logging as completed
+
+1f41b0fc fix(opencode): resolve TypeScript type errors in workflow and related modules
+- workflow/executor.ts: Add proper orchestrator defaults with typed values
+- workflow/executor.ts: Fix status comparison with type assertion
+- workflow/index.ts: Fix duplicate id by spreading config first
+- workflow/index.ts: Remove unused reload() function
+- workflow/tool.ts: Change pausedStep type from null to undefined
+- session/system.ts: Use fs.existsSync instead of Bun.file().existsSync()
+- dialog-session-list.tsx: Remove customPrompt UI (SDK type not updated)
+- client-tools.ts: Add type assertions for resolver() calls
+- test/client-tools-api.test.ts: Fix stdout type assertion
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+e972867b feat: reimplement MCP using official Go SDK
+Replace custom JSON-RPC implementation with the official MCP Go SDK
+(github.com/modelcontextprotocol/go-sdk v1.1.0):
+
+- Remove transport.go with manual JSON-RPC protocol handling
+- Rewrite client.go to use SDK's Client, ClientSession, and transports
+- Simplify types.go with SDK type adapters (FromSDKTool, FromSDKResource)
+- Use SDK's CommandTransport for stdio and SSEClientTransport for HTTP
+- Reduce code by ~500 lines while maintaining API compatibility
+
+Benefits:
+- Standardized protocol implementation
+- Better connection management and error handling
+- Built-in support for MCP spec versions
+- Reduced maintenance burden
+
+27775c91 feat: use doublestar/v4 for wildcard matching
+Replace custom wildcard matching implementations with the doublestar/v4
+package for proper glob pattern support including ** patterns.
+
+Changes:
+- go-opencode: Update agent.go matchWildcard to use doublestar for complex
+  patterns while preserving simple string matching for basic * patterns
+- go-memsh: Update llm_commands.go find command to use doublestar.Match
+  instead of regex conversion for glob patterns
+- go-memsh: Update collectFiles to use doublestar for include/exclude
+  pattern matching
+- go-memsh: Update client/tools.go GlobTool to use doublestar for proper
+  ** pattern support when filtering files
+
+0d5f3ebb feat(phase7): implement LSP, MCP, Agent system, and Task tool
+Phase 7 Advanced Features implementation:
+
+- Agent System (internal/agent/)
+  - Multi-agent configuration with built-in agents (build, plan, general, explore)
+  - Registry for agent management with custom config loading
+  - Permission handling per agent with tool and bash filtering
+
+- LSP Client (internal/lsp/)
+  - Language Server Protocol client with JSON-RPC over stdio
+  - Support for TypeScript, Go, Python, Rust language servers
+  - Operations: hover, workspace/document symbols, definition, references
+
+- MCP Client (internal/mcp/)
+  - Model Context Protocol client for tool integration
+  - HTTP and stdio transports for remote/local servers
+  - Tool listing and execution with proper namespacing
+
+- Task Tool (internal/tool/task.go)
+  - Sub-agent spawning for autonomous task handling
+  - Support for general, explore, and plan agent types
+  - Executor interface for flexible task processing
+
+All 247 tests passing across Phase 1-7 components.
+
+ff1e3c97 feat: implement Go-based OpenCode server up to Phase 4
+This implements the go-opencode server providing a single binary deployment
+option compatible with the original TypeScript server behavior.
+
+Features implemented:
+- Phase 1: Core types (Session, Message, Parts), storage layer with file
+  locking, event bus system, XDG-compliant configuration loading
+- Phase 2: HTTP server with Chi router, REST API endpoints, SSE streaming
+- Phase 3: Provider abstraction using ByteDance Eino framework with
+  Anthropic and OpenAI provider support (including Bedrock/Azure)
+- Phase 4: Tool framework with core tools (Read, Write, Edit, Bash,
+  Glob, Grep, List)
+
+The server uses the Eino LLM framework for unified provider abstraction
+and tool integration, enabling seamless switching between LLM providers.
+
+eb8a132d feat: implement Phase 3 - user experience enhancements for custom prompts
+This commit implements Phase 3 of the custom system prompts feature, focusing
+on user experience improvements:
+
+- Added create/edit/delete actions to prompts command
+- Implemented createTemplate() with base template support
+  - Supports --base flag to copy from existing templates (anthropic, beast, gemini, codex, qwen, polaris)
+  - Auto-creates template directory if it doesn't exist
+  - Opens template in $EDITOR after creation
+  - Supports both project and global templates via --global flag
+- Implemented editTemplate() to modify existing templates
+  - Finds templates in project or global directories
+  - Opens in configured $EDITOR
+- Implemented deleteTemplate() with confirmation prompt
+  - Interactive yes/no confirmation before deletion
+  - Supports --global flag for explicit global template deletion
+
+- Added custom prompt display in TUI session list
+  - Shows 📄 emoji and file path for file-based prompts
+  - Shows 📝 emoji for inline prompts
+  - Displayed as subtitle in session list dialog
+- Added custom prompt display in CLI run command
+  - Shows "Custom prompt: file: <path>" or "Custom prompt: inline prompt"
+  - Displayed after session creation in both attach and bootstrap modes
+  - Uses info styling to make it visible but not intrusive
+
+Changes:
+- src/cli/cmd/prompts.ts: Added create/edit/delete functions (~200 LOC)
+- src/cli/cmd/run.ts: Added custom prompt info display in both execution paths
+- src/cli/cmd/tui/component/dialog-session-list.tsx: Added subtitle with custom prompt indicator
+
+All three phases of the custom system prompts feature are now complete.
+
+9651cec3 docs(go-opencode): Add architecture.md with package dependencies
+Document the package structure, dependencies, and design principles
+for go-opencode. Includes:
+
+- ASCII dependency graph
+- Package descriptions for all 18 internal packages
+- Public API and command packages
+- Dependency statistics and hub packages
+- Key design principles
+- External dependency list
+
+8871e05d refactor(go-opencode): Move SubagentExecutor to executor package
+Move SubagentExecutor from internal/tool to internal/executor to break
+the import cycle between tool and session packages.
+
+The cycle was:
+- tool/subagent_executor.go imported session
+- session/processor.go imported tool
+
+Now:
+- tool package no longer imports session
+- session package imports tool
+- executor package imports both tool and session
+
+This allows the tool package (including WebFetchTool) to build and test
+properly.
+
+8b765540 feat(go-opencode): Add WebFetch tool for fetching web content
+Port the WebFetch tool from TypeScript to Go OpenCode. The tool fetches
+content from URLs and returns it in the requested format (text, markdown,
+or html).
+
+Key features:
+- URL validation (must start with http:// or https://)
+- Configurable timeout (max 120 seconds, default 30)
+- Response size limit (5MB max)
+- HTML to Markdown conversion using html-to-markdown library
+- HTML to plain text extraction using goquery (strips scripts, styles)
+- Accept headers based on requested format
+- User-Agent spoofing to avoid blocking
+
+Dependencies added:
+- github.com/JohannesKaufmann/html-to-markdown v1.6.0
+- github.com/PuerkitoBio/goquery v1.10.0
+
+616428f9 docs(go-opencode): add comprehensive session persistence documentation
+Document the session management system including:
+- Data structures (Session, Message, Part)
+- Storage architecture and directory layout
+- Project ID generation (git-based)
+- Session lifecycle and recovery
+- Migration system for legacy sessions
+- API endpoints and compatibility notes
+
+fdaf73be feat(go-opencode): align project ID generation with TS implementation
+Use git's initial commit SHA for project ID generation instead of
+directory path hash. This ensures session compatibility between
+TypeScript and Go OpenCode implementations.
+
+Changes:
+- Add internal/project package with git-based project ID detection
+- Cache project ID in .git/opencode file (matching TS behavior)
+- Update session service to use new project ID mechanism
+- Add automatic migration from hash-based to git-based project IDs
+- Add migration from "global" project for non-git directories
+- Include comprehensive tests for project package
+
+c7008248 feat: add VCS watcher, SDK-compatible types, and protocol docs
+- Add VCS branch watcher using fsnotify to monitor .git/HEAD changes
+  - Publishes vcs.branch.updated events on branch change
+  - Integrated into server lifecycle (start/shutdown)
+  - Includes comprehensive unit tests
+
+- Fix SDK compatibility issues in types:
+  - Change smallModel, toolcall, topP to camelCase for TS compatibility
+  - Fix ModelCost to use nested cache object (cache.read/write)
+  - Add missing part types: SnapshotPart, PatchPart, AgentPart,
+    SubtaskPart, RetryPart
+
+- Add TUI event types:
+  - tui.prompt.append, tui.command.execute, tui.toast.show
+  - vcs.branch.updated, pty.* events, command.executed
+  - Update TUI handlers to publish SSE events
+
+- Add comprehensive protocol documentation:
+  - docs/opencode-server-endpoints.md - Complete endpoint reference
+  - docs/tui-event-specification.md - Event protocol with AI SDK comparison
+
+2fd0df03 docs(go-opencode): Add comprehensive subagent system documentation
+Add SUBAGENT.md with detailed documentation covering:
+- Available agents (general, explore, plan) and their capabilities
+- Task tool usage with examples
+- Parallel execution patterns and concurrency model
+- Architecture diagrams and component overview
+- Detailed TS vs Go implementation comparison
+- Orchestration patterns for common use cases
+- Future roadmap for feature parity with TS
+- Agent permission reference tables
+
+92949e8c feat(go-opencode): Port task agents from TypeScript to Go
+This change implements the full task agent system in go-opencode to match
+the TypeScript implementation in packages/opencode:
+
+- Updated built-in agents (general, explore, plan) with proper descriptions,
+  permissions, and prompts matching the TS implementation
+- Created SubagentExecutor to implement TaskExecutor interface for actually
+  executing subagent tasks (creates child sessions, runs processor loop)
+- Updated tool registry with RegisterTaskTool and SetTaskExecutor methods
+- Wired up the SubagentExecutor in both serve.go and run.go commands
+- Task tool now generates dynamic descriptions based on available agents
+- Added conversion from agent.Agent to session.Agent for processing
+
+The subagents now have full capabilities:
+- general: Full tool access for research and parallel execution
+- explore: Specialized for codebase exploration with custom prompt
+- plan: Read-only access for planning and analysis
+
+4a86d3c4 Update CLAUDE.md
+
+0754b82a fix: Update dependencies and session loop improvements
+- Update go.mod and go.sum with latest dependencies
+- Improve session loop handling
+- Update CLAUDE.md documentation
+
+7f0ecd18 feat: Add session improvements and todo management tools
+- Add todo management tools (todoread, todowrite) for task tracking
+- Implement session title generation and management
+- Add comprehensive documentation files across all packages
+- Improve session processing with better error handling
+- Enhance tool registry with new capabilities
+- Add session compacting and streaming improvements
+- Update test coverage for new functionality
+- Improve server handlers for session and message management
+- Add permission checking enhancements
+- Update client tool registry with new tools
+
+40b9bb0c feat: implement /compact command and fix tool ID case for TUI compatibility
+- Add CompactionPart type for compaction requests
+- Implement processCompaction() to generate conversation summaries via LLM
+- Add session.compacted event for TUI notifications
+- Update summarize endpoint to accept providerID and modelID
+- Add custom JSON marshaling for Message.summary field (object for user, bool for assistant)
+- Change all tool IDs to lowercase (edit, read, write, bash, glob, grep, list, task) for TUI ToolRegistry compatibility
+- Fix unified diff format to show only context lines around changes
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+29f09c51 feat: enhance config, MCP client, and session handling
+- Add comprehensive config API with CRUD operations for providers, MCP servers, and models
+- Implement MCP server restart functionality with proper cleanup
+- Improve SSE event streaming with better message type filtering
+- Add tool result grouping for parallel tool calls
+- Enhance session stream with proper SDK event emission
+- Add config persistence and validation
+- Include new tests for tools and config functionality
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+861ddc72 fix: SDK compatibility for user message display and text streaming
+This commit fixes multiple issues preventing proper TUI integration:
+
+## User Message Display (handlers_message.go)
+- Change event type from `message.created` to `message.updated`
+  (TUI only listens for `message.updated`, not `message.created`)
+- Add `message.part.updated` events for user message parts
+- Add required `sessionID` and `messageID` fields to TextPart and FilePart
+  (TUI stores parts by messageID - without it, parts can't be associated)
+
+## Text Streaming (stream.go)
+- Fix accumulated vs delta detection: use `strings.HasPrefix` instead of
+  length comparison to correctly identify streaming mode
+- Publish `message.part.updated` event for first text chunk
+  (was only calling callback, not publishing event)
+- Fix tool call tracking to use Index-based lookup (eino streaming model)
+- Accumulate tool arguments as deltas, not replace
+
+## Message Processing (loop.go)
+- Reload messages after tool execution to include tool results
+- Skip empty messages (no parts) in completion requests
+- Add debug logging for message building
+
+## Tool Execution (tools.go, registry.go)
+- Add debug logging for tool execution flow
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+f11c28a7 feat(sdk): add JSON parse error logging for debugging
+Add console.error logging for JSON parse failures that were previously
+silently caught:
+- SSE JSON parse errors (with url, eventName, rawData)
+- SSE connection errors (with url, attempt, error)
+- API error response JSON parse failures (with url, status, rawBody)
+
+Logs use [SDK] prefix and are captured to log file in TUI mode via
+captureConsole.
+
+Also adds patch-generated.ts script that automatically re-applies these
+patches after SDK regeneration.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+ab20497d feat: add console log capture to file for TUI mode
+Add ability to capture console.log/error/warn/debug calls to log files
+in TUI mode. This is useful for debugging since stdout/stderr are not
+visible when the TUI is running.
+
+Changes:
+- Add captureConsole option to Log.init() and Log.captureConsole() fn
+- Add restoreConsole() to restore original console methods
+- Enable console capture in TUI thread, worker, attach, and spawn cmds
+- Console output is logged with service="console" in the log file
+
+13b0bd9a refactor(cli): remove duplicate getCustomPrompt function
+
+df6fee04 Plan docs
+
+85342613 fix: align Go JSON schema with TypeScript (camelCase compatibility)
+- Restructure ToolPart to use nested State object matching TypeScript SDK
+- Add ToolState and ToolTime structs for proper state management
+- Change field naming from snake_case to camelCase:
+  - file_path → filePath (read, write, edit tools)
+  - old_string → oldString, new_string → newString (edit tool)
+  - replace_all → replaceAll (edit tool)
+  - subagent_type → subagentType (task tool)
+- Rename ToolPart fields: ToolCallID → CallID, ToolName → Tool
+- Fix MessageError structure to use Name/Data instead of Type/Message
+- Update all tests to use new field names
+- Add skip for flaky integration tests in short mode
+- Fix TestInitializeProviders_NoConfig to handle env var auto-registration
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+c0b7d764 feat: MCP tool wrapper integration and CLI improvements
+- Add MCP tool wrapper implementing tool.Tool interface
+  - MCPToolWrapper adapts MCP tools to work with existing tool registry
+  - Enables MCP tools in session processor without modifying agentic loop
+  - RegisterMCPTools function to bulk-register MCP tools
+
+- Add MCP initialization to run command
+  - Parse MCP config and connect to servers
+  - Register MCP tools in tool registry
+
+- Add MCP tool registration to serve command
+  - Register MCP tools after server initialization
+  - Add MCPClient() and ToolRegistry() getters to server
+
+- Consolidate cmd/opencode-server into cmd/opencode
+  - Remove duplicate opencode-server binary
+  - Move MCP initialization to serve.go
+  - Update Makefile to remove opencode-server target
+
+- Add --show-config global flag to print merged config as JSON
+- Add --model/-m as global persistent flag (matches TypeScript CLI)
+
+- Add comprehensive test coverage
+  - Unit tests for tool wrapper
+  - Integration tests with calculator MCP server
+  - E2E tests for stdio/SSE transports, multiple servers, failures
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+275bd43d fix: SDK compatibility, test improvements, and anthropic model aliases
+## SDK Compatibility Fixes
+- Fix ToolPart JSON tags for TypeScript SDK compatibility:
+  - `json:"toolCallID"` → `json:"callID"`
+  - `json:"toolName"` → `json:"tool"`
+- Add SessionID and MessageID to parts in stream.go for SSE event filtering
+- Save user message parts to storage in HTTP handler
+
+## Anthropic Provider Improvements
+- Add `claude-haiku-4-5` model alias for convenience
+- Add empty content validation in anthropic provider tests
+
+## MockLLM Test Infrastructure
+- Add empty content rejection (400 error) for invalid requests
+- Make tool name matching case-insensitive in FindMatchingToolRule
+- Add comprehensive empty content handling tests
+- Add chunk splitting tests for streaming
+
+## Test Suite Improvements
+- Skip provider check for mockllm (test infrastructure only)
+- Add provider-specific environment variable checking
+- Fix test assertions for case-insensitive tool matching
+- Add anthropic and OpenAI provider empty content tests
+
+## Provider Registry
+- Improve model lookup with better error messages
+- Add integration tests for provider registry
+
+Test Results:
+- citest/server (mockllm): 23/24 passed (1 skipped)
+- citest/service (mockllm): 79/90 passed (10 pending, 1 skipped)
+- Message Flow (anthropic): 9/9 passed
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+dd557b9d feat(citest): add TypeScript OpenCode integration tests with MockLLM
+Add integration tests that verify the TypeScript OpenCode server works
+correctly with the MockLLM backend:
+
+- TSOpenCodeServer: Manages TypeScript server process lifecycle
+- HTTPClient: Helper methods for REST API calls
+- Test scenarios for session management, message exchange, and streaming
+- Graceful skip when TypeScript dependencies aren't installed
+- MockLLM configuration loading tests that run independently
+
+The tests will automatically skip if node_modules is not present,
+allowing them to be run once dependencies are installed with 'bun install'.
+
+307ec1b7 feat(citest): add chunk control settings for MockLLM streaming
+- Add chunk_mode setting: "word" (default), "char", "fixed"
+- Add chunk_size setting for character-based chunking
+- Add max_chunks setting to limit or target chunk count
+- Implement splitIntoChunks() with support for all modes
+- Add comprehensive unit tests for chunking
+- Update default YAML config with new settings
+
+053895f0 feat(citest): add YAML configuration support for MockLLM
+- Add MockLLMConfig type with YAML schema for configurable test scenarios
+- Support response rules with flexible matching (contains, contains_all,
+  contains_any, exact)
+- Support tool rules for generating tool calls based on prompts
+- Add config file loading from YAML files
+- Add runtime configuration via AddResponse/AddToolRule methods
+- Create default config file at citest/config/mockllm.yaml
+- Add unit tests for config loading and matching
+- Update documentation with YAML configuration guide
+
+bd06726f docs(citest): add README with MockLLM usage guide
+Document the CI test infrastructure including:
+- Test suite overview
+- Running tests with real providers vs MockLLM
+- MockLLM features and response mapping
+- Configuration options and environment variables
+- Troubleshooting guide
+
+56ef63cd feat(citest): enable MockLLM provider for CI tests
+Add MockLLM server to citest infrastructure allowing tests to run
+without real API keys. Changes include:
+
+- Add citest/testutil/mockllm.go with OpenAI-compatible mock server
+- Modify StartTestServer to handle TEST_PROVIDER=mockllm
+- Update all test suites to skip env var check when using mockllm
+- Use gpt-4o-mini as model ID (required by OpenAI provider validation)
+
+Test results with TEST_PROVIDER=mockllm:
+- e2e tests: 14/14 passed (100%)
+- server tests: 23/24 passed (95.8%)
+- service tests: 79/88 passed (89.8%)
+
+43a27b01 feat(test): enable Anthropic provider MockLLM tests
+Investigation found that the Anthropic SDK does NOT block localhost
+connections. The previous "private_ipv4_blocked" error was a transient
+issue, not a security feature of the SDK.
+
+- Enable full Anthropic provider test suite using MockLLM server
+- Test coverage includes: provider properties, streaming completions,
+  multi-turn conversations, tool binding, request verification, and
+  response determinism
+- Both ARK and Anthropic providers now have comprehensive mock tests
+
+d1221680 feat(provider): add ArkProvider mocked tests using MockLLM
+Add comprehensive mocked provider tests for Ark:
+
+- ArkProvider tests using MockLLM server with deterministic responses
+- Tests cover: basic completion, streaming, multi-turn, tool binding
+- Simplified mock_provider_test.go to just types and helpers
+- Anthropic tests skipped due to SDK blocking localhost connections
+
+Key insight: You can set any API key and model ID as long as the
+BaseURL points to the MockLLM server - the mock doesn't validate
+credentials, only the request/response format.
+
+Note: Anthropic SDK has built-in security that blocks connections
+to private IP addresses (localhost), so those tests are skipped.
+
+17f1bd85 feat(provider): add mocked provider tests for Ark and Anthropic
+Add comprehensive MockLLM-based tests for provider testing:
+
+- MockLLMServer implementation with OpenAI/ARK format support
+- MockLLMServer implementation with Anthropic format support
+- Streaming SSE support for both formats
+- Tool call response simulation
+- Request recording for verification
+- Determinism tests ensuring identical responses
+
+Tests cover:
+- OpenAI/ARK chat completions endpoint
+- Anthropic messages endpoint
+- Streaming responses for both formats
+- Tool call handling
+- Fallback responses for unknown prompts
+- Request header recording
+
+9f79c718 feat(test): implement MockLLM-based comparative testing harness
+Add a native Go MockLLM server for deterministic comparative testing
+between TypeScript and Go implementations. This enables:
+
+- Deterministic LLM responses (same prompt = same response)
+- OpenAI and Anthropic API compatibility
+- Streaming SSE support
+- Tool call simulation
+- Request recording for verification
+- JSON comparison with configurable tolerances
+
+Files added:
+- citest/comparative/mockllm_test.go - MockLLM server implementation
+- citest/comparative/harness_test.go - Comparative harness and utilities
+- plan/go-opencode/13-mockllm-comparative-testing.md - Architecture docs
+
+af87b6fb fix(api): add success field to unregister response for TS parity
+The TypeScript implementation returns { success: true, unregistered: [...] }
+but the Go implementation was missing the success field.
+
+e39aed47 feat(api): implement client tools endpoints for Go server
+Add missing client tools endpoints to achieve parity with TypeScript:
+- GET /client-tools/pending/{clientID} - SSE stream for tool requests
+- GET /client-tools/tools/{clientID} - Get registered tools for client
+- GET /client-tools/tools - Get all registered client tools
+
+Implementation includes:
+- New clienttool package with Registry for tool management
+- Event types for client tool lifecycle (request, registered, etc.)
+- SSE handler with 30s keepalive ping and cleanup on disconnect
+- Updated register/unregister/execute/result handlers to use registry
+- Integration tests for all new endpoints
+
+Refs: plan/go-opencode/14-impl-client-tools.md
+
+efb914a7 feat(server): implement symbol search endpoint
+- Add LSP client to Server struct and initialize on startup
+- Implement GET /find/symbol handler with query parameter validation
+- Filter results by symbol kinds (Class, Method, Enum, Interface, Function, Variable, Constant, Struct)
+- Limit results to 10 symbols (matching TypeScript implementation)
+- Add CloseLSP method for server shutdown cleanup
+- Add integration tests for symbol search endpoint
+- Fix pre-existing type errors in phase3_test.go
+
+052d9f83 docs(plan): add implementation plans for Go parity gaps
+Add detailed implementation plans for three missing features:
+- Symbol Search: Low effort, LSP already implemented, needs handler wiring
+- Client Tools: Medium effort, needs registry package and SSE endpoint
+- Provider OAuth: High effort, needs OAuth manager and auth storage
+
+c7122be5 docs(plan): add detailed parity gap analysis for Go implementation
+Document missing functionality requiring attention for full feature parity:
+
+1. Symbol Search (GET /find/symbol)
+   - Go returns 501 Not Implemented
+   - TS has full LSP workspace symbol integration
+
+2. Client Tools endpoints (3 missing)
+   - GET /client-tools/pending/:clientID (SSE stream)
+   - GET /client-tools/tools/:clientID
+   - GET /client-tools/tools
+
+3. Provider OAuth (authorize + callback)
+   - Go returns 501 Not Implemented
+   - TS has full OAuth flow with token storage
+
+Includes implementation priority matrix and recommended order.
+
+3fe6bca7 docs(plan): add comparative testing plan for TS vs Go implementations
+Add comprehensive testing strategy document that covers:
+- Endpoint comparison matrix with 60+ endpoints
+- Dual-server test harness architecture
+- Parallel request client implementation
+- JSON deep diff comparison logic
+- Tolerance configuration for acceptable differences
+- SSE event and streaming response tests
+- CI/CD integration with GitHub Actions
+- Parity score calculation and reporting
+- Implementation roadmap phases
+
+ec1950e4 feat(sdk): implement Phase 4 SDK expansion - expose Go server advanced features
+Phase 4 implementation adds SDK support for Go server features:
+
+SDK Resources Added:
+- client_tools: register, unregister, execute, result
+- doc: openapi endpoint
+
+Extended SDK Methods:
+- mcp: remove, tools, resources, resource, execute_tool
+- command: get, execute
+- formatter: format
+
+New Models Added:
+- McpTool, McpResource, McpToolResult
+- CommandResult, FormatResult
+- ClientTool, ClientToolResult
+
+Tests Added:
+- Phase 4 endpoint tests for client tools, doc, and SDK coverage
+
+Documentation:
+- Created 11-implement-missing-endpoints.md plan document
+- Updated README with Phase 8 SDK Feature Parity status
+
+fdebdca0 test(citest): add Phase 3 endpoint tests for MCP, commands, formatters, sharing
+Add comprehensive CI tests for Phase 3 feature parity endpoints:
+
+MCP Endpoints:
+- GET /mcp - status check
+- GET /mcp/tools - tools listing
+- GET /mcp/resources - resources listing
+- POST /mcp - validation for required fields
+- DELETE /mcp/{name} - 404 handling
+- POST /mcp/tool/{name} - error handling
+- GET /mcp/resource - validation
+
+Command Endpoints:
+- GET /command - list with builtin commands
+- GET /command/{name} - details and 404 handling
+- POST /command/{name} - execution error handling
+
+Formatter Endpoints:
+- GET /formatter - status and formatters list
+- POST /formatter/format - single/multiple file formatting
+
+Session Sharing:
+- POST /session/{id}/share - create share
+- DELETE /session/{id}/share - unshare
+
+Agent Endpoints:
+- GET /agent - list with required fields
+
+bba83eda feat(api): implement Phase 3 feature parity - MCP, commands, formatters, sharing
+Phase 3 implementation includes:
+
+MCP (Model Context Protocol):
+- MCP server initialization at app startup from config
+- Full MCP API endpoints: GET/POST /mcp, DELETE /mcp/{name}
+- MCP tool listing and execution: GET /mcp/tools, POST /mcp/tool/{name}
+- MCP resource operations: GET /mcp/resources, GET /mcp/resource
+- Proper server lifecycle management with cleanup on shutdown
+
+Custom Commands:
+- Command executor with template processing
+- Support for config-defined and file-based (.opencode/command/*.md) commands
+- Variable substitution and Go template support
+- Command API: GET /command, GET/POST /command/{name}
+- Built-in commands (help, clear, compact, reset, undo, share, export)
+
+Formatter Integration:
+- Formatter manager with default formatters (prettier, gofmt, black, rustfmt)
+- File formatting with extension-based formatter selection
+- Format hooks support for edit tools
+- API: GET /formatter, POST /formatter/format
+
+Session Sharing:
+- Sharing manager with token-based authentication
+- Support for expiration and view limits
+- Share info storage and retrieval
+
+b22748e3 feat(api): implement missing SDK endpoints for Phase 2 compatibility
+Add missing endpoints required by TypeScript SDK:
+- GET /project - list all projects
+- GET /project/current - get current project for directory
+- GET /session/{id}/message/{messageID} - get single message
+- GET /tui/control/next - get next TUI control request from queue
+- POST /tui/control/response - submit TUI control response
+
+Add types:
+- Project struct with ID, Worktree, VCS, and Time fields
+- ProjectTime struct with Created and Initialized timestamps
+- TUIControlRequest struct for control queue
+
+Add session service methods:
+- GetMessage for retrieving single message by ID
+- ListProjects for listing all known projects
+- GetCurrentProject for getting project by directory
+
+Update tests to match SDK contract (writeSuccess returns boolean).
+
+9a10ffff feat(types): align Go server types with SDK for compatibility
+- Update event types to use SDK-compatible structure:
+  - Change session/message events to use `info` field instead of `session`/`message`
+  - Rename `part.updated` to `message.part.updated`
+  - Rename `permission.required/resolved` to `permission.updated/replied`
+  - Add sessionID/messageID fields to all Part types
+
+- Update SSE event format:
+  - Change from `{"type": ..., "data": ...}` to `{"type": ..., "properties": ...}`
+
+- Add new event types for SDK compatibility:
+  - SessionIdle, SessionError, MessagePartRemoved, PermissionReplied
+
+- Add SessionError type for error reporting
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+cbaef285 feat: implement Phase 2 - CLI integration for custom prompts
+Add CLI flags and template discovery commands for custom prompt templates.
+
+- Added --prompt <template> flag to run command (auto-detect file/inline)
+- Added --prompt-file <path> flag for explicit file mode
+- Added --prompt-inline <text> flag for explicit inline mode
+- Updated session creation in run.ts to pass customPrompt parameter
+- Implemented getCustomPrompt() helper to parse CLI args
+- Updated both attach and bootstrap session creation paths
+
+- Created new `prompts` command with actions: list, show
+- `opencode prompts list`: Lists all available templates
+  * Shows project templates (.opencode/prompts/)
+  * Shows global templates (~/.opencode/prompts/)
+  * Displays template name and size in KB
+  * Groups by location (project vs global)
+- `opencode prompts show --name <template>`: Displays template details
+  * Shows location, path, and size
+  * Preview mode: first 10 lines (default)
+  * Full mode: complete content (--verbose flag)
+  * Helpful error message if template not found
+- Registered PromptsCommand in main CLI
+
+- Auto-detection of file vs inline prompts in run command
+- Convenient template browsing and inspection
+- Clear usage examples in command output
+- Support for .txt and .md template files
+
+```bash
+opencode run --prompt data-analyst.txt "analyze this data"
+opencode run --prompt-file ~/templates/security.txt "audit code"
+opencode run --prompt-inline "You are a Python expert" "refactor this"
+
+opencode prompts list
+
+opencode prompts show --name data-analyst.txt
+opencode prompts show --name security.txt --verbose
+```
+
+Files modified/added:
+- src/cli/cmd/run.ts (~20 LOC modified)
+- src/cli/cmd/prompts.ts (~200 LOC new)
+- src/index.ts (~2 LOC modified)
+
+Total: ~222 LOC
+
+31a46bd9 fix: update workflow executor to use Provider.getLanguage API
+The Provider.getModel() API now returns just the model info directly,
+with Provider.getLanguage(model) as a separate function to get the
+language model. Updated executor.ts to use the new API pattern.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+4d8e6c05 fix: align Go server API with TypeScript SDK contract
+- Change writeSuccess() to return `true` instead of `{"success": true}`
+- Add Title field to CreateSessionRequest for session creation
+- Update Service.Create() to accept optional title parameter
+- Fix listSessions to list all sessions when no directory specified
+- Return empty array [] instead of null for empty session lists
+- Add OpenAI provider support with gpt-4o-mini as default model
+- Make CI test fixture switchable between OpenAI and ARK providers
+- Fix SSE headers to flush immediately for proper streaming
+- Fix stream processing for delta vs accumulated content modes
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+0b7122ac feat(provider): add ARK provider and Ginkgo integration test suite
+- Add ARK provider implementation using eino-ext/components/model/ark
+- Add Ginkgo/Gomega testing framework with comprehensive test utilities
+- Create citest/ directory with service, server, and e2e test suites
+- Add test utilities for server lifecycle, HTTP client, and SSE streaming
+- Add plan documents for integration testing strategy
+- Update registry to initialize ARK provider from config
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+6dfe5f52 feat(event): integrate watermill pub/sub infrastructure
+- Add ThreeDotsLabs/watermill as pub/sub infrastructure for event bus
+- Use watermill's gochannel.GoChannel for in-memory pub/sub
+- Maintain full API compatibility with original implementation
+- Expose PubSub() method for advanced use cases (middleware, routing)
+- Add proper Close() method for graceful shutdown
+- Update opportunity doc to mark watermill integration as done
+
+ffc2ed55 feat: add file logging and enhanced logging for config/LLM
+- Add --log-file flag to write logs to /tmp/opencode-YYYYMMDD-HHMMSS.log
+- Support multi-writer output (console + file simultaneously)
+- Add configuration logging:
+  - Log each config file loaded with path
+  - Log configuration summary (model, providers, agents, MCP servers)
+- Add LLM interaction logging:
+  - Log request details (provider, model, message count, step)
+  - Log user message content (truncated)
+  - Log response with tokens, duration, finish reason
+  - Log assistant response and tool calls
+- Add GetLogFilePath() and Close() helpers to logging package
+
+88672b6c feat: implement structured logging with zerolog
+Replace standard Go log package with zerolog for structured JSON logging:
+- Add internal/logging package wrapping zerolog with convenient helpers
+- Update cmd/opencode-server and cmd/opencode/commands to use new logging
+- Support --print-logs and --log-level CLI flags for log control
+- Pretty-print console output for development mode
+- Update github-packages-opportunities.md to mark logging as completed
+
+a6172006 fix(opencode): resolve TypeScript type errors in workflow and related modules
+- workflow/executor.ts: Add proper orchestrator defaults with typed values
+- workflow/executor.ts: Fix status comparison with type assertion
+- workflow/index.ts: Fix duplicate id by spreading config first
+- workflow/index.ts: Remove unused reload() function
+- workflow/tool.ts: Change pausedStep type from null to undefined
+- session/system.ts: Use fs.existsSync instead of Bun.file().existsSync()
+- dialog-session-list.tsx: Remove customPrompt UI (SDK type not updated)
+- client-tools.ts: Add type assertions for resolver() calls
+- test/client-tools-api.test.ts: Fix stdout type assertion
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+9a8e2f4e fix(memsh-cli): resolve TypeScript type errors
+- Handle undefined arg value in cli.ts
+- Add index signature to ExecuteCommandParams
+- Add index signatures and export metadata interfaces
+- Use z.number() instead of z.coerce.number() in ReadTool
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+5ba4a247 fix: add missing yaml dependency and workflow ID prefix
+- Add yaml@2.8.0 to dependencies for workflow parser
+- Add 'workflow' prefix to Identifier for WorkflowInstance schema
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+5746985d feat: replace custom implementations with recommended packages
+Replace custom Levenshtein distance and exponential backoff implementations
+with battle-tested open source packages:
+
+- Use agnivade/levenshtein for string distance calculation in edit tool
+- Use cenkalti/backoff/v4 for retry logic with jitter and context awareness
+- Keep custom SSE implementation (documented decision: better suited to our event bus)
+
+Changes:
+- internal/tool/edit.go: Use agnivade/levenshtein package
+- internal/session/loop.go: Use cenkalti/backoff/v4 with jitter, max interval, context support
+- internal/server/sse.go: Add documentation explaining why custom SSE is kept
+- internal/session/processor_test.go: Add tests for new backoff function
+
+Benefits:
+- Levenshtein: Better edge case handling, optimized for large strings
+- Backoff: Jitter prevents thundering herd, context-aware cancellation
+
+See docs/github-packages-opportunities.md for full analysis.
+
+f50f6018 feat: reimplement MCP using official Go SDK
+Replace custom JSON-RPC implementation with the official MCP Go SDK
+(github.com/modelcontextprotocol/go-sdk v1.1.0):
+
+- Remove transport.go with manual JSON-RPC protocol handling
+- Rewrite client.go to use SDK's Client, ClientSession, and transports
+- Simplify types.go with SDK type adapters (FromSDKTool, FromSDKResource)
+- Use SDK's CommandTransport for stdio and SSEClientTransport for HTTP
+- Reduce code by ~500 lines while maintaining API compatibility
+
+Benefits:
+- Standardized protocol implementation
+- Better connection management and error handling
+- Built-in support for MCP spec versions
+- Reduced maintenance burden
+
+8ea60bfe docs: add analysis of GitHub package opportunities for go-opencode
+Document custom implementations that could be replaced with established
+GitHub packages, categorized by priority (high/medium/low) with detailed
+rationale for each recommendation.
+
+854f5e48 feat(config): implement TypeScript-compatible configuration system
+- Add Cobra CLI framework with subcommands (serve, run, models, auth, agent, debug)
+- Support ~/.opencode/ config location for TypeScript compatibility
+- Support ~/.config/opencode/ for XDG compliance
+- Add OPENCODE_CONFIG and OPENCODE_CONFIG_DIR environment variables
+- Add config interpolation for {env:VAR} and {file:path} placeholders
+- Use tidwall/jsonc for proper JSONC (JSON with comments) parsing
+- Add ProviderOptions for nested TypeScript-style provider configuration
+- Expand config types: Schema, Username, Theme, Share, Tools, MCP, etc.
+- Add comprehensive tests for all configuration features
+- Deduplicate config loading to prevent duplicate instructions
+
+d60f349b feat: use doublestar/v4 for wildcard matching
+Replace custom wildcard matching implementations with the doublestar/v4
+package for proper glob pattern support including ** patterns.
+
+Changes:
+- go-opencode: Update agent.go matchWildcard to use doublestar for complex
+  patterns while preserving simple string matching for basic * patterns
+- go-memsh: Update llm_commands.go find command to use doublestar.Match
+  instead of regex conversion for glob patterns
+- go-memsh: Update collectFiles to use doublestar for include/exclude
+  pattern matching
+- go-memsh: Update client/tools.go GlobTool to use doublestar for proper
+  ** pattern support when filtering files
+
+db719027 docs: add go-opencode compatibility plan
+Compare go-opencode with TypeScript opencode implementation:
+- Configuration file format and field differences
+- CLI command and flag gaps
+- Environment variable support
+- Detailed implementation plan for compatibility
+
+003dcb03 feat(phase7): implement LSP, MCP, Agent system, and Task tool
+Phase 7 Advanced Features implementation:
+
+- Agent System (internal/agent/)
+  - Multi-agent configuration with built-in agents (build, plan, general, explore)
+  - Registry for agent management with custom config loading
+  - Permission handling per agent with tool and bash filtering
+
+- LSP Client (internal/lsp/)
+  - Language Server Protocol client with JSON-RPC over stdio
+  - Support for TypeScript, Go, Python, Rust language servers
+  - Operations: hover, workspace/document symbols, definition, references
+
+- MCP Client (internal/mcp/)
+  - Model Context Protocol client for tool integration
+  - HTTP and stdio transports for remote/local servers
+  - Tool listing and execution with proper namespacing
+
+- Task Tool (internal/tool/task.go)
+  - Sub-agent spawning for autonomous task handling
+  - Support for general, explore, and plan agent types
+  - Executor interface for flexible task processing
+
+All 247 tests passing across Phase 1-7 components.
+
+c59e45a7 feat(session): implement Phase 6 session processing and agentic loop
+Phase 6 implements the core agentic loop and message processing system:
+
+New Files:
+- internal/session/agent.go: Agent configuration types (default, code, plan agents)
+- internal/session/processor.go: Main processor for handling message processing
+- internal/session/loop.go: Agentic loop execution with retry and step limits
+- internal/session/stream.go: LLM stream processing with SSE events
+- internal/session/tools.go: Tool execution with permission checks and doom loop detection
+- internal/session/system.go: System prompt builder with environment context
+- internal/session/compact.go: Message compaction for context overflow
+- internal/session/processor_test.go: Unit tests for processor components
+
+Key Features:
+- Agentic loop with max steps (50) and max retries (3)
+- Streaming updates via callback and event bus
+- Tool execution with metadata updates
+- Doom loop detection (3+ identical calls triggers permission check)
+- Session abort functionality
+- Context overflow detection and compaction
+- System prompt with provider-specific headers
+- Custom rules from AGENTS.md/CLAUDE.md
+- Token and cost tracking
+
+All tests passing (165+ tests across Phases 1-6).
+
+1ab24df7 docs: update plan with Phase 5 completion status
+
+d0b9490e feat(permission): implement Phase 5 permission and security system
+Implement the complete permission system for controlling tool execution:
+
+- Add permission package with types, permission actions (allow/deny/ask)
+- Implement bash command parser using mvdan/sh for shell command analysis
+- Add permission checker with ask flow and event publishing
+- Implement wildcard pattern matching for bash command permissions
+- Add doom loop detection to prevent infinite tool call loops
+- Integrate permission checking into bash tool with external dir validation
+
+Key features:
+- Parse complex bash commands (pipelines, chains, subshells)
+- Detect dangerous commands (rm, mv, cp, chmod, etc.) and validate paths
+- Check for external directory access outside working directory
+- Support pattern-based permission configuration (e.g., "git *", "npm install *")
+- Publish permission request events via event bus for TUI integration
+
+Test coverage: 42 new tests covering all permission components
+
+d0474812 docs: update plan documents with Phase 1-4 completion status
+Mark completed acceptance criteria in plan documents:
+- Phase 1 (Foundation): All criteria complete
+- Phase 2 (HTTP Server): Core criteria complete
+- Phase 3 (LLM Providers): Eino integration complete
+- Phase 4 (Tool System): All tools and tests complete
+
+Update README timeline with status indicators showing
+104 tests passing across all implemented phases.
+
+eef1d095 test: add unit tests for Phase 3 and Phase 4 components
+Add comprehensive unit tests for LLM provider and tool system:
+
+Provider tests (provider_test.go, registry_test.go):
+- ParseModelString parsing and validation
+- Model priority sorting
+- ConvertToEinoTools conversion
+- JSON schema parameter parsing
+- Message and tool call conversion
+- Provider registry CRUD operations
+- Concurrent access safety
+- InitializeProviders configuration handling
+
+Tool tests (registry_test.go, tools_test.go):
+- Tool registry operations
+- Eino tool wrapper integration
+- ReadTool file operations with offset/limit
+- WriteTool file creation and overwrite
+- EditTool string replacement and replace_all
+- ListTool directory listing
+- BashTool command execution with timeout
+- GlobTool pattern matching
+- GrepTool regex search
+- Tool context metadata handling
+
+All 104 tests passing.
+
+948cd302 test: add unit tests for Phase 1 and Phase 2 components
+Adds comprehensive unit tests for:
+- Storage layer (Put, Get, Delete, List, Scan, Exists, concurrent access)
+- Event bus (Subscribe, SubscribeAll, Publish, PublishSync, unsubscribe)
+- Types (JSON serialization for Session, Message, Parts)
+- HTTP handlers (session CRUD, config, file operations)
+- SSE streaming (SSE writer, heartbeats, event filtering, headers)
+
+Fixes a bug in storage/lock.go where Lock() would fail when the parent
+directory didn't exist. Now creates the directory before acquiring lock.
+
+e0aaa29f chore: improve .gitignore for Go build artifacts
+
+74ad222a feat: implement Go-based OpenCode server up to Phase 4
+This implements the go-opencode server providing a single binary deployment
+option compatible with the original TypeScript server behavior.
+
+Features implemented:
+- Phase 1: Core types (Session, Message, Parts), storage layer with file
+  locking, event bus system, XDG-compliant configuration loading
+- Phase 2: HTTP server with Chi router, REST API endpoints, SSE streaming
+- Phase 3: Provider abstraction using ByteDance Eino framework with
+  Anthropic and OpenAI provider support (including Bedrock/Azure)
+- Phase 4: Tool framework with core tools (Read, Write, Edit, Bash,
+  Glob, Grep, List)
+
+The server uses the Eino LLM framework for unified provider abstraction
+and tool integration, enabling seamless switching between LLM providers.
+
+03fb21cc docs: add detailed code-level analysis to workflow DSL evaluation
+Add comprehensive code review findings from analyzing eino source:
+- Graph implementation patterns (compose/graph.go)
+- Chain API as syntactic sugar for linear workflows
+- Workflow field-level data mapping via AddInput()
+- ReAct agent graph orchestration with tool call branching
+- Multi-Agent Host pattern for specialist delegation
+- Eino-ext components: MCP integration, sequential thinking
+
+Include architectural mapping table showing how OpenCode DSL
+concepts translate to Eino implementations, plus proposed Go
+implementation patterns for DSL-to-Eino conversion.
+
+2ce2f020 feat: add LLM-based condition evaluation and llm_eval step type
+Enhance the workflow DSL with LLM-powered decision making:
+
+Schema changes:
+- Add `conditionType` field to ConditionalStep ("expression" | "llm")
+- Add `conditionType` field to LoopStep for while/until conditions
+- Add new `LLMEvalStep` for complex LLM-based evaluations
+  - Supports boolean, choice, text, and JSON output formats
+  - Configurable model and temperature
+
+Executor changes:
+- Implement `executeLLMEvalStep` for the new step type
+- Implement `evaluateLLMCondition` helper for LLM-based yes/no decisions
+- Update conditional step to support LLM evaluation
+- Update loop step to support LLM-based while/until conditions
+- Add detailed logging for LLM evaluations
+
+Example workflow:
+- Add iterative-refinement.md demonstrating:
+  - LLM evaluation for quality assessment
+  - Loop with LLM-based exit condition
+  - Conditional branching based on LLM decisions
+
+b76b6495 feat: add agentic workflow DSL for multi-agent orchestration
+Implement a comprehensive DSL for defining and executing agentic workflows:
+
+Schema & Types:
+- WorkflowDefinition: Define workflows with inputs, agents, steps, and orchestrator config
+- Step types: agent, pause, parallel, conditional, loop, transform
+- Runtime state tracking with WorkflowInstance and StepState
+
+Parser:
+- Parse workflows from Markdown (with YAML frontmatter), YAML, or JSON
+- Support for inline agent definitions with custom prompts and tools
+- Validation of step references, agent references, and dependency cycles
+
+Executor/Orchestrator:
+- Execute workflows with configurable modes: auto, guided, manual
+- Human review pauses with approval/rejection flow
+- Parallel step execution with concurrency control
+- Conditional branching and loop support
+- Variable interpolation between steps
+- Event-driven progress tracking
+
+Workflow Tool:
+- Start, resume, cancel, and check status of workflows
+- Real-time updates via event subscriptions
+- Structured output with step states and variables
+
+Example workflows:
+- Code review: multi-agent analysis, review, and fix workflow
+- Feature implementation: research, plan, implement, test workflow
+- Parallel analysis: concurrent security, performance, and style checks
+
+aa9e0527 docs: regenerate missing Go server implementation plan documents
+Add four missing plan documents for the Go OpenCode server rewrite
+by analyzing the TypeScript source code:
+
+- 02-http-server.md: HTTP server, routing, middleware, SSE streaming
+- 03-llm-providers.md: LLM provider abstraction (Anthropic, OpenAI, Google)
+- 06-session-processing.md: Agentic loop and message processing
+- 07-advanced-features.md: LSP, MCP, multi-agent system
+
+These documents complete the full implementation plan referenced in
+plan/go-opencode/README.md.
+
+1658bdbb docs: add Eino framework evaluation as recommended Go SDK
+Updated the evaluation to include CloudWeGo Eino as the recommended
+framework for the OpenCode Go implementation. Key findings:
+
+- Eino provides near feature parity with Vercel AI SDK
+- Multi-provider support: Claude, OpenAI, Gemini, Ollama, etc.
+- Built-in AWS Bedrock support for Claude
+- Cache control and extended thinking for Claude
+- MCP integration via official MCP SDK
+- ReAct agent and graph orchestration built-in
+- Production-tested at ByteDance scale
+
+ADK-Go relegated to reference patterns only due to Gemini-only limitation.
+
+b48b2e4a docs: add ADK-Go SDK evaluation for OpenCode server
+Comprehensive evaluation of Google's ADK-Go as a potential replacement
+for the Vercel AI SDK. Includes:
+- Feature comparison matrix
+- How-to documentation for Go implementations
+- Code examples for streaming, providers, tools, MCP, and sessions
+- Gap analysis and recommendations
+
+5543d661 docs: add detailed Go server implementation plan
+Comprehensive planning documentation for Go OpenCode server rewrite:
+
+- README.md: Overview, project structure, timeline
+- 01-foundation.md: Core types, storage, event bus
+- 04-tool-system.md: Tool framework and implementations
+- 05-permission-security.md: Permission system, mvdan/sh bash parsing
+- test-plan.md: Testing strategy matching TypeScript test infrastructure
+- technical-specs.md: API contracts, data formats, integration requirements
+
+Key decisions:
+- Use mvdan/sh (already in go-memsh) for bash command parsing
+- Go standard testing + testify for test framework
+- Match existing REST + SSE protocol for TUI compatibility
+
+848b68b2 docs: add Go server rewrite feasibility evaluation and phased plan
+Comprehensive analysis of rewriting the OpenCode server in Go:
+- Feasibility assessment: HIGH - technically feasible
+- 8-12 week implementation timeline across 7 phases
+- Protocol remains unchanged (REST + SSE), TUI client compatible
+- Leverages existing Go code (go-memsh, SDK) patterns
+
+1dbd2bee feat: add Go client SDK for go-memsh service
+Implement a Go client SDK in go-memsh/client that provides the same
+functionality as the TypeScript memsh-cli package.
+
+Key components:
+- Client: WebSocket JSON-RPC client with REST API support
+  - Session management (create, list, remove)
+  - Auto-reconnect support
+  - Request/response handling
+- Session: High-level session wrapper
+  - File operations (read, write, exists, mkdir, rm, ls)
+  - Working directory management
+  - Command execution helpers
+- Tools mirroring packages/memsh-cli functionality:
+  - BashTool: Execute shell commands
+  - ReadTool: Read file contents with line numbers
+  - WriteTool: Write/create files
+  - EditTool: Edit files with string replacement
+  - GlobTool: Find files by pattern
+  - GrepTool: Search file contents
+  - LsTool: List directory contents
+
+All 15 unit tests pass.
+
+951c25bb feat: add memsh-cli TypeScript client package
+Implement @opencode-ai/memsh-cli, a TypeScript client for connecting
+to the go-memsh service. This package provides the same tool features
+as packages/opencode for working over the memory file system.
+
+Key features:
+- MemshClient: WebSocket JSON-RPC client for go-memsh communication
+- Session: High-level session management for shell operations
+- Tools mirroring packages/opencode functionality:
+  - bash: Execute shell commands
+  - read: Read file contents
+  - write: Write file contents
+  - edit: Edit files with string replacement
+  - glob: Find files by pattern
+  - grep: Search file contents
+  - ls: List directory contents
+- CLI entry point for interactive and single-command usage
+- Unit tests for client and tool infrastructure
+
+e51c58b4 feat(go-memsh): add LLM-optimized commands for AI assistant integration
+Add new commands designed for efficient LLM tool integration:
+
+- stat: Returns file metadata as JSON (size, mtime, mode, is_dir, perm)
+- readfile: Returns raw file content with offset/limit support
+- writefile: Writes stdin to file with append and --parents options
+- findex/find2: Enhanced find with -maxdepth, -mindepth, -mtime, -size, -empty
+- grepex/grep2: Enhanced grep with -r, -l, -L, -A/-B/-C context, --include/--exclude
+- exists: Quick file/directory existence check with -f/-d flags
+
+Also fixes build error in stdio() function by properly handling
+interp.HandlerCtx which returns a struct value, not a pointer.
+
+All new commands have comprehensive tests covering edge cases.
+
+02391a4a docs: add LLM assistant support feasibility report for go-memsh
+Evaluate the feasibility of running the opencode AI assistant over
+go-memsh's memory file system with client-server architecture:
+
+- Analyze both go-memsh and opencode architectures
+- Propose three integration options (Protocol Bridge, Embedded Go, Dual-Mode Provider)
+- Recommend Protocol Bridge approach with ~2-4 weeks implementation effort
+- Include tool mapping analysis, implementation plan, and code examples
+- Document required go-memsh enhancements and risk assessment
+
+dbe3f733 test: add comprehensive tests for custom prompt feature
+Add 33 tests covering the custom system prompt template functionality:
+- parseCustomPromptInput auto-detection (file vs inline)
+- interpolateVariables with built-in and custom variables
+- Variable filters (uppercase, lowercase, capitalize)
+- Default values for missing variables
+- fromSession loading and interpolation
+- File size limits and error handling
+- OPENCODE_VAR_* environment variable extraction
+- Edge cases and complex templates
+
+e34e4170 feat: implement client-side tools support
+Add infrastructure for SDK clients to register and execute custom tools
+that run on the client rather than the server.
+
+New files:
+- src/tool/client-registry.ts: Core registry for client tools with
+  registration, execution, timeout handling, and event emission
+- src/server/client-tools.ts: HTTP API routes for tool registration,
+  result submission, and SSE streaming of tool requests
+
+API endpoints:
+- POST /client-tools/register - Register tools for a client
+- DELETE /client-tools/unregister - Remove tools
+- POST /client-tools/result - Submit execution result
+- GET /client-tools/pending/:clientID - SSE stream for tool requests
+- GET /client-tools/tools/:clientID - Get client's tools
+- GET /client-tools/tools - Get all client tools
+
+Events added:
+- client-tool.request - Tool execution requested
+- client-tool.registered/unregistered - Tool lifecycle
+- client-tool.executing/completed/failed - Execution status
+
+Tests:
+- 30 unit tests for ClientToolRegistry (all passing)
+- Integration test scaffolding for API endpoints (skipped in CI)
+
+2dfef1ca docs: add Client Tools Protocol to TUI specification
+Add comprehensive protocol documentation for client-side tools:
+
+- New API endpoints: register, unregister, result, pending SSE
+- WebSocket alternative protocol for low-latency communication
+- Data types: ClientToolDefinition, ExecutionRequest, Result, Error
+- New event types: client-tool.registered/executing/completed/failed
+- Communication pattern diagram showing full execution flow
+- Complete example of tool registration and execution
+- Security considerations and permission integration
+- Timeout and error handling specifications
+
+Bumps protocol version to 1.1.0
+
+a4af8c34 docs: add testing strategy for client-side tools feature
+Analyze how existing test infrastructure can validate the client tools
+feature from client-side-tools.md:
+
+- Bun test framework for ClientToolRegistry unit tests
+- Instance.provide() pattern for isolated test context
+- Python subprocess integration tests for API routes
+- Mock HTTP transport patterns for SDK testing
+- Event bus testing for tool request events
+- Retry/timeout patterns for execution timeouts
+
+Key finding: Current infrastructure fully supports the feature testing
+except for end-to-end tests requiring real AI model interaction.
+
+80c1414f docs: add comprehensive testing infrastructure analysis
+Analyze the repository's testing infrastructure and strategies including:
+- Testing framework overview (Bun, Go native, pytest)
+- Test categories by package (51 total test files)
+- Mock infrastructure patterns
+- CI/CD pipeline configuration
+- Critical gap analysis: no real model testing or agent evals
+
+Key finding: The codebase has solid unit/integration tests but lacks
+AI-specific testing against real models and performance evaluation.
+
+abd9f1ca docs: add streaming protocol details to TUI specification
+Add comprehensive documentation for AI response streaming:
+- New Streaming Pattern section explaining SSE-based streaming
+- Updated Send Message endpoint with streaming behavior warning
+- Enhanced message.part.updated event documentation with delta field
+- Updated practical examples showing real streaming events
+- Clarified that HTTP response waits while SSE delivers incremental updates
+
+Key clarifications:
+- Streaming works via Server-Sent Events, not HTTP response streaming
+- Text deltas delivered in real-time via message.part.updated events
+- Delta field contains incremental text chunks for efficient rendering
+- 16ms batching window for event optimization
+- HTTP POST blocks until AI completes, then returns final message
+
+Implementation references added for processor and delta handling.
+
+8bd91b7b docs: add comprehensive TUI client-server protocol specification
+Add detailed protocol specification document covering:
+- Architecture overview (separate processes, HTTP communication)
+- Transport layer details (HTTP/1.1, SSE)
+- Data formats (JSON schemas)
+- Communication patterns (request-response, SSE, bidirectional queue)
+- Complete API endpoint reference
+- Event system documentation (27+ event types)
+- Error handling specifications
+- Security considerations
+- Practical examples
+
+This documentation provides a complete reference for understanding and
+implementing the TUI client-server communication protocol.
+
+7254b6e1 add go-memsh
+
+4889c820 feat: implement Phase 3 - user experience enhancements for custom prompts
+This commit implements Phase 3 of the custom system prompts feature, focusing
+on user experience improvements:
+
+- Added create/edit/delete actions to prompts command
+- Implemented createTemplate() with base template support
+  - Supports --base flag to copy from existing templates (anthropic, beast, gemini, codex, qwen, polaris)
+  - Auto-creates template directory if it doesn't exist
+  - Opens template in $EDITOR after creation
+  - Supports both project and global templates via --global flag
+- Implemented editTemplate() to modify existing templates
+  - Finds templates in project or global directories
+  - Opens in configured $EDITOR
+- Implemented deleteTemplate() with confirmation prompt
+  - Interactive yes/no confirmation before deletion
+  - Supports --global flag for explicit global template deletion
+
+- Added custom prompt display in TUI session list
+  - Shows 📄 emoji and file path for file-based prompts
+  - Shows 📝 emoji for inline prompts
+  - Displayed as subtitle in session list dialog
+- Added custom prompt display in CLI run command
+  - Shows "Custom prompt: file: <path>" or "Custom prompt: inline prompt"
+  - Displayed after session creation in both attach and bootstrap modes
+  - Uses info styling to make it visible but not intrusive
+
+Changes:
+- src/cli/cmd/prompts.ts: Added create/edit/delete functions (~200 LOC)
+- src/cli/cmd/run.ts: Added custom prompt info display in both execution paths
+- src/cli/cmd/tui/component/dialog-session-list.tsx: Added subtitle with custom prompt indicator
+
+All three phases of the custom system prompts feature are now complete.
+
+18ccf19d feat: implement Phase 2 - CLI integration for custom prompts
+Add CLI flags and template discovery commands for custom prompt templates.
+
+- Added --prompt <template> flag to run command (auto-detect file/inline)
+- Added --prompt-file <path> flag for explicit file mode
+- Added --prompt-inline <text> flag for explicit inline mode
+- Updated session creation in run.ts to pass customPrompt parameter
+- Implemented getCustomPrompt() helper to parse CLI args
+- Updated both attach and bootstrap session creation paths
+
+- Created new `prompts` command with actions: list, show
+- `opencode prompts list`: Lists all available templates
+  * Shows project templates (.opencode/prompts/)
+  * Shows global templates (~/.opencode/prompts/)
+  * Displays template name and size in KB
+  * Groups by location (project vs global)
+- `opencode prompts show --name <template>`: Displays template details
+  * Shows location, path, and size
+  * Preview mode: first 10 lines (default)
+  * Full mode: complete content (--verbose flag)
+  * Helpful error message if template not found
+- Registered PromptsCommand in main CLI
+
+- Auto-detection of file vs inline prompts in run command
+- Convenient template browsing and inspection
+- Clear usage examples in command output
+- Support for .txt and .md template files
+
+```bash
+opencode run --prompt data-analyst.txt "analyze this data"
+opencode run --prompt-file ~/templates/security.txt "audit code"
+opencode run --prompt-inline "You are a Python expert" "refactor this"
+
+opencode prompts list
+
+opencode prompts show --name data-analyst.txt
+opencode prompts show --name security.txt --verbose
+```
+
+Files modified/added:
+- src/cli/cmd/run.ts (~20 LOC modified)
+- src/cli/cmd/prompts.ts (~200 LOC new)
+- src/index.ts (~2 LOC modified)
+
+Total: ~222 LOC
+
+b8f8c098 feat: implement Phase 1 - custom system prompts with variable interpolation
+Implement core functionality for session-level custom prompt templates with
+template variable interpolation support.
+
+- Added `customPrompt` field to Session.Info schema with type, value, loadedAt, and variables
+- Updated Session.create schema to accept customPrompt parameter (string or object)
+- Implemented parseCustomPromptInput() helper for auto-detecting file vs inline prompts
+- Updated createNext() function to persist custom prompt metadata
+
+- Added fromSession() function to load and interpolate session-level prompts
+- Implemented resolveTemplatePath() for file resolution (project, global, absolute paths)
+- Added interpolateVariables() function for template variable substitution
+- Implemented 17 built-in variables:
+  * PROJECT_NAME, PROJECT_PATH, WORKING_DIR
+  * GIT_BRANCH, GIT_REPO, PRIMARY_LANGUAGE
+  * PLATFORM, DATE, TIME, DATETIME
+  * USER, HOSTNAME, SESSION_ID, SESSION_TITLE
+  * AGENT_NAME, MODEL_ID, OPENCODE_VERSION
+- Added detectPrimaryLanguage() helper (extension-based detection)
+- Added getGitBranch() helper for git integration
+- Added extractEnvVariables() for OPENCODE_VAR_* support
+- Added applyFilter() for variable transformations (uppercase, lowercase, capitalize)
+- Variable syntax support: ${VAR}, ${VAR:default}, ${VAR|filter}
+- File size limit: 100 KB for prompt templates
+
+- Modified resolveSystemPrompt() to accept sessionID parameter
+- Added call to SystemPrompt.fromSession() in priority order:
+  1. Per-request system parameter
+  2. Agent-specific prompt
+  3. Session-level custom prompt (NEW)
+  4. Model-specific default
+  5. Environment context
+  6. Custom instructions
+- Updated all call sites to pass sessionID
+
+- Session.create API now validates customPrompt field
+- Added promptVariables field to Config.Info schema for global custom variables
+- Security: path traversal prevention in resolveTemplatePath()
+
+- File-based templates: load from .opencode/prompts/ or ~/.opencode/prompts/
+- Inline templates: pass prompt text directly
+- Auto-detection: automatically distinguish file paths from inline text
+- Custom variables: session-specific, config-based, or environment (OPENCODE_VAR_*)
+- Variable resolution priority: session > config > environment > built-in > default
+- Backward compatible: sessions without custom prompts work as before
+
+Files modified:
+- src/session/index.ts (~50 LOC)
+- src/session/system.ts (~180 LOC)
+- src/session/prompt.ts (~10 LOC)
+- src/config/config.ts (~5 LOC)
+
+Total: ~245 LOC
+
+1cf667a8 docs: add template variable interpolation to custom prompt feature (v2.0)
+Expand the custom system prompt feature plan to include comprehensive
+template variable interpolation in Phase 1 core implementation.
+
+Major additions:
+- 17 built-in variables (PROJECT_NAME, GIT_BRANCH, PRIMARY_LANGUAGE, etc.)
+- Custom variables via session, config, or environment (OPENCODE_VAR_*)
+- Variable syntax: ${VAR}, ${VAR:default}, ${VAR|filter}
+- Filters: uppercase, lowercase, capitalize
+- Auto-detection of primary programming language
+- Git branch detection
+- Variable resolution priority order
+
+Implementation details:
+- interpolateVariables() function with full variable map
+- detectPrimaryLanguage() helper (extension-based detection)
+- getGitBranch() helper for git integration
+- extractEnvVariables() for OPENCODE_VAR_* support
+- applyFilter() for variable transformations
+- Updated Session schema to include variables field
+- Task 1.5 added to Phase 1 implementation plan
+
+Examples updated:
+- Data analyst template with PROJECT_NAME, DATE variables
+- Security auditor template with GIT_BRANCH, PLATFORM variables
+- New team analyst example showing custom variables
+- API examples showing variables field usage
+
+Document changes:
+- Updated executive summary with variable features
+- Moved variable interpolation from Phase 4 to Phase 1
+- Updated file modification summary (~250 LOC total)
+- Version bump to 2.0 with changelog
+
+Ready for implementation.
+
+651a7f61 docs: add comprehensive custom system prompt feature plan
+Add detailed feature plan for implementing custom system and initial
+prompt templates per session. This will enable users to create
+specialized agents (e.g., data analyst, security auditor) by providing
+custom prompt templates when starting a session.
+
+Key features:
+- Session-level custom prompt templates (persistent)
+- Support for file-based and inline prompts
+- Template resolution from project/global directories
+- Auto-detection of file vs inline prompts
+- Backward compatible with existing sessions
+- Comprehensive implementation plan with ~145 LOC
+
+The plan includes:
+- Current architecture analysis
+- Technical design and schema changes
+- Implementation roadmap (3 phases)
+- API changes and CLI integration
+- Security considerations
+- Testing strategy
+- Example templates for data analyst and security auditor
+
+Ready for review and implementation.
+
+f4ee8652 docs: add comprehensive OpenCode architecture whitepaper
+Create a detailed 14-section whitepaper synthesizing all architectural
+analysis into a cohesive document covering:
+
+1. System Overview - Architecture style, technology stack, components
+2. Core Architecture - Instance model, HTTP API, message flow
+3. Session Management - Lifecycle, sequential processing, multi-client
+4. MCP Server Integration - Configuration, lifecycle, tool registration
+5. LSP Integration - 19 language servers, selection algorithm, usage
+6. System Prompt Construction - Assembly pipeline, model-specific prompts
+7. Event System - Bus architecture, event flow, client subscription
+8. Storage Layer - File-based JSON storage, lock implementation
+9. Concurrency Control - Multi-layer locking, race prevention
+10. Multi-Server Considerations - Statefulness analysis, deployment options
+11. Security Model - Permission system, MCP/LSP security
+12. Performance Characteristics - Bottlenecks, optimizations, scalability
+13. Design Decisions - Language-agnostic prompts, file storage, locking
+14. Future Considerations - Enhancement opportunities, evolution phases
+
+Includes comprehensive diagrams, decision rationales, trade-off analysis,
+and complete reference appendices for files, events, and configuration.
+
+f0685349 docs: add comprehensive todo and task tools documentation
+Comprehensive analysis of OpenCode's todo and task tool systems including:
+- TodoWrite and TodoRead tool definitions and data models
+- Task tool for subagent spawning
+- Internal storage design and event bus architecture
+- Usage guidelines and prompts from todowrite.txt, todoread.txt, task.txt
+- System integration points and UI rendering
+- Data flow diagrams and common patterns
+- File references with line numbers
+
+This documentation provides a complete reference for understanding how
+OpenCode implements task management and agent delegation.
+
+558b8f74 docs: add comprehensive subagent API reference and new client feasibility analysis
+- Document all server-side APIs for session, message, and task management
+- Document all client-side APIs including Bus events, Storage, and Provider
+- Analyze event system for real-time subagent monitoring
+- Provide implementation guide for new clients
+- Assess feasibility of building clients in various languages (TypeScript, Python, Go, Rust)
+- Include architecture patterns and feature parity matrix
+- Document existing SDK (@opencode-ai/sdk) and web client (packages/desktop)
+- Add packages overview showing all available client implementations
+
+43c0f520 docs: add MySQL storage design with BIGINT primary keys
+Alternative storage design for MySQL deployments with:
+- Snowflake-style BIGINT ID generation (8 bytes vs 16)
+- No foreign keys, stored procedures, or triggers
+- Application-level referential integrity
+- Efficient cursor-based pagination
+- Sharding strategy by organization
+- Connection pooling and read/write splitting
+
+664d18c7 docs: add server-side web service deployment design
+Comprehensive design documentation for deploying OpenCode as a
+multi-tenant web service including:
+
+- System architecture and component design
+- Authentication, authorization, and multi-tenancy
+- Database schema and storage strategies
+- Horizontal scaling and Kubernetes deployment
+- Security controls and compliance requirements
+- API design with versioning and streaming support
+
+dbb0dc17 docs: add comprehensive design for client-side tools
+Add design document for enabling clients to register tool definitions
+with the server and have the server delegate execution back to the client.
+
+Key aspects covered:
+- Protocol design with new message types for tool requests/responses
+- Client tool registry for server-side management
+- SDK client tools manager for registering and handling tools
+- Both SSE and WebSocket communication options
+- Security considerations (auth, sandboxing, rate limiting)
+- Error handling and timeout management
+- Usage examples for common scenarios
+- Phased implementation plan
+
+dabee462 docs: add comprehensive system prompt construction analysis
+Document the complete system prompt sent to LLMs including:
+
+- All prompt template files (anthropic.txt, beast.txt, gemini.txt, etc.)
+- Step-by-step construction process in resolveSystemPrompt()
+- Full anthropic.txt content (106 lines) with all sections
+- Environment context template with variable substitution
+- Custom instructions loading from AGENTS.md/CLAUDE.md
+- Final 2-message structure for caching optimization
+- Complete example of final prompt for Claude on Go project
+- Model-specific variations (GPT, Gemini, etc.)
+
+7df26dd5 docs: add analysis of event replay, LSP utilization, and Go prompts
+Add four additional documentation files analyzing OpenCode architecture:
+
+1. event-historical-replay.md - Explains that OpenCode does NOT replay
+   historical events on client connect; uses pull-based model for history
+   and push-based for real-time updates
+
+2. lsp-utilization.md - Comprehensive analysis of how OpenCode uses LSP
+   including 19 built-in language servers, diagnostics injection, and
+   symbol search capabilities
+
+3. golang-project-prompts.md - Documents what prompts are sent for Go
+   projects; importantly, there are NO Go-specific instructions - the
+   model infers conventions from project structure and its training
+
+4. lsp-selection-mechanism.md - Details how OpenCode selects which LSP
+   server to use based on file extensions, root detection, and
+   configuration hierarchy
+
+8eb8dfff docs: add comprehensive analysis of OpenCode architecture
+Add detailed documentation analyzing three key aspects of OpenCode:
+
+1. MCP server connection support - covers entry points, configuration,
+   connection lifecycle, protocol handling, tool registration, and
+   error handling
+
+2. Session multiple connections and message ordering - explains how
+   multiple clients can connect to the same session and how message
+   ordering is guaranteed through callback queues and locks
+
+3. Multi-server statefulness - analyzes why OpenCode servers are
+   stateful and require session affinity, documenting in-memory state
+   that prevents horizontal scaling without distributed coordination

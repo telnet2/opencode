@@ -539,7 +539,6 @@ export default function Page() {
                             file={{
                               name: f().path,
                               contents: f().content?.content ?? "",
-                              cacheKey: checksum(f().content?.content ?? ""),
                             }}
                             overflow="scroll"
                             class="pb-40"

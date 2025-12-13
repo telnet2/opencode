@@ -37,6 +37,9 @@ await createClient({
   ],
 })
 
+// Apply error logging patches to generated files
+await $`bun ${path.join(dir, "script/patch-generated.ts")}`
+
 await $`bun prettier --write src/gen`
 await $`bun prettier --write src/v2`
 await $`rm -rf dist`

@@ -1,0 +1,789 @@
+// Package session provides session management functionality.
+package session
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/oklog/ulid/v2"
+
+	"github.com/opencode-ai/opencode/internal/event"
+	"github.com/opencode-ai/opencode/internal/permission"
+	"github.com/opencode-ai/opencode/internal/project"
+	"github.com/opencode-ai/opencode/internal/provider"
+	"github.com/opencode-ai/opencode/internal/storage"
+	"github.com/opencode-ai/opencode/internal/tool"
+	"github.com/opencode-ai/opencode/pkg/types"
+)
+
+// Service manages session operations.
+type Service struct {
+	storage *storage.Storage
+
+	// Active session processing
+	mu       sync.RWMutex
+	active   map[string]*ActiveSession
+	abortChs map[string]chan struct{}
+
+	// Processor for agentic loop
+	processor *Processor
+}
+
+// ActiveSession tracks an active processing session.
+type ActiveSession struct {
+	SessionID string
+	AbortCh   chan struct{}
+	StartTime time.Time
+}
+
+// NewService creates a new session service.
+func NewService(store *storage.Storage) *Service {
+	return &Service{
+		storage:  store,
+		active:   make(map[string]*ActiveSession),
+		abortChs: make(map[string]chan struct{}),
+	}
+}
+
+// NewServiceWithProcessor creates a new session service with processor dependencies.
+func NewServiceWithProcessor(
+	store *storage.Storage,
+	providerReg *provider.Registry,
+	toolReg *tool.Registry,
+	permChecker *permission.Checker,
+	defaultProviderID string,
+	defaultModelID string,
+) *Service {
+	s := &Service{
+		storage:  store,
+		active:   make(map[string]*ActiveSession),
+		abortChs: make(map[string]chan struct{}),
+	}
+	s.processor = NewProcessor(providerReg, toolReg, store, permChecker, defaultProviderID, defaultModelID)
+	return s
+}
+
+// GetProcessor returns the session processor.
+func (s *Service) GetProcessor() *Processor {
+	return s.processor
+}
+
+// Create creates a new session.
+func (s *Service) Create(ctx context.Context, directory string, title string) (*types.Session, error) {
+	now := time.Now().UnixMilli()
+	projectID, err := project.GetProjectID(directory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project ID: %w", err)
+	}
+
+	// Migrate any existing sessions from the old hash-based project ID
+	if err := s.migrateFromHashBasedID(ctx, directory, projectID); err != nil {
+		// Log but don't fail - migration is best-effort
+		_ = err
+	}
+
+	// Also migrate from "global" if applicable
+	if err := s.migrateFromGlobal(ctx, directory, projectID); err != nil {
+		_ = err
+	}
+
+	// Use default title if not provided
+	if title == "" {
+		title = "New Session"
+	}
+
+	session := &types.Session{
+		ID:        generateID(),
+		ProjectID: projectID,
+		Directory: directory,
+		Title:     title,
+		Version:   "1",
+		Summary: types.SessionSummary{
+			Additions: 0,
+			Deletions: 0,
+			Files:     0,
+		},
+		Time: types.SessionTime{
+			Created: now,
+			Updated: now,
+		},
+	}
+
+	if err := s.storage.Put(ctx, []string{"session", projectID, session.ID}, session); err != nil {
+		return nil, fmt.Errorf("failed to save session: %w", err)
+	}
+
+	return session, nil
+}
+
+// Get retrieves a session by ID.
+func (s *Service) Get(ctx context.Context, sessionID string) (*types.Session, error) {
+	// Try to find in any project
+	projects, err := s.storage.List(ctx, []string{"session"})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, projectID := range projects {
+		var session types.Session
+		if err := s.storage.Get(ctx, []string{"session", projectID, sessionID}, &session); err == nil {
+			return &session, nil
+		}
+	}
+
+	return nil, storage.ErrNotFound
+}
+
+// Update updates a session with the given updates.
+func (s *Service) Update(ctx context.Context, sessionID string, updates map[string]any) (*types.Session, error) {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply updates
+	if title, ok := updates["title"].(string); ok {
+		session.Title = title
+	}
+
+	session.Time.Updated = time.Now().UnixMilli()
+
+	if err := s.storage.Put(ctx, []string{"session", session.ProjectID, session.ID}, session); err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+// Delete deletes a session.
+func (s *Service) Delete(ctx context.Context, sessionID string) error {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	// Delete session file
+	if err := s.storage.Delete(ctx, []string{"session", session.ProjectID, sessionID}); err != nil {
+		return err
+	}
+
+	// Delete associated messages
+	messages, _ := s.GetMessages(ctx, sessionID)
+	for _, msg := range messages {
+		s.storage.Delete(ctx, []string{"message", sessionID, msg.ID})
+	}
+
+	return nil
+}
+
+// List lists sessions for a directory.
+// If directory is empty, lists all sessions across all projects.
+func (s *Service) List(ctx context.Context, directory string) ([]*types.Session, error) {
+	var sessions []*types.Session
+
+	if directory == "" {
+		// List ALL sessions across all projects
+		projects, err := s.storage.List(ctx, []string{"session"})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, projectID := range projects {
+			err := s.storage.Scan(ctx, []string{"session", projectID}, func(key string, data json.RawMessage) error {
+				var session types.Session
+				if err := json.Unmarshal(data, &session); err != nil {
+					return err
+				}
+				sessions = append(sessions, &session)
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return sessions, nil
+	}
+
+	// List sessions for a specific directory/project
+	projectID, err := project.GetProjectID(directory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project ID: %w", err)
+	}
+
+	// Also check for sessions under the old hash-based project ID and migrate them
+	if err := s.migrateFromHashBasedID(ctx, directory, projectID); err != nil {
+		// Log but don't fail - migration is best-effort
+		_ = err
+	}
+
+	// Also migrate from "global" if applicable
+	if err := s.migrateFromGlobal(ctx, directory, projectID); err != nil {
+		_ = err
+	}
+
+	err = s.storage.Scan(ctx, []string{"session", projectID}, func(key string, data json.RawMessage) error {
+		var session types.Session
+		if err := json.Unmarshal(data, &session); err != nil {
+			return err
+		}
+		sessions = append(sessions, &session)
+		return nil
+	})
+
+	return sessions, err
+}
+
+// GetChildren returns child sessions (forks).
+func (s *Service) GetChildren(ctx context.Context, sessionID string) ([]*types.Session, error) {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	all, err := s.List(ctx, session.Directory)
+	if err != nil {
+		return nil, err
+	}
+
+	var children []*types.Session
+	for _, sess := range all {
+		if sess.ParentID != nil && *sess.ParentID == sessionID {
+			children = append(children, sess)
+		}
+	}
+
+	return children, nil
+}
+
+// Fork creates a fork of a session at a specific message.
+func (s *Service) Fork(ctx context.Context, sessionID, messageID string) (*types.Session, error) {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create new session with fork title
+	newSession, err := s.Create(ctx, session.Directory, session.Title+" (fork)")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set parent
+	newSession.ParentID = &sessionID
+
+	// Copy messages up to the fork point
+	messages, err := s.GetMessages(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, msg := range messages {
+		// Copy message
+		newMsg := *msg
+		newMsg.SessionID = newSession.ID
+		s.AddMessage(ctx, newSession.ID, &newMsg)
+
+		if msg.ID == messageID {
+			break
+		}
+	}
+
+	// Save updated session
+	if err := s.storage.Put(ctx, []string{"session", newSession.ProjectID, newSession.ID}, newSession); err != nil {
+		return nil, err
+	}
+
+	return newSession, nil
+}
+
+// Abort aborts an active session.
+func (s *Service) Abort(ctx context.Context, sessionID string) error {
+	// Use the processor's abort mechanism which cancels the context
+	if s.processor != nil {
+		return s.processor.Abort(sessionID)
+	}
+
+	// Fallback to channel-based abort (legacy)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if ch, ok := s.abortChs[sessionID]; ok {
+		close(ch)
+		delete(s.abortChs, sessionID)
+	}
+
+	return nil
+}
+
+// Share shares a session and returns a share URL.
+func (s *Service) Share(ctx context.Context, sessionID string) (string, error) {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return "", err
+	}
+
+	// Generate a share URL (placeholder)
+	shareURL := fmt.Sprintf("https://opencode.ai/share/%s", sessionID)
+
+	session.Share = &types.SessionShare{URL: shareURL}
+	session.Time.Updated = time.Now().UnixMilli()
+
+	if err := s.storage.Put(ctx, []string{"session", session.ProjectID, session.ID}, session); err != nil {
+		return "", err
+	}
+
+	return shareURL, nil
+}
+
+// Unshare removes sharing from a session.
+func (s *Service) Unshare(ctx context.Context, sessionID string) error {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	session.Share = nil
+	session.Time.Updated = time.Now().UnixMilli()
+
+	return s.storage.Put(ctx, []string{"session", session.ProjectID, session.ID}, session)
+}
+
+// Summarize initiates a compaction/summarization of the session.
+// This creates a user message with a compaction part and triggers the processing loop.
+func (s *Service) Summarize(ctx context.Context, sessionID, providerID, modelID string) error {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	// Get the current agent from the last user message
+	messages, err := s.GetMessages(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	currentAgent := "default"
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "user" {
+			if messages[i].Agent != "" {
+				currentAgent = messages[i].Agent
+			}
+			break
+		}
+	}
+
+	// Create a user message with a compaction part
+	now := time.Now().UnixMilli()
+	userMsg := &types.Message{
+		ID:        ulid.Make().String(),
+		SessionID: sessionID,
+		Role:      "user",
+		Agent:     currentAgent,
+		Model: &types.ModelRef{
+			ProviderID: providerID,
+			ModelID:    modelID,
+		},
+		Time: types.MessageTime{
+			Created: now,
+		},
+	}
+
+	// Store the user message
+	if err := s.storage.Put(ctx, []string{"message", sessionID, userMsg.ID}, userMsg); err != nil {
+		return err
+	}
+
+	// Publish message created event
+	event.PublishSync(event.Event{
+		Type: event.MessageCreated,
+		Data: event.MessageCreatedData{Info: userMsg},
+	})
+
+	// Create the compaction part
+	compactionPart := &types.CompactionPart{
+		ID:        ulid.Make().String(),
+		SessionID: sessionID,
+		MessageID: userMsg.ID,
+		Type:      "compaction",
+		Auto:      false,
+	}
+
+	// Store the compaction part
+	if err := s.storage.Put(ctx, []string{"part", userMsg.ID, compactionPart.ID}, compactionPart); err != nil {
+		return err
+	}
+
+	// Publish part updated event
+	event.PublishSync(event.Event{
+		Type: event.MessagePartUpdated,
+		Data: event.MessagePartUpdatedData{Part: compactionPart},
+	})
+
+	// Trigger the processing loop
+	if s.processor != nil {
+		go func() {
+			s.processor.Process(context.Background(), session.ID, nil, nil)
+		}()
+	}
+
+	return nil
+}
+
+// GetDiffs returns diffs for a session.
+func (s *Service) GetDiffs(ctx context.Context, sessionID string) ([]types.FileDiff, error) {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return session.Summary.Diffs, nil
+}
+
+// GetTodos returns todos for a session.
+func (s *Service) GetTodos(ctx context.Context, sessionID string) ([]map[string]any, error) {
+	// TODO: Implement todo tracking
+	return []map[string]any{}, nil
+}
+
+// Revert reverts a session to a specific message.
+func (s *Service) Revert(ctx context.Context, sessionID, messageID string, partID *string) error {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	session.Revert = &types.SessionRevert{
+		MessageID: messageID,
+		PartID:    partID,
+	}
+	session.Time.Updated = time.Now().UnixMilli()
+
+	return s.storage.Put(ctx, []string{"session", session.ProjectID, session.ID}, session)
+}
+
+// Unrevert removes the revert state from a session.
+func (s *Service) Unrevert(ctx context.Context, sessionID string) error {
+	session, err := s.Get(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	session.Revert = nil
+	session.Time.Updated = time.Now().UnixMilli()
+
+	return s.storage.Put(ctx, []string{"session", session.ProjectID, session.ID}, session)
+}
+
+// ExecuteCommand executes a slash command.
+func (s *Service) ExecuteCommand(ctx context.Context, sessionID, command string) (map[string]any, error) {
+	// TODO: Implement command execution
+	return map[string]any{"result": "command executed"}, nil
+}
+
+// RunShell runs a shell command in the session context.
+func (s *Service) RunShell(ctx context.Context, sessionID, command string, timeout int) (map[string]any, error) {
+	// TODO: Implement shell execution
+	return map[string]any{"output": ""}, nil
+}
+
+// RespondPermission responds to a permission request.
+func (s *Service) RespondPermission(ctx context.Context, sessionID, permissionID string, granted bool) error {
+	// TODO: Implement permission response handling
+	return nil
+}
+
+// AddMessage adds a message to a session.
+func (s *Service) AddMessage(ctx context.Context, sessionID string, msg *types.Message) error {
+	return s.storage.Put(ctx, []string{"message", sessionID, msg.ID}, msg)
+}
+
+// GetMessages returns all messages for a session.
+func (s *Service) GetMessages(ctx context.Context, sessionID string) ([]*types.Message, error) {
+	var messages []*types.Message
+	err := s.storage.Scan(ctx, []string{"message", sessionID}, func(key string, data json.RawMessage) error {
+		var msg types.Message
+		if err := json.Unmarshal(data, &msg); err != nil {
+			return err
+		}
+		messages = append(messages, &msg)
+		return nil
+	})
+	return messages, err
+}
+
+// GetParts returns all parts for a message.
+func (s *Service) GetParts(ctx context.Context, messageID string) ([]types.Part, error) {
+	var parts []types.Part
+	err := s.storage.Scan(ctx, []string{"part", messageID}, func(key string, data json.RawMessage) error {
+		part, err := types.UnmarshalPart(data)
+		if err != nil {
+			return err
+		}
+		parts = append(parts, part)
+		return nil
+	})
+	return parts, err
+}
+
+// SavePart saves a part to storage for a given message.
+func (s *Service) SavePart(ctx context.Context, messageID string, part types.Part) error {
+	partID := ""
+	switch p := part.(type) {
+	case *types.TextPart:
+		partID = p.ID
+	case *types.FilePart:
+		partID = p.ID
+	case *types.ReasoningPart:
+		partID = p.ID
+	case *types.ToolPart:
+		partID = p.ID
+	}
+	if partID == "" {
+		return fmt.Errorf("part has no ID")
+	}
+	return s.storage.Put(ctx, []string{"part", messageID, partID}, part)
+}
+
+// GetMessage returns a single message by ID.
+func (s *Service) GetMessage(ctx context.Context, sessionID, messageID string) (*types.Message, error) {
+	var msg types.Message
+	if err := s.storage.Get(ctx, []string{"message", sessionID, messageID}, &msg); err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
+// ListProjects returns all known projects.
+func (s *Service) ListProjects(ctx context.Context, directory string) ([]*types.Project, error) {
+	// Get all project IDs from storage
+	projectIDs, err := s.storage.List(ctx, []string{"session"})
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a map of unique projects
+	projectMap := make(map[string]*types.Project)
+
+	for _, projectID := range projectIDs {
+		// Scan sessions in this project to find directory
+		err := s.storage.Scan(ctx, []string{"session", projectID}, func(key string, data json.RawMessage) error {
+			var session types.Session
+			if err := json.Unmarshal(data, &session); err != nil {
+				return err
+			}
+
+			// Filter by directory if specified
+			if directory != "" && session.Directory != directory {
+				return nil
+			}
+
+			// Add to projects map if not already present
+			if _, exists := projectMap[session.ProjectID]; !exists {
+				// Check if directory is a git repository
+				var vcs *string
+				gitVCS := "git"
+				// Just check if .git exists
+				vcs = &gitVCS // Assume git for now
+
+				projectMap[session.ProjectID] = &types.Project{
+					ID:       session.ProjectID,
+					Worktree: session.Directory,
+					VCS:      vcs,
+					Time: types.ProjectTime{
+						Created: session.Time.Created,
+					},
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Convert map to slice
+	projects := make([]*types.Project, 0, len(projectMap))
+	for _, p := range projectMap {
+		projects = append(projects, p)
+	}
+
+	return projects, nil
+}
+
+// GetCurrentProject returns the project for the given directory.
+func (s *Service) GetCurrentProject(ctx context.Context, directory string) (*types.Project, error) {
+	if directory == "" {
+		return nil, fmt.Errorf("directory is required")
+	}
+
+	info, err := project.FromDirectory(directory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project info: %w", err)
+	}
+
+	now := time.Now().UnixMilli()
+
+	return &types.Project{
+		ID:       info.ID,
+		Worktree: info.Worktree,
+		VCS:      info.VCS,
+		Time: types.ProjectTime{
+			Created: now,
+		},
+	}, nil
+}
+
+// ProcessMessage processes a user message and generates an assistant response.
+// This is the main agentic loop.
+// Note: The caller (HTTP handler) is responsible for creating and storing the user message
+// and its parts before calling this function.
+func (s *Service) ProcessMessage(
+	ctx context.Context,
+	session *types.Session,
+	content string,
+	model *types.ModelRef,
+	onUpdate func(msg *types.Message, parts []types.Part),
+) (*types.Message, []types.Part, error) {
+	// Use processor if available
+	if s.processor != nil {
+		var finalMsg *types.Message
+		var finalParts []types.Part
+
+		err := s.processor.Process(ctx, session.ID, DefaultAgent(), func(msg *types.Message, parts []types.Part) {
+			finalMsg = msg
+			finalParts = parts
+			if onUpdate != nil {
+				onUpdate(msg, parts)
+			}
+		})
+
+		if err != nil {
+			return finalMsg, finalParts, err
+		}
+
+		return finalMsg, finalParts, nil
+	}
+
+	// Fallback: Create placeholder assistant message if no processor
+	assistantMsg := &types.Message{
+		ID:        generateID(),
+		SessionID: session.ID,
+		Role:      "assistant",
+		Time: types.MessageTime{
+			Created: time.Now().UnixMilli(),
+		},
+	}
+
+	if model != nil {
+		assistantMsg.ProviderID = model.ProviderID
+		assistantMsg.ModelID = model.ModelID
+	}
+
+	parts := []types.Part{
+		&types.TextPart{
+			ID:   generateID(),
+			Type: "text",
+			Text: "Processor not initialized. Please configure providers.",
+		},
+	}
+
+	// Save message
+	if err := s.AddMessage(ctx, session.ID, assistantMsg); err != nil {
+		return nil, nil, err
+	}
+
+	// Notify of update
+	if onUpdate != nil {
+		onUpdate(assistantMsg, parts)
+	}
+
+	return assistantMsg, parts, nil
+}
+
+// generateID generates a new ULID.
+func generateID() string {
+	return ulid.Make().String()
+}
+
+// migrateFromHashBasedID migrates sessions from the old hash-based project ID
+// to the new git-based project ID. This ensures compatibility with TypeScript OpenCode.
+func (s *Service) migrateFromHashBasedID(ctx context.Context, directory, newProjectID string) error {
+	// Calculate the old hash-based project ID
+	oldProjectID := project.HashDirectory(directory)
+
+	// If they're the same (e.g., "global"), no migration needed
+	if oldProjectID == newProjectID {
+		return nil
+	}
+
+	// Check if there are any sessions under the old project ID
+	oldSessions, err := s.storage.List(ctx, []string{"session", oldProjectID})
+	if err != nil || len(oldSessions) == 0 {
+		return nil // No sessions to migrate
+	}
+
+	// Migrate each session
+	for _, sessionID := range oldSessions {
+		var session types.Session
+		if err := s.storage.Get(ctx, []string{"session", oldProjectID, sessionID}, &session); err != nil {
+			continue // Skip sessions that can't be read
+		}
+
+		// Only migrate sessions that belong to this directory
+		if session.Directory != directory {
+			continue
+		}
+
+		// Update project ID and save to new location
+		session.ProjectID = newProjectID
+		if err := s.storage.Put(ctx, []string{"session", newProjectID, session.ID}, &session); err != nil {
+			continue // Skip on error
+		}
+
+		// Delete from old location
+		_ = s.storage.Delete(ctx, []string{"session", oldProjectID, sessionID})
+	}
+
+	return nil
+}
+
+// migrateFromGlobal migrates sessions from the "global" project to a specific project.
+// This handles cases where sessions were created before git detection was implemented.
+func (s *Service) migrateFromGlobal(ctx context.Context, directory, newProjectID string) error {
+	if newProjectID == "global" {
+		return nil // Can't migrate to global
+	}
+
+	// Check for sessions in "global" that belong to this directory
+	globalSessions, err := s.storage.List(ctx, []string{"session", "global"})
+	if err != nil || len(globalSessions) == 0 {
+		return nil
+	}
+
+	for _, sessionID := range globalSessions {
+		var session types.Session
+		if err := s.storage.Get(ctx, []string{"session", "global", sessionID}, &session); err != nil {
+			continue
+		}
+
+		// Only migrate sessions that belong to this directory
+		if session.Directory != directory {
+			continue
+		}
+
+		// Update project ID and save to new location
+		session.ProjectID = newProjectID
+		if err := s.storage.Put(ctx, []string{"session", newProjectID, session.ID}, &session); err != nil {
+			continue
+		}
+
+		// Delete from global
+		_ = s.storage.Delete(ctx, []string{"session", "global", sessionID})
+	}
+
+	return nil
+}

@@ -1,0 +1,141 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/spf13/afero"
+)
+
+func main() {
+	// Create an in-memory filesystem
+	fs := afero.NewMemMapFs()
+
+	// Create shell
+	shell, err := NewShell(fs)
+	if err != nil {
+		log.Fatalf("Failed to create shell: %v", err)
+	}
+
+	// Run demo scripts if arguments provided, otherwise run interactive mode
+	if len(os.Args) > 1 && os.Args[1] == "demo" {
+		runDemo(shell)
+	} else if len(os.Args) > 1 && os.Args[1] == "script" && len(os.Args) > 2 {
+		runScript(shell, os.Args[2])
+	} else {
+		runInteractive(shell)
+	}
+}
+
+func runDemo(shell *Shell) {
+	ctx := context.Background()
+
+	fmt.Println("=== Demo: Basic File Operations ===")
+	runCommand(shell, ctx, "pwd")
+	runCommand(shell, ctx, "mkdir -p /home/user/test")
+	runCommand(shell, ctx, "cd /home/user/test")
+	runCommand(shell, ctx, "pwd")
+	runCommand(shell, ctx, "echo 'Hello, World!' > hello.txt")
+	runCommand(shell, ctx, "cat hello.txt")
+	runCommand(shell, ctx, "ls -la")
+
+	fmt.Println("\n=== Demo: Pipes ===")
+	runCommand(shell, ctx, "echo 'Line 1\nLine 2\nLine 3' > lines.txt")
+	runCommand(shell, ctx, "cat lines.txt | cat")
+
+	fmt.Println("\n=== Demo: Redirection ===")
+	runCommand(shell, ctx, "echo 'output' > output.txt")
+	runCommand(shell, ctx, "cat output.txt")
+	runCommand(shell, ctx, "echo 'appended' >> output.txt")
+	runCommand(shell, ctx, "cat output.txt")
+
+	fmt.Println("\n=== Demo: Control Flow - If Statement ===")
+	script := `
+if [ -f hello.txt ]; then
+  echo "hello.txt exists"
+else
+  echo "hello.txt does not exist"
+fi
+`
+	runCommand(shell, ctx, script)
+
+	fmt.Println("\n=== Demo: Control Flow - For Loop ===")
+	script = `
+for i in 1 2 3 4 5; do
+  echo "Number: $i"
+done
+`
+	runCommand(shell, ctx, script)
+
+	fmt.Println("\n=== Demo: Test Expressions ===")
+	runCommand(shell, ctx, "touch testfile")
+	runCommand(shell, ctx, "[ -f testfile ] && echo 'testfile is a file'")
+	runCommand(shell, ctx, "[ -d testfile ] || echo 'testfile is not a directory'")
+
+	fmt.Println("\n=== Demo: File Operations ===")
+	runCommand(shell, ctx, "mkdir dir1 dir2")
+	runCommand(shell, ctx, "touch dir1/file1.txt dir1/file2.txt")
+	runCommand(shell, ctx, "ls dir1")
+	runCommand(shell, ctx, "cp -r dir1 dir3")
+	runCommand(shell, ctx, "ls dir3")
+	runCommand(shell, ctx, "mv dir3/file1.txt dir3/renamed.txt")
+	runCommand(shell, ctx, "ls dir3")
+
+	fmt.Println("\n=== Demo: Import/Export ===")
+	// Create a test directory and file in local filesystem
+	os.MkdirAll("/tmp/go-memsh-test", 0755)
+	os.WriteFile("/tmp/go-memsh-test/local-file.txt", []byte("This is a local file"), 0644)
+
+	runCommand(shell, ctx, "import-file /tmp/go-memsh-test/local-file.txt /imported.txt")
+	runCommand(shell, ctx, "cat /imported.txt")
+	runCommand(shell, ctx, "echo 'Modified content' > /export-test.txt")
+	runCommand(shell, ctx, "export-file /export-test.txt /tmp/go-memsh-test/exported.txt")
+
+	// Verify export
+	content, _ := os.ReadFile("/tmp/go-memsh-test/exported.txt")
+	fmt.Printf("Exported file content (from local filesystem): %s\n", string(content))
+
+	fmt.Println("\n=== Demo: Sleep ===")
+	fmt.Println("Sleeping for 1 second...")
+	runCommand(shell, ctx, "sleep 1")
+	fmt.Println("Done!")
+
+	fmt.Println("\n=== Demo Complete ===")
+}
+
+func runCommand(shell *Shell, ctx context.Context, cmd string) {
+	fmt.Printf("$ %s\n", cmd)
+	err := shell.Run(ctx, cmd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	}
+}
+
+func runScript(shell *Shell, scriptPath string) {
+	ctx := context.Background()
+
+	content, err := os.ReadFile(scriptPath)
+	if err != nil {
+		log.Fatalf("Failed to read script: %v", err)
+	}
+
+	err = shell.Run(ctx, string(content))
+	if err != nil {
+		log.Fatalf("Script execution failed: %v", err)
+	}
+}
+
+func runInteractive(shell *Shell) {
+	ctx := context.Background()
+
+	fmt.Println("Welcome to MemSh - Shell running on afero.FS")
+	fmt.Println("Type 'exit' or press Ctrl+D to exit")
+	fmt.Println()
+
+	err := shell.RunInteractive(ctx)
+	if err != nil {
+		log.Fatalf("Interactive mode failed: %v", err)
+	}
+}
