@@ -11,6 +11,15 @@ export const ProviderConfigSchema = z.object({
 
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>
 
+export const MCPServerConfigSchema = z.object({
+  name: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  env: z.record(z.string(), z.string()).optional(),
+})
+
+export type MCPServerConfig = z.infer<typeof MCPServerConfigSchema>
+
 export const ConfigSchema = z.object({
   provider: ProviderConfigSchema,
   systemPrompt: z.string().optional(),
@@ -23,6 +32,8 @@ export const ConfigSchema = z.object({
   maxRetries: z.number().int().min(0).max(10).optional().default(5),
   // Enable streaming mode (default: true)
   streaming: z.boolean().optional().default(true),
+  // MCP servers to connect to
+  mcpServers: z.array(MCPServerConfigSchema).optional(),
 })
 
 export type Config = z.infer<typeof ConfigSchema>
@@ -108,7 +119,18 @@ export const CONFIG_TEMPLATE = `{
 
   // Maximum retries for rate limit errors (default: 5)
   // Uses exponential backoff and respects Retry-After headers
-  "maxRetries": 5
+  "maxRetries": 5,
+
+  // MCP servers to connect to (optional)
+  "mcpServers": [
+    // Example: File system server
+    // {
+    //   "name": "filesystem",
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/directory"],
+    //   "env": {}
+    // }
+  ]
 }
 `
 

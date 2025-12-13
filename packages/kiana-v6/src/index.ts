@@ -42,7 +42,7 @@ export type {
 } from "./stream.js"
 
 // Config
-export { loadConfig, writeConfigTemplate, DEFAULT_SYSTEM_PROMPT, type Config } from "./config.js"
+export { loadConfig, writeConfigTemplate, DEFAULT_SYSTEM_PROMPT, type Config, type MCPServerConfig } from "./config.js"
 
 // Provider
 export { createLanguageModel } from "./provider.js"
@@ -87,6 +87,14 @@ export {
   getAvailableAgentTypes,
   type SubagentExecutor,
 } from "./tool/index.js"
+
+// MCP Support
+export {
+  MCPClientManager,
+  getMCPManager,
+  initializeMCPServers,
+  createMCPTool,
+} from "./tool/mcp.js"
 
 // Types
 export type {

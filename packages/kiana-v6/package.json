@@ -20,17 +20,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "ai": "beta",
     "@ai-sdk/anthropic": "beta",
+    "@ai-sdk/google": "beta",
     "@ai-sdk/openai": "beta",
     "@ai-sdk/openai-compatible": "beta",
-    "@ai-sdk/google": "beta",
-    "zod": "latest",
-    "jsonc-parser": "latest"
+    "@modelcontextprotocol/sdk": "^1.24.3",
+    "ai": "beta",
+    "jsonc-parser": "latest",
+    "zod": "latest"
   },
   "devDependencies": {
-    "typescript": "latest",
-    "@types/node": "latest"
+    "@types/node": "latest",
+    "typescript": "latest"
   },
   "engines": {
     "node": ">=20"

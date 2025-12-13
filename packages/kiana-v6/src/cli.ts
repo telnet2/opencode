@@ -20,13 +20,50 @@ import * as readline from "node:readline"
 import { loadConfig, writeConfigTemplate } from "./config.js"
 import { createLanguageModel } from "./provider.js"
 import { CodingAgent, formatSSE, type StreamPart } from "./agent.js"
+import { InteractiveInput } from "./interactive.js"
+
+/**
+ * Create a JSONL logger for stream events.
+ */
+function createLogger(logPath: string): {
+  log: (part: StreamPart) => void
+  close: () => void
+} {
+  const stream = fs.createWriteStream(logPath, { flags: "a" })
+
+  // Write session start marker
+  stream.write(JSON.stringify({
+    type: "log-start",
+    timestamp: new Date().toISOString(),
+    pid: process.pid
+  }) + "\n")
+
+  return {
+    log: (part: StreamPart) => {
+      const entry = {
+        timestamp: new Date().toISOString(),
+        ...part,
+      }
+      stream.write(JSON.stringify(entry) + "\n")
+    },
+    close: () => {
+      stream.write(JSON.stringify({
+        type: "log-end",
+        timestamp: new Date().toISOString()
+      }) + "\n")
+      stream.end()
+    },
+  }
+}
 
 // Parse command line arguments
 interface Args {
   config?: string
   prompt?: string
   session?: string
+  log?: string
   createConfig?: boolean
+  interactive: boolean
   humanReadable: boolean
   verbose: boolean
   help: boolean
@@ -34,6 +71,7 @@ interface Args {
 
 function parseArgs(argv: string[]): Args {
   const args: Args = {
+    interactive: false,
     humanReadable: false,
     verbose: false,
     help: false,
@@ -54,8 +92,16 @@ function parseArgs(argv: string[]): Args {
       case "-s":
         args.session = argv[++i]
         break
+      case "--log":
+      case "-l":
+        args.log = argv[++i]
+        break
       case "--create-config":
         args.createConfig = true
+        break
+      case "-i":
+      case "--interactive":
+        args.interactive = true
         break
       case "-H":
         args.humanReadable = true
@@ -82,29 +128,40 @@ Usage:
   kiana-v6 [options]
 
 Options:
-  --config, -c     Path to config file (default: ./kiana.jsonc)
-  --prompt, -p     Send a single prompt and exit
-  --session, -s    Session directory for persistence
-  --create-config  Generate a template config file
-  -H               Human-readable output (instead of SSE)
-  -v, --verbose    Show verbose output (tool inputs/outputs)
-  --help, -h       Show help
+  --config, -c       Path to config file (default: ./kiana.jsonc)
+  --prompt, -p       Send a single prompt and exit
+  --interactive, -i  Interactive REPL mode (Enter sends, Ctrl+J newline)
+  --session, -s      Session directory for persistence
+  --log, -l          Log all events to file (JSONL format)
+  --create-config    Generate a template config file
+  -H                 Human-readable output (instead of SSE)
+  -v, --verbose      Show verbose output (tool inputs/outputs)
+  --help, -h         Show help
 
 Examples:
-  # Run with default config (./kiana.jsonc)
+  # Interactive mode (recommended for human use)
+  kiana-v6 -i
+
+  # Interactive mode with verbose output
+  kiana-v6 -i -v
+
+  # Single prompt mode
   kiana-v6 -H -p "List all TypeScript files"
 
   # Run with a specific config
-  kiana-v6 -c config.jsonc -p "List all TypeScript files"
+  kiana-v6 -c config.jsonc -H -p "List all TypeScript files"
 
-  # Human-readable streaming output
-  kiana-v6 -H -p "Analyze this codebase"
-
-  # Interactive mode (read JSON from stdin)
+  # JSON protocol mode (read JSON from stdin)
   kiana-v6
 
   # Generate config template
   kiana-v6 --create-config > kiana.jsonc
+
+Interactive mode keybindings:
+  Enter      Send message
+  Ctrl+J     Insert newline
+  ESC ESC    Cancel current operation (double-tap within 2s)
+  Ctrl+C     Exit interactive mode
 `)
 }
 
@@ -282,6 +339,96 @@ function formatPartHumanReadable(part: StreamPart, verbose: boolean = false): st
   }
 }
 
+/**
+ * Run interactive REPL mode.
+ */
+async function runInteractive(
+  agent: CodingAgent,
+  config: ReturnType<typeof loadConfig>,
+  verbose: boolean,
+  logger?: { log: (part: StreamPart) => void; close: () => void }
+): Promise<void> {
+  const input = new InteractiveInput()
+
+  // Welcome message
+  console.log(`${colors.dim}Kiana v6 Interactive Mode`)
+  console.log(`Enter: send | Ctrl+J: newline | ESC ESC: cancel | Ctrl+C: exit${colors.reset}`)
+  console.log()
+
+  // Track streaming state for output formatting
+  let isStreaming = false
+
+  // Set up output handler for human-readable format
+  const outputPart = (part: StreamPart) => {
+    // Log to file if enabled
+    if (logger) {
+      logger.log(part)
+    }
+
+    const formatted = formatPartHumanReadable(part, verbose)
+    if (formatted) {
+      process.stdout.write(formatted)
+    }
+
+    // Update input mode based on session state
+    if (part.type === "data-session-idle") {
+      isStreaming = false
+      input.setMode("idle")
+    }
+  }
+
+  // Subscribe to stream parts
+  agent.onStream(outputPart)
+
+  // Handle submit events from input
+  input.on("submit", async (message: string) => {
+    isStreaming = true
+
+    try {
+      if (config.streaming !== false) {
+        const result = await agent.stream({ prompt: message })
+        // Consume the text stream to trigger events
+        for await (const _chunk of result.textStream) {
+          // Events are emitted via onStream callback
+        }
+        // Wait for completion
+        await result.text
+      } else {
+        await agent.generate({ prompt: message })
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      console.error(`${colors.red}Error: ${errorMsg}${colors.reset}`)
+      isStreaming = false
+      input.setMode("idle")
+    }
+  })
+
+  // Handle abort events from input
+  input.on("abort", () => {
+    agent.abort()
+    // Mode will be set to idle when data-session-idle is received
+  })
+
+  // Handle exit events from input
+  input.on("exit", async () => {
+    input.stop()
+    agent.abort()
+    await agent.cleanup()
+    if (logger) {
+      logger.close()
+    }
+    console.log(`${colors.dim}Goodbye!${colors.reset}`)
+    process.exit(0)
+  })
+
+  // Start the input handler
+  input.start()
+
+  // Keep the process running
+  await new Promise(() => {})
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv)
 
@@ -325,10 +472,46 @@ async function main(): Promise<void> {
     maxSteps: config.maxSteps,
     maxRetries: config.maxRetries,
     sessionDir: args.session,
+    mcpServers: config.mcpServers,
   })
 
-  // Set up output handler
+  // Validate conflicting flags
+  if (args.interactive && args.prompt) {
+    console.error("Error: Cannot use --prompt with --interactive")
+    process.exit(1)
+  }
+
+  // Create logger if --log specified
+  const logger = args.log ? createLogger(args.log) : undefined
+
+  // Handle signals
+  process.on("SIGINT", async () => {
+    agent.abort()
+    await agent.cleanup()
+    if (logger) logger.close()
+    process.exit(0)
+  })
+
+  process.on("SIGTERM", async () => {
+    agent.abort()
+    await agent.cleanup()
+    if (logger) logger.close()
+    process.exit(0)
+  })
+
+  // Interactive REPL mode (handles its own stream subscription)
+  if (args.interactive) {
+    await runInteractive(agent, config, args.verbose, logger)
+    return
+  }
+
+  // Set up output handler for non-interactive modes
   const outputPart = (part: StreamPart) => {
+    // Log to file if enabled
+    if (logger) {
+      logger.log(part)
+    }
+
     if (args.humanReadable) {
       const formatted = formatPartHumanReadable(part, args.verbose)
       if (formatted) {
@@ -342,17 +525,6 @@ async function main(): Promise<void> {
 
   // Subscribe to stream parts
   agent.onStream(outputPart)
-
-  // Handle signals
-  process.on("SIGINT", () => {
-    agent.abort()
-    process.exit(0)
-  })
-
-  process.on("SIGTERM", () => {
-    agent.abort()
-    process.exit(0)
-  })
 
   // If --prompt is provided, send it and exit after completion
   if (args.prompt) {
@@ -378,6 +550,8 @@ async function main(): Promise<void> {
       process.stdout.write("data: [DONE]\n\n")
     }
 
+    await agent.cleanup()
+    if (logger) logger.close()
     process.exit(0)
   }
 
@@ -438,8 +612,10 @@ async function main(): Promise<void> {
     }
   })
 
-  rl.on("close", () => {
+  rl.on("close", async () => {
     agent.abort()
+    await agent.cleanup()
+    if (logger) logger.close()
     process.exit(0)
   })
 }

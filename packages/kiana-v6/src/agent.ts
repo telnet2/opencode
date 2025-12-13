@@ -6,6 +6,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import type { Tool, ToolContext, ToolResult } from "./tool/tool.js"
 import { ALL_TOOLS, DEFAULT_TOOLS, setSubagentExecutor } from "./tool/index.js"
+import { initializeMCPServers, getMCPManager, type MCPServerConfig } from "./tool/mcp.js"
 import type { SessionInfo } from "./types/session.js"
 import type { MessageInfo } from "./types/message.js"
 import type {
@@ -96,6 +97,8 @@ export interface CodingAgentConfig {
   maxRetries?: number
   /** Session directory for persistence */
   sessionDir?: string
+  /** MCP servers to connect to */
+  mcpServers?: MCPServerConfig[]
 }
 
 export interface GenerateParams {
@@ -119,6 +122,7 @@ export class CodingAgent {
   private config: CodingAgentConfig
   private abortController: AbortController
   private streamCallbacks: Set<StreamCallback> = new Set()
+  private mcpInitialized = false
 
   constructor(config: CodingAgentConfig) {
     this.config = config
@@ -142,6 +146,39 @@ export class CodingAgent {
 
     // Setup subagent executor for Task tool
     this.setupSubagentExecutor()
+  }
+
+  /**
+   * Initialize MCP servers and add their tools
+   */
+  private async initializeMCP(): Promise<void> {
+    if (this.mcpInitialized || !this.config.mcpServers?.length) {
+      return
+    }
+
+    try {
+      const mcpTools = await initializeMCPServers(this.config.mcpServers)
+      
+      // Add MCP tools to the agent's tool set
+      for (const [name, tool] of Object.entries(mcpTools)) {
+        this.tools[name] = tool
+      }
+      
+      this.mcpInitialized = true
+    } catch (error) {
+      console.error("Failed to initialize MCP servers:", error)
+      throw error
+    }
+  }
+
+  /**
+   * Cleanup MCP connections
+   */
+  async cleanup(): Promise<void> {
+    if (this.mcpInitialized) {
+      const manager = getMCPManager()
+      await manager.disconnectAll()
+    }
   }
 
   private emit(part: StreamPart): void {
@@ -200,6 +237,9 @@ export class CodingAgent {
    * Generate a response (non-streaming) - still emits stream parts for compatibility
    */
   async generate(params: GenerateParams): Promise<{ text: string; usage?: any }> {
+    // Initialize MCP servers if configured
+    await this.initializeMCP()
+    
     const { agent, callParams, messageId } = await this.buildAgent(params)
 
     // Emit session info
@@ -238,6 +278,9 @@ export class CodingAgent {
     textStream: AsyncIterable<string>
     text: Promise<string>
   }> {
+    // Initialize MCP servers if configured
+    await this.initializeMCP()
+    
     const { agent, callParams, messageId, assistantParts } = await this.buildAgent(params)
 
     // Emit session info
@@ -622,7 +665,7 @@ export class CodingAgent {
               type: "tool-call",
               toolCallId: toolPart.callID,
               toolName: toolPart.tool,
-              input: JSON.stringify(toolPart.state.input),
+              input: toolPart.state.input,
             })
           }
 

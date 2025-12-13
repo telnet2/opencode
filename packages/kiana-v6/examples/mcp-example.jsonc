@@ -1,0 +1,88 @@
+{
+  // Example Kiana configuration with MCP support
+  "provider": {
+    "type": "anthropic",
+    "apiKey": "YOUR_API_KEY_HERE",
+    "model": "claude-sonnet-4-20250514"
+  },
+
+  // System prompt (optional)
+  "systemPrompt": null,
+
+  // Working directory
+  "workingDirectory": null,
+
+  // Tools whitelist (optional, null = all tools)
+  "tools": null,
+
+  // Maximum steps
+  "maxSteps": 50,
+
+  // Maximum retries
+  "maxRetries": 5,
+
+  // MCP Servers
+  // Uncomment and configure the servers you want to use
+  "mcpServers": [
+    // Example: Filesystem access
+    // This gives the AI access to files in a specific directory
+    // {
+    //   "name": "filesystem",
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/directory"],
+    //   "env": {}
+    // },
+
+    // Example: GitHub access
+    // Get a token from https://github.com/settings/tokens
+    // {
+    //   "name": "github",
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-github"],
+    //   "env": {
+    //     "GITHUB_TOKEN": "ghp_your_token_here"
+    //   }
+    // },
+
+    // Example: Google Drive access
+    // {
+    //   "name": "gdrive",
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-gdrive"],
+    //   "env": {
+    //     "GOOGLE_CLIENT_ID": "your-client-id",
+    //     "GOOGLE_CLIENT_SECRET": "your-client-secret"
+    //   }
+    // },
+
+    // Example: PostgreSQL database
+    // {
+    //   "name": "postgres",
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://user:pass@localhost:5432/dbname"],
+    //   "env": {}
+    // },
+
+    // Example: Brave Search
+    // Get a key from https://brave.com/search/api/
+    // {
+    //   "name": "brave-search",
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+    //   "env": {
+    //     "BRAVE_API_KEY": "your-api-key"
+    //   }
+    // },
+
+    // Example: Slack
+    // {
+    //   "name": "slack",
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-slack"],
+    //   "env": {
+    //     "SLACK_BOT_TOKEN": "xoxb-your-token",
+    //     "SLACK_TEAM_ID": "T01234567"
+    //   }
+    // }
+  ]
+}
