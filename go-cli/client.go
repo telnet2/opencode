@@ -15,6 +15,7 @@ type SimpleClient struct {
     api       *opencode.Client
     sessionID string
     cancel    context.CancelFunc
+    renderer  *Renderer
 }
 
 func newSimpleClient(cfg ResolvedConfig, renderer *Renderer) (*SimpleClient, error) {
@@ -44,7 +45,9 @@ func newSimpleClient(cfg ResolvedConfig, renderer *Renderer) (*SimpleClient, err
         }
         sessionID = created.ID
         cached = &SessionStateEntry{SessionID: sessionID, Model: cfg.Model, Provider: cfg.Provider, Agent: cfg.Agent, UpdatedAt: time.Now().UnixMilli()}
-        persistSessionState(cfg, *cached)
+        if err := persistSessionState(cfg, *cached); err != nil {
+            renderer.Trace("state persistence failed", map[string]any{"error": err.Error()})
+        }
     }
 
     renderer.Trace("session", map[string]any{"sessionID": sessionID})
@@ -61,7 +64,7 @@ func newSimpleClient(cfg ResolvedConfig, renderer *Renderer) (*SimpleClient, err
         }
     }()
 
-    return &SimpleClient{api: client, sessionID: sessionID, cancel: cancel}, nil
+    return &SimpleClient{api: client, sessionID: sessionID, cancel: cancel, renderer: renderer}, nil
 }
 
 func (c *SimpleClient) Close() {
@@ -96,19 +99,22 @@ func (c *SimpleClient) SendPrompt(ctx context.Context, text string, cfg Resolved
         return nil, err
     }
 
-    persistSessionState(cfg, SessionStateEntry{
+    if err := persistSessionState(cfg, SessionStateEntry{
         SessionID: c.sessionID,
         Model:     cfg.Model,
         Provider:  cfg.Provider,
         Agent:     cfg.Agent,
         UpdatedAt: time.Now().UnixMilli(),
-    })
+    }); err != nil {
+        c.renderer.Trace("state persistence failed", map[string]any{"error": err.Error()})
+    }
 
     return resp, nil
 }
 
 func handleEvent(evt opencode.EventListResponse, sessionID string, renderer *Renderer) {
     switch v := evt.AsUnion().(type) {
+    // Message events
     case opencode.EventListResponseEventMessageUpdated:
         if v.Properties.Info.SessionID == sessionID {
             renderer.RenderMessage(v.Properties.Info.ID, v.Properties.Info.Role == opencode.MessageRoleAssistant, nil)
@@ -116,6 +122,36 @@ func handleEvent(evt opencode.EventListResponse, sessionID string, renderer *Ren
     case opencode.EventListResponseEventMessagePartUpdated:
         if v.Properties.Part.SessionID == sessionID {
             renderer.RenderPart(v.Properties.Part)
+        }
+    case opencode.EventListResponseEventMessageRemoved:
+        if v.Properties.SessionID == sessionID {
+            renderer.Trace("message.removed", map[string]any{"messageID": v.Properties.MessageID})
+        }
+    case opencode.EventListResponseEventMessagePartRemoved:
+        if v.Properties.SessionID == sessionID {
+            renderer.Trace("message.part.removed", map[string]any{"partID": v.Properties.PartID})
+        }
+
+    // Session lifecycle events
+    case opencode.EventListResponseEventSessionCreated:
+        if v.Properties.Info.ID == sessionID {
+            renderer.Trace("session.created", map[string]any{"sessionID": v.Properties.Info.ID})
+        }
+    case opencode.EventListResponseEventSessionUpdated:
+        if v.Properties.Info.ID == sessionID {
+            renderer.Trace("session.updated", map[string]any{"sessionID": v.Properties.Info.ID})
+        }
+    case opencode.EventListResponseEventSessionDeleted:
+        if v.Properties.Info.ID == sessionID {
+            renderer.Trace("session.deleted", map[string]any{"sessionID": v.Properties.Info.ID})
+        }
+    case opencode.EventListResponseEventSessionIdle:
+        if v.Properties.SessionID == sessionID {
+            renderer.Trace("session.idle", nil)
+        }
+    case opencode.EventListResponseEventSessionError:
+        if v.Properties.SessionID == sessionID {
+            renderer.SessionError(string(v.Properties.Error.Name))
         }
     }
 }

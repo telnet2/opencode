@@ -2,6 +2,7 @@ package main
 
 import (
     "encoding/json"
+    "fmt"
     "os"
     "path/filepath"
 )
@@ -56,16 +57,19 @@ func loadSessionState(cfg ResolvedConfig) *SessionStateEntry {
     return nil
 }
 
-func persistSessionState(cfg ResolvedConfig, entry SessionStateEntry) {
+func persistSessionState(cfg ResolvedConfig, entry SessionStateEntry) error {
     st := readState(cfg.SessionFile)
     st.Sessions[entry.SessionID] = entry
     st.LastSessionID = entry.SessionID
     if err := ensureDir(cfg.SessionFile); err != nil {
-        return
+        return fmt.Errorf("failed to create state directory: %w", err)
     }
     data, err := json.MarshalIndent(st, "", "  ")
     if err != nil {
-        return
+        return fmt.Errorf("failed to marshal state: %w", err)
     }
-    _ = os.WriteFile(cfg.SessionFile, data, 0o644)
+    if err := os.WriteFile(cfg.SessionFile, data, 0o644); err != nil {
+        return fmt.Errorf("failed to write state file: %w", err)
+    }
+    return nil
 }

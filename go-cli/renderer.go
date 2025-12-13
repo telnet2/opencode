@@ -11,8 +11,9 @@ import (
 
 // Renderer mirrors the TS renderer to show conversation progress.
 type Renderer struct {
-    opts rendererOptions
-    c    *color.Color
+    opts             rendererOptions
+    c                *color.Color
+    renderedMessages map[string]bool // track messages already rendered to avoid duplicates
 }
 
 type rendererOptions struct {
@@ -31,7 +32,8 @@ func NewRenderer(cfg ResolvedConfig) *Renderer {
             JSON:    cfg.JSON,
             Verbose: cfg.Verbose,
         },
-        c: color.New(color.FgCyan),
+        c:                color.New(color.FgCyan),
+        renderedMessages: make(map[string]bool),
     }
 }
 
@@ -78,6 +80,15 @@ func (r *Renderer) Trace(msg string, details map[string]any) {
     }
 }
 
+func (r *Renderer) SessionError(message string) {
+    if r.opts.JSON {
+        b, _ := json.Marshal(map[string]string{"type": "session_error", "error": message})
+        fmt.Println(string(b))
+        return
+    }
+    fmt.Fprintln(os.Stderr, color.New(color.FgRed).Sprintf("session error: %s", message))
+}
+
 func (r *Renderer) Tool(part opencode.ToolPart) {
     summary := describeToolState(part.State)
     if r.opts.JSON {
@@ -104,6 +115,16 @@ func (r *Renderer) Tool(part opencode.ToolPart) {
     }
 }
 
+// MarkRendered marks a message as having been fully rendered (to avoid duplicate event rendering)
+func (r *Renderer) MarkRendered(messageID string) {
+    r.renderedMessages[messageID] = true
+}
+
+// WasRendered checks if a message was already rendered
+func (r *Renderer) WasRendered(messageID string) bool {
+    return r.renderedMessages[messageID]
+}
+
 func (r *Renderer) RenderMessage(messageID string, isAssistant bool, parts []opencode.Part) {
     var textParts []string
     for _, p := range parts {
@@ -116,7 +137,9 @@ func (r *Renderer) RenderMessage(messageID string, isAssistant bool, parts []ope
     }
     if len(textParts) > 0 {
         r.Assistant(joinLines(textParts))
-    } else if isAssistant {
+        r.MarkRendered(messageID) // Mark as rendered when we output actual content
+    } else if isAssistant && !r.WasRendered(messageID) {
+        // Only show "message updated" if we haven't already rendered this message with content
         r.Assistant(fmt.Sprintf("message %s updated", messageID))
     }
 }

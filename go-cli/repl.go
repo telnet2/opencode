@@ -6,6 +6,8 @@ import (
     "fmt"
     "os"
     "strings"
+
+    opencode "github.com/sst/opencode-sdk-go"
 )
 
 func buildPrompt() string {
@@ -83,6 +85,6 @@ func runRepl(cfg *ResolvedConfig, client *SimpleClient, renderer *Renderer) erro
             fmt.Fprintf(os.Stderr, "Failed to send prompt: %v\n", err)
             continue
         }
-        renderer.RenderMessage(resp.Info.ID, true, resp.Parts)
+        renderer.RenderMessage(resp.Info.ID, resp.Info.Role == opencode.AssistantMessageRoleAssistant, resp.Parts)
     }
 }
