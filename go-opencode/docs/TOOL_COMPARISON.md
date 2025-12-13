@@ -35,6 +35,14 @@ This document compares the built-in tools provided by the TypeScript OpenCode se
 | Concurrency safety | Uses file-time assertions before overwriting existing files. | No stale-write protection. | Potential race/stale edits in Go compared to TS safeguards.【F:packages/opencode/src/tool/write.ts†L53-L56】
 | Post-write metadata | Returns LSP diagnostics and file metadata; triggers bus event and file-time tracking. | Returns byte count plus before/after snapshots, diff text, and addition/deletion totals; publishes file-edited event. | Go adds diff-oriented metadata but still lacks diagnostics feedback and file-time updates.【F:packages/opencode/src/tool/write.ts†L71-L97】【F:go-opencode/internal/tool/write.go†L71-L105】
 
+## Todo Tools (`todowrite` / `todoread`)
+
+| Aspect | TypeScript | Go | Notes |
+| --- | --- | --- | --- |
+| Write semantics | Accepts an array of todo items (id/content/status/priority) and persists them to storage while publishing a `todo.updated` event; returns the remaining-count title, JSON output, and metadata echo. | Uses the same required fields, stores todos directly, publishes `todo.updated`, and returns matching count/title/output/metadata. | Core behavior is effectively in parity; Go’s implementation mirrors the TypeScript shape and event emission.【F:packages/opencode/src/tool/todo.ts†L6-L37】【F:packages/opencode/src/session/todo.ts†L7-L36】【F:go-opencode/internal/tool/todowrite.go†L65-L151】
+| Read semantics | Loads the current session’s todos (defaulting to `[]`), returns the remaining-count title plus JSON/metadata echo. | Reads todos from storage (defaulting to `[]`), returns the remaining-count title plus JSON/metadata echo. | Behavior matches, including the completed/non-completed counting and metadata echo.【F:packages/opencode/src/tool/todo.ts†L26-L37】【F:go-opencode/internal/tool/todoread.go†L40-L66】
+| Guidance & guardrails | Minimal runtime guidance; usage expectations live in prompts and `todowrite.txt`. | Bundles extensive “when to use”/state-management instructions directly in the tool description. | Go surfaces richer operator guidance via the tool description, but runtime behavior remains aligned.【F:go-opencode/internal/tool/todowrite.go†L14-L57】
+
 ## List/LS Tool
 
 | Aspect | TypeScript (`list`) | Go (`list`) | Notes |
