@@ -120,6 +120,9 @@ func DefaultRegistry(workDir string, store *storage.Storage) *Registry {
 	r.Register(NewTodoWriteTool(workDir, store))
 	r.Register(NewTodoReadTool(workDir, store))
 
+	// Register batch tool for parallel execution
+	r.Register(NewBatchTool(workDir, r))
+
 	// Note: TaskTool requires agent registry, register separately using RegisterTaskTool
 
 	fmt.Printf("[registry] DefaultRegistry created with %d tools: %v\n", len(r.tools), r.IDs())
